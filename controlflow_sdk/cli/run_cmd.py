@@ -46,7 +46,7 @@ def run_cmd(args: argparse.Namespace) -> int:
     # ── Load project ──────────────────────────────────────────────────────────
     try:
         project = Project.load(root)
-    except (FileNotFoundError, Exception) as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
         print(f"ERROR loading project at {root}: {exc}", file=sys.stderr)
         return 1
 
