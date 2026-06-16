@@ -112,6 +112,68 @@ class TestRenderMarkdown:
         md = render_markdown(workpaper)
         assert "100" in md
 
+    def test_pipe_and_newline_in_violation_escaped(self) -> None:
+        """Pipe in item_key and newline in description must not break the table row."""
+        from controlflow_sdk.model.run import RunRecord
+        from controlflow_sdk.model.violation import Severity, Violation
+        from controlflow_sdk.model.workpaper import Procedure, Workpaper
+
+        run = RunRecord(
+            control_id="ctrl-x",
+            executed_at="2026-06-16T00:00:00Z",
+            population_size=10,
+            violations=[
+                Violation(
+                    item_key="INV|002",
+                    description="First line\nSecond line",
+                    severity=Severity.HIGH,
+                ),
+            ],
+            provenance=[],
+        )
+        procedure = Procedure(
+            title="Pipe Test",
+            narrative="Testing escape.",
+            test_code="pass",
+            result=run,
+        )
+        wp = Workpaper(
+            control_id="ctrl-x",
+            title="Pipe Test WP",
+            objective="Test pipe escaping.",
+            narrative="N/A",
+            framework_refs={"nist": [], "extra": {}},
+            procedures=[procedure],
+            generated_at="2026-06-16T00:00:00Z",
+        )
+
+        md = render_markdown(wp)
+
+        # Find the violations table row
+        rows = [line for line in md.splitlines() if "INV" in line]
+        assert len(rows) == 1, "Violation must render as exactly one table row"
+        row = rows[0]
+
+        # Pipe in item_key must be escaped as \|
+        assert "INV\\|002" in row
+
+        # The row must not contain a bare (unescaped) pipe inside a cell value.
+        # We verify this by checking that every "|" in the row is either a cell
+        # delimiter or part of the escape sequence "\|" — i.e. no lone "|" that
+        # isn't preceded by "\".  A simpler structural check: after replacing
+        # all escaped pipes with a placeholder, the remaining "|" count must
+        # equal the number of column delimiters for a 3-column table (4 pipes:
+        # "| col1 | col2 | col3 |").
+        row_no_escaped = row.replace("\\|", "ESCAPED_PIPE")
+        assert row_no_escaped.count("|") == 4, (
+            f"Expected 4 delimiter pipes after removing escaped pipes, "
+            f"got {row_no_escaped.count('|')}: {row!r}"
+        )
+
+        # Newline in description must be collapsed to a space
+        assert "\n" not in row
+        assert "First line Second line" in row
+
 
 # ── render_html tests ─────────────────────────────────────────────────────────
 

@@ -12,6 +12,18 @@ if TYPE_CHECKING:
     from controlflow_sdk.model.workpaper import Workpaper
 
 
+def _md_cell(text: object) -> str:
+    """Make a value safe to place inside a Markdown table cell."""
+    s = str(text)
+    return (
+        s.replace("\\", "\\\\")
+        .replace("|", "\\|")
+        .replace("\r\n", " ")
+        .replace("\n", " ")
+        .replace("\r", " ")
+    )
+
+
 def render_markdown(wp: Workpaper) -> str:
     """Return a Markdown string representing the full audit workpaper.
 
@@ -78,10 +90,10 @@ def render_markdown(wp: Workpaper) -> str:
         lines.append("")
         lines.append("| Metric | Value |")
         lines.append("| --- | --- |")
-        lines.append(f"| Population | {run.population_size} |")
-        lines.append(f"| Passed | {run.passed} |")
-        lines.append(f"| Failed | {run.failed} |")
-        lines.append(f"| Pass Rate | {run.pass_rate}% |")
+        lines.append(f"| Population | {_md_cell(run.population_size)} |")
+        lines.append(f"| Passed | {_md_cell(run.passed)} |")
+        lines.append(f"| Failed | {_md_cell(run.failed)} |")
+        lines.append(f"| Pass Rate | {_md_cell(run.pass_rate)}% |")
         lines.append("")
 
         # Violations table
@@ -91,7 +103,10 @@ def render_markdown(wp: Workpaper) -> str:
             lines.append("| Item Key | Severity | Description |")
             lines.append("| --- | --- | --- |")
             for v in run.violations:
-                lines.append(f"| {v.item_key} | {v.severity} | {v.description} |")
+                key = _md_cell(v.item_key)
+                sev = _md_cell(v.severity)
+                desc = _md_cell(v.description)
+                lines.append(f"| {key} | {sev} | {desc} |")
             lines.append("")
 
         # Provenance block
