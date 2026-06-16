@@ -11,14 +11,20 @@ new control <slug> [--dir <dir>]
 validate [dir]
     Load the project, validate all controls, and report results.
     Exits 0 if all controls are valid, 1 if any are invalid.
+
+run [dir] [--control <id>] [--at <iso8601>]
+    Execute all controls (or one) and write workpaper + evidence outputs.
+    Exits 0 if all controls completed, 1 if any errored.
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
+from controlflow_sdk.cli.run_cmd import run_cmd
 from controlflow_sdk.cli.scaffold import scaffold_control, scaffold_project
 from controlflow_sdk.project import ProjectError, load_sources
 from controlflow_sdk.schema.validate import validate_control
@@ -143,6 +149,30 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Project root directory (default: current directory).",
     )
 
+    # -- run -----------------------------------------------------------------
+    run_p = sub.add_parser(
+        "run",
+        help="Execute controls and write workpaper + evidence outputs.",
+    )
+    run_p.add_argument(
+        "dir",
+        nargs="?",
+        default=".",
+        help="Project root directory (default: current directory).",
+    )
+    run_p.add_argument(
+        "--control",
+        default=None,
+        metavar="<id>",
+        help="Run only the control with this id (default: run all).",
+    )
+    run_p.add_argument(
+        "--at",
+        default=None,
+        metavar="<iso8601>",
+        help="Execution timestamp in ISO-8601 format (default: current UTC time).",
+    )
+
     return parser
 
 
@@ -170,6 +200,11 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_new(args)
     if args.command == "validate":
         return _cmd_validate(args)
+    if args.command == "run":
+        # Clock boundary: inject current UTC time only when --at is not supplied.
+        if args.at is None:
+            args.at = datetime.now(UTC).isoformat()
+        return run_cmd(args)
 
     parser.print_help()
     return 2
