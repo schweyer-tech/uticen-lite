@@ -1,0 +1,7 @@
+id: SLUG
+title: SLUG Control
+objective: Describe what this control is designed to achieve.
+narrative: >
+  Describe the control procedure in detail. Include who performs it,
+  how often, and how exceptions are identified and resolved.
+sources: []

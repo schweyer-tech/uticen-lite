@@ -1,0 +1,7 @@
+name: My Audit Project
+framework: NIST SP 800-53
+system:
+  name: Target System
+  description: Description of the system under audit
+defaults:
+  severity: medium
