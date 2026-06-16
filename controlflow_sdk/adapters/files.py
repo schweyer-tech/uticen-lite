@@ -8,8 +8,8 @@ pure-Python core modules.
 from __future__ import annotations
 
 import hashlib
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -96,6 +96,8 @@ class CsvSource(Source):
         self._binding = binding
         self._root = root
         self._path: Path = root / binding.config["path"]
+        # Populated by load(); provenance() falls back to parsing if not yet set.
+        self._row_count: int | None = None
 
     # ------------------------------------------------------------------
     # Source interface
@@ -140,22 +142,33 @@ class CsvSource(Source):
             )
 
         result_df = pd.DataFrame(kept_series)
+        self._row_count = len(result_df)
         return Population(df=result_df, columns=columns, source_id=self._binding.id)
 
     def provenance(self) -> dict[str, Any]:
-        """Return file path, SHA-256 digest of raw bytes, and row count."""
+        """Return file path, SHA-256 digest of raw bytes, and row count.
+
+        ``sha256`` is computed from the raw file bytes (integrity of the
+        original file).  ``row_count`` reflects the number of DATA rows
+        actually parsed by pandas — it equals ``len(df)`` and correctly
+        handles quoted fields that contain embedded newlines, trailing
+        newlines, or any other formatting artefact that would fool a naive
+        line-count approach.
+
+        If :meth:`load` has already been called the cached count is reused;
+        otherwise the file is parsed once to obtain the count.
+        """
         raw_bytes = self._path.read_bytes()
         sha256 = hashlib.sha256(raw_bytes).hexdigest()
 
-        # Row count: count non-empty lines, then subtract 1 for the header.
-        # Split on newlines and filter out empty strings (covers trailing newline).
-        lines = [ln for ln in raw_bytes.split(b"\n") if ln]
-        row_count = max(len(lines) - 1, 0)  # subtract 1 for the header row
+        if self._row_count is None:
+            # load() hasn't been called yet — parse minimally just to count rows.
+            self._row_count = len(pd.read_csv(self._path, dtype=str))
 
         return {
             "path": str(self._path),
             "sha256": sha256,
-            "row_count": row_count,
+            "row_count": self._row_count,
         }
 
 

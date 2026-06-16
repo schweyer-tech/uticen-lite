@@ -202,9 +202,49 @@ class TestCsvSourceProvenance:
         assert len(sha) == 64
         assert all(c in "0123456789abcdef" for c in sha)
 
-    def test_row_count_equals_3(self) -> None:
+    def test_row_count_equals_data_rows_not_raw_lines(self) -> None:
+        """row_count must equal the number of parsed data rows (3), not raw newline count."""
         prov = self.src.provenance()
         assert prov["row_count"] == 3
+
+    def test_row_count_with_embedded_newline_in_quoted_field(self, tmp_path: Path) -> None:
+        """A quoted field containing an embedded newline must still count as ONE data row."""
+        # Three data rows; the second has a quoted description field with a newline inside.
+        csv_content = (
+            'entry_id,account,amount,posted_date\n'
+            'GL-001,1000,150.00,2024-01-15\n'
+            '"GL-002","description\nwith newline",75.00,2024-01-16\n'
+            'GL-003,2000,300.00,2024-01-17\n'
+        )
+        csv_file = tmp_path / "embedded.csv"
+        csv_file.write_text(csv_content)
+
+        # Minimal binding — only the columns present in this fixture.
+        mappings = [
+            {"original_name": "entry_id", "display_name": "Entry ID", "data_type": "text",
+             "is_key": True, "include": True},
+            {"original_name": "account", "display_name": "Account", "data_type": "text",
+             "is_key": False, "include": True},
+            {"original_name": "amount", "display_name": "Amount", "data_type": "number",
+             "is_key": False, "include": True},
+            {"original_name": "posted_date", "display_name": "Posted Date", "data_type": "date",
+             "is_key": False, "include": True},
+        ]
+        binding = SourceBinding(
+            id="embedded",
+            type="file",
+            config={"format": "csv", "path": "embedded.csv"},
+            key_config={"type": "single", "columns": ["entry_id"]},
+            column_mappings=mappings,
+        )
+        src = source_for(binding, tmp_path)
+        prov = src.provenance()
+
+        # The raw file has 5 newlines (header + 3 data lines + embedded) but only 3 data rows.
+        assert prov["row_count"] == 3, (
+            f"Expected 3 data rows but got {prov['row_count']}; "
+            "raw line-count would incorrectly return 4"
+        )
 
 
 # ---------------------------------------------------------------------------
