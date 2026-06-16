@@ -92,11 +92,68 @@ This checks:
 - Data source paths are readable
 - Output violations match the expected shape
 
+### 4. Run the control
+
+Once your control is authored and passes validation, execute it against the full population:
+
+```bash
+cflow run
+```
+
+This will:
+1. Load your control and all bound data sources
+2. Execute your `test()` function against **the complete population** (no sampling)
+3. Write three types of output to the `target/` directory:
+   - Markdown workpapers: `target/workpapers/<control-id>.md`
+   - HTML workpapers: `target/workpapers/<control-id>.html` (open in browser)
+   - Violation evidence: `target/evidence/<control-id>-violations.json`
+   - Immutable run log: `target/run-log.json` (JSONL, append-only)
+
+#### Output Directory Structure
+
+```
+target/
+├── workpapers/           # Ready-to-share, signed workpapers
+│   ├── CTL-001.md        # Markdown (portable, git-friendly)
+│   └── CTL-001.html      # HTML (open in browser, styled)
+├── evidence/             # Raw violation data
+│   └── CTL-001-violations.json  # JSON array of violations
+└── run-log.json          # Immutable JSONL ledger of all runs
+```
+
+#### Run Provenance & Reproducibility
+
+Every run records:
+- **Execution timestamp** (`executed_at`) — ISO-8601, immutable
+- **Data provenance** — sha256 hash + row count for each bound data source
+- **Run ID** — deterministic 16-char identifier (derived from control ID, timestamp, and data hashes)
+
+This ensures every execution is:
+- **Auditable** — know exactly what data was tested
+- **Reproducible** — same inputs always yield the same run ID
+- **Traceable** — full history in `target/run-log.json`
+
+#### Running a Single Control
+
+To run only one control, use `--control`:
+
+```bash
+cflow run --control CTL-001
+```
+
+#### Custom Execution Timestamp
+
+By default, `cflow run` uses the current UTC time. To specify a fixed timestamp (e.g., for testing or historical runs):
+
+```bash
+cflow run --at 2026-06-16T14:30:00Z
+```
+
 ## Features Roadmap
 
-- **Phase 1 (current):** Control authoring, validation, project discovery
-- **Phase 2:** `cflow run` — execute tests against live or local data
-- **Phase 3:** `cflow build` — package and export audit-grade workpapers for ControlFlow import
+- **Phase 1:** Control authoring, validation, project discovery ✓
+- **Phase 2 (current):** `cflow run` — execute tests against full populations, write provenanced workpapers ✓
+- **Phase 3:** `cflow build` — package and export importable bundles for ControlFlow (not yet available)
 
 ## API Reference
 
