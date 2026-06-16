@@ -1,0 +1,99 @@
+name: Release
+
+# Triggered automatically on v* tags to build + verify the distributable.
+# The publish step ONLY runs when a human explicitly triggers workflow_dispatch
+# and the PYPI_API_TOKEN secret is available — it NEVER publishes on a plain
+# push or tag push alone.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish to PyPI? (requires PYPI_API_TOKEN secret)"
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  build-and-check:
+    name: Build & verify distributable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build + twine
+        run: pip install build twine
+
+      - name: Build wheel and sdist
+        run: python -m build
+
+      - name: twine check
+        run: twine check dist/*
+
+      - name: Smoke-test wheel import
+        run: |
+          pip install dist/*.whl
+          python -c "import controlflow_sdk; from controlflow_sdk import Violation; print('wheel import OK')"
+
+      - name: Confirm no compiled deps in wheel
+        run: |
+          python - <<'EOF'
+          import zipfile, sys
+          whl = next(__import__('pathlib').Path('dist').glob('*.whl'))
+          with zipfile.ZipFile(whl) as z:
+              record = z.read(next(n for n in z.namelist() if n.endswith('/RECORD'))).decode()
+          bad = [l for l in record.splitlines() if 'pydantic' in l.lower()]
+          if bad:
+              print('ERROR: pydantic found in wheel RECORD:', bad, file=sys.stderr)
+              sys.exit(1)
+          print('No pydantic/pydantic_core in wheel RECORD — Pyodide-safe OK')
+          EOF
+
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.ref_name }}
+          path: dist/
+          retention-days: 30
+
+  publish:
+    name: Publish to PyPI (MANUAL + TOKEN-GATED)
+    needs: build-and-check
+    runs-on: ubuntu-latest
+    # This job is EXPLICITLY GATED — it runs only when:
+    #   1. The workflow was triggered via workflow_dispatch (manual human action), AND
+    #   2. The operator set publish=true in the dispatch inputs.
+    # It NEVER runs on an automatic tag push alone.
+    if: >
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.publish == 'true'
+    environment:
+      name: pypi
+      url: https://pypi.org/project/controlflow-sdk/
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build
+        run: pip install build
+
+      - name: Rebuild wheel and sdist
+        run: python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # PYPI_API_TOKEN must be set in the repository secrets.
+          # If the secret is absent the publish step fails safely — it does NOT fall
+          # back to any other credential or upload path.
+          password: ${{ secrets.PYPI_API_TOKEN }}
