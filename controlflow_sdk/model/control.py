@@ -103,6 +103,11 @@ class SourceBinding:
 
     ``to_data_source()`` maps to the app's ``data_sources`` shape (the subset
     the app cares about): ``{type, key_config, column_mappings}``.
+
+    ``description`` and ``completeness_accuracy`` are optional, author-supplied
+    audit prose — a one-line description of the extract and a Completeness &
+    Accuracy assertion. They surface in the rendered workpaper's Data Sources
+    section; when absent the renderer derives a default C&A line from the tie-out.
     """
 
     id: str
@@ -110,6 +115,8 @@ class SourceBinding:
     config: dict[str, Any]
     key_config: dict[str, Any]
     column_mappings: list[dict[str, Any]]
+    description: str | None = None
+    completeness_accuracy: str | None = None
 
     def to_data_source(self) -> dict[str, Any]:
         """Return the app ``data_sources`` shape (type + key_config + column_mappings only)."""

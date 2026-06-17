@@ -17,6 +17,14 @@
             "type": "string",
             "description": "Unique source identifier matching references in control docs."
           },
+          "description": {
+            "type": "string",
+            "description": "Optional one-line description of the extract, shown in the workpaper's Data Sources section."
+          },
+          "completeness_accuracy": {
+            "type": "string",
+            "description": "Optional Completeness & Accuracy assertion for the extract, shown in the workpaper's Data Sources section."
+          },
           "type": {
             "type": "string",
             "description": "Source type (e.g. file, s3, snowflake, rest).",

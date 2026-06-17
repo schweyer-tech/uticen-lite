@@ -54,6 +54,10 @@ class DataSample:
     rows so the HTML renderer can embed an interactive data table.  ``total_rows``
     is the *full* row count, so the renderer can show "first 500 of N" when capped.
 
+    ``description`` and ``completeness_accuracy`` carry the author-supplied
+    Data Sources prose (threaded from the bound source) so the renderer can show
+    a Description line and a Completeness & Accuracy assertion per source.
+
     This is **render-only**: it is never serialised into the import bundle (the
     bundle keeps its no-raw-rows trust boundary).
     """
@@ -63,6 +67,8 @@ class DataSample:
     columns: list[str]
     rows: list[list[str]] = field(default_factory=list)
     total_rows: int = 0
+    description: str | None = None
+    completeness_accuracy: str | None = None
 
     @property
     def capped(self) -> bool:

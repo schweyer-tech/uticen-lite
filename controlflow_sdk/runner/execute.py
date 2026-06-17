@@ -26,13 +26,15 @@ class RunnerError(Exception):
     """Wraps author-code failures with the control id and an original traceback summary."""
 
 
-def _sample_from_population(pop: Population, path: str) -> DataSample:
+def _sample_from_population(pop: Population, path: str, binding: SourceBinding) -> DataSample:
     """Build a capped, render-only :class:`DataSample` from a loaded population.
 
     Columns are the population's *included* columns' display names; rows are the
     first :data:`MAX_SAMPLE_ROWS` rows, every cell stringified (the renderer
     HTML-escapes them).  ``total_rows`` records the full population size so the
-    renderer can show "first 500 of N" when capped.
+    renderer can show "first 500 of N" when capped.  The bound source's optional
+    ``description`` / ``completeness_accuracy`` prose is threaded through for the
+    renderer's Data Sources section.
     """
     cols = [c for c in pop.columns if c.include]
     display_names = [c.display_name for c in cols]
@@ -49,6 +51,8 @@ def _sample_from_population(pop: Population, path: str) -> DataSample:
         columns=display_names,
         rows=rows,
         total_rows=pop.size,
+        description=binding.description,
+        completeness_accuracy=binding.completeness_accuracy,
     )
 
 
@@ -239,5 +243,5 @@ def collect_data_samples(
         adapter = source_for(src_binding, root)
         pop = adapter.load()
         path = adapter.provenance()["path"]
-        samples.append(_sample_from_population(pop, path))
+        samples.append(_sample_from_population(pop, path, src_binding))
     return samples
