@@ -1,6 +1,8 @@
 sources:
   - id: journal_entries
     type: file
+    description: General-ledger journal entry register for the period.
+    completeness_accuracy: Extracted directly from the GL; total entry count reconciled to the trial-balance posting count.
     config:
       path: data/journal_entries.csv
       format: csv
@@ -44,6 +46,8 @@ sources:
 
   - id: closed_periods
     type: file
+    description: Accounting calendar listing each fiscal period and its open/closed status.
+    completeness_accuracy: Pulled from the period-close control table; status confirmed against the month-end close checklist for every period in scope.
     config:
       path: data/closed_periods.csv
       format: csv
@@ -63,6 +67,8 @@ sources:
 
   - id: purchase_orders
     type: file
+    description: Purchase order register covering all POs raised in the period.
+    completeness_accuracy: Exported from the procurement system; PO count and total value reconciled to the open/closed PO aging report.
     config:
       path: data/purchase_orders.csv
       format: csv
@@ -94,6 +100,8 @@ sources:
 
   - id: invoices
     type: file
+    description: Vendor invoice register for goods and services received in the period.
+    completeness_accuracy: Extracted from accounts payable; invoice count and total reconciled to the AP subledger control account.
     config:
       path: data/invoices.csv
       format: csv
@@ -125,6 +133,8 @@ sources:
 
   - id: payments
     type: file
+    description: Disbursement register of all vendor payments made in the period.
+    completeness_accuracy: Drawn from the cash disbursements journal; payment count and total tied to the bank statement clearings for the period.
     config:
       path: data/payments.csv
       format: csv
@@ -164,6 +174,8 @@ sources:
 
   - id: employees
     type: file
+    description: HR master roster of active and terminated employees for the period.
+    completeness_accuracy: Sourced from the HRIS system of record; headcount reconciled to the payroll register for the period.
     config:
       path: data/employees.csv
       format: csv
@@ -195,6 +207,8 @@ sources:
 
   - id: access_accounts
     type: file
+    description: System access account listing with role, privilege, and MFA attributes.
+    completeness_accuracy: Generated from the identity provider's full account export; account count reconciled to the IAM directory total at extract time.
     config:
       path: data/access_accounts.csv
       format: csv
@@ -242,6 +256,8 @@ sources:
 
   - id: vendor_master
     type: file
+    description: Vendor master file of all approved suppliers and their maintenance attributes.
+    completeness_accuracy: Extracted from the vendor master in full; record count reconciled to the approved-vendor list maintained by procurement.
     config:
       path: data/vendor_master.csv
       format: csv
