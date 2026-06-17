@@ -151,6 +151,28 @@ Each violation dict shape:
 }
 ```
 
+### Joining across sources
+
+A control bound to multiple sources can declare a second parameter, `sources`,
+a dict of every bound source keyed by the `id` you gave it in `sources.yaml`
+(the primary is included). `pop` is still the first bound source.
+
+```python
+def test(pop, sources):
+    payments = pop.df                       # primary source
+    invoices = sources["invoices"].df       # other bound sources, by id
+    pos      = sources["purchase_orders"].df
+    merged = payments.merge(invoices, on="invoice_id").merge(pos, on="po_id")
+    return [
+        {"item_key": r.payment_id, "description": "no matching approved PO",
+         "severity": "high", "details": {"amount": r.amount_x}}
+        for r in merged.itertuples() if r.status != "approved"
+    ]
+```
+
+Single-argument `def test(pop)` is unchanged — the `sources` dict is only
+passed when your function declares it.
+
 ### 4. Validate the control
 
 ```bash
