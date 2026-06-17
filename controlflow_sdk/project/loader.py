@@ -104,6 +104,7 @@ def load_sources(root: Path) -> dict[str, SourceBinding]:
             column_mappings=[dict(cm) for cm in src.get("column_mappings") or []],
             description=src.get("description"),
             completeness_accuracy=src.get("completeness_accuracy"),
+            extract_date=src.get("extract_date"),
         )
         result[binding.id] = binding
 

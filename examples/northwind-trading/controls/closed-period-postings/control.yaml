@@ -1,4 +1,4 @@
-id: closed-period-postings
+id: Finance.GL.2
 title: Closed Accounting Period Posting Detection
 objective: >
   Detect journal entries that were posted to accounting periods that have

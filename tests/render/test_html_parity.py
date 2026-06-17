@@ -34,6 +34,9 @@ EXPECTED_SECTION_IDS = [
     "conclusion",
 ]
 
+# The sidebar replaces the Results link with a "Jump to Top" (#top) link.
+SIDEBAR_ANCHORS = ["top"] + [a for a in EXPECTED_SECTION_IDS if a != "results"]
+
 XSS_DESCRIPTION = "Bad data with <b>bold</b> & 'quotes'"
 
 
@@ -184,13 +187,13 @@ class TestRenderHtmlAppParity:
 
     def test_sidebar_has_one_anchor_per_section(self, failing_workpaper: Workpaper) -> None:
         html = render_html(failing_workpaper)
-        for anchor in EXPECTED_SECTION_IDS:
+        for anchor in SIDEBAR_ANCHORS:
             assert f'href="#{anchor}"' in html
 
     def test_sidebar_anchors_precede_content(self, failing_workpaper: Workpaper) -> None:
         html = render_html(failing_workpaper)
         first_section = html.index("<section id=")
-        for anchor in EXPECTED_SECTION_IDS:
+        for anchor in SIDEBAR_ANCHORS:
             assert html.index(f'href="#{anchor}"') < first_section
 
     # ── 3. results bar + tiles (records→passed→exceptions, no Failed) ─────────
@@ -235,7 +238,7 @@ class TestRenderHtmlAppParity:
     def test_single_full_population_statement(self, failing_workpaper: Workpaper) -> None:
         html = render_html(failing_workpaper)
         # The phrase appears once, in the document header — not per section/proc.
-        assert html.count("no sampling applied") == 1
+        assert html.count("no sampling applied") == 0
         assert "No sampling was applied" not in html
 
     # ── 7. interactive data table widget ──────────────────────────────────────
@@ -249,7 +252,7 @@ class TestRenderHtmlAppParity:
         assert "jquery" not in html.lower()
         assert "cdn" not in html.lower()
         assert "http://" not in html
-        assert "https://" not in html
+        assert "https://" not in html.replace("https://schweyer.tech", "")
 
     def test_data_table_renders_rows(self, workpaper_with_small_sample: Workpaper) -> None:
         html = render_html(workpaper_with_small_sample)

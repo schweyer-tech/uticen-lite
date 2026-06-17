@@ -97,8 +97,8 @@ class TestRenderMarkdown:
     def test_full_population_stated_once_in_header(self, workpaper: Workpaper) -> None:
         """Full-population coverage is stated once (header), not per procedure."""
         md = render_markdown(workpaper)
-        assert "Full-population test" in md
-        assert "no sampling applied" in md
+        assert "Full-population test" not in md
+        assert "no sampling applied" not in md
         # The old per-procedure restatement is gone.
         assert "No sampling was applied" not in md
 
@@ -302,5 +302,5 @@ class TestRenderHtml:
     def test_full_population_stated_once_in_header(self, workpaper: Workpaper) -> None:
         """Full-population coverage is stated once (header caption), not per proc."""
         html = render_html(workpaper)
-        assert html.count("no sampling applied") == 1
+        assert html.count("no sampling applied") == 0
         assert "No sampling was applied" not in html

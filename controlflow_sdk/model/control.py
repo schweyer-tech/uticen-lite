@@ -108,6 +108,11 @@ class SourceBinding:
     audit prose — a one-line description of the extract and a Completeness &
     Accuracy assertion. They surface in the rendered workpaper's Data Sources
     section; when absent the renderer derives a default C&A line from the tie-out.
+
+    ``extract_date`` is the optional author-supplied as-of date of the extract
+    (the date the data is current as of). It surfaces as the Extract Date in the
+    rendered workpaper's Data Sources section; when absent the renderer falls
+    back to the run's execution/as-of date.
     """
 
     id: str
@@ -117,6 +122,7 @@ class SourceBinding:
     column_mappings: list[dict[str, Any]]
     description: str | None = None
     completeness_accuracy: str | None = None
+    extract_date: str | None = None
 
     def to_data_source(self) -> dict[str, Any]:
         """Return the app ``data_sources`` shape (type + key_config + column_mappings only)."""

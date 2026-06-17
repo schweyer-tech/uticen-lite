@@ -58,6 +58,10 @@ class DataSample:
     Data Sources prose (threaded from the bound source) so the renderer can show
     a Description line and a Completeness & Accuracy assertion per source.
 
+    ``extract_date`` is the optional author-supplied as-of date of the extract
+    (the date the data is current as of). When absent the renderer falls back to
+    the run's execution/as-of date.
+
     This is **render-only**: it is never serialised into the import bundle (the
     bundle keeps its no-raw-rows trust boundary).
     """
@@ -69,6 +73,7 @@ class DataSample:
     total_rows: int = 0
     description: str | None = None
     completeness_accuracy: str | None = None
+    extract_date: str | None = None
 
     @property
     def capped(self) -> bool:
