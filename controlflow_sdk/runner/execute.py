@@ -8,6 +8,7 @@ abstraction that ``source_for(...).load()`` returns.
 
 from __future__ import annotations
 
+import inspect
 import traceback
 from pathlib import Path
 from typing import Any
@@ -57,6 +58,22 @@ def _clean_traceback_summary(exc: BaseException) -> str:
     return f"{frame_lines}{exc_line}"
 
 
+def _accepts_sources(test_fn: object) -> bool:
+    """True if the author's test() declares a second positional parameter (the
+    sources dict) or accepts *args — i.e. wants multi-source access."""
+    try:
+        params = list(inspect.signature(test_fn).parameters.values())  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return False
+    positional = [
+        p
+        for p in params
+        if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+    ]
+    has_var_positional = any(p.kind is inspect.Parameter.VAR_POSITIONAL for p in params)
+    return len(positional) >= 2 or has_var_positional
+
+
 def run_control(
     control: ControlDef,
     sources: dict[str, SourceBinding],
@@ -101,6 +118,7 @@ def run_control(
     # ── 1. Load every bound source ────────────────────────────────────────────
     populations: list[Population] = []
     prov_records: list[SourceProvenance] = []
+    sources_by_id: dict[str, Population] = {}
 
     for binding in control.sources:
         src_binding = sources[binding.id]
@@ -116,6 +134,7 @@ def run_control(
             )
         )
         populations.append(pop)
+        sources_by_id[binding.id] = pop
 
     # ── 2. Select the primary population (first bound source) ─────────────────
     primary: Population = populations[0]
@@ -124,7 +143,10 @@ def run_control(
     test_fn = load_test_callable(control)
 
     try:
-        raw_result: Any = test_fn(primary)
+        if _accepts_sources(test_fn):
+            raw_result: Any = test_fn(primary, sources_by_id)
+        else:
+            raw_result = test_fn(primary)
     except Exception as exc:
         tb_summary = _clean_traceback_summary(exc)
         raise RunnerError(
