@@ -28,9 +28,7 @@ def test(pop):  # noqa: ANN001, ANN201
             violations.append(
                 {
                     "item_key": account_id,
-                    "description": (
-                        f"Active account '{account_id}' does not have MFA enabled"
-                    ),
+                    "description": (f"Active account '{account_id}' does not have MFA enabled"),
                     "severity": "high",
                     "details": {
                         "system": system,

@@ -43,16 +43,14 @@ def test(pop):  # noqa: ANN001, ANN201
                 reasons.append("no approver recorded")
             if review_stale:
                 reasons.append(
-                    f"last review date '{last_review_raw}' is before cutoff "
-                    f"'{_REVIEW_CUTOFF}'"
+                    f"last review date '{last_review_raw}' is before cutoff '{_REVIEW_CUTOFF}'"
                 )
 
             violations.append(
                 {
                     "item_key": account_id,
                     "description": (
-                        f"Privileged account '{account_id}' failed review: "
-                        + "; ".join(reasons)
+                        f"Privileged account '{account_id}' failed review: " + "; ".join(reasons)
                     ),
                     "severity": "high",
                     "details": {

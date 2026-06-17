@@ -5,6 +5,7 @@ in the HR employee roster. Any is_active account belonging to a terminated
 employee indicates access was not revoked after separation.
 """
 
+
 def test(pop, sources):  # noqa: ANN001, ANN201
     accounts_df = pop.df
     employees_df = sources["employees"].df
