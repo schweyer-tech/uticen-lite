@@ -1,0 +1,15 @@
+vendor_id,vendor_name,created_by,last_modified_by
+V01,Acme Supplies Inc,emp-003,emp-003
+V02,Best Parts Co,emp-004,emp-010
+V03,Crown Distributors,emp-010,emp-019
+V04,Delta Goods LLC,emp-014,emp-014
+V05,Eagle Wholesale,emp-019,emp-003
+V06,Frontier Products,emp-003,emp-023
+V07,Global Imports Ltd,emp-023,emp-023
+V08,Harbor Trading Co,emp-014,emp-004
+V09,Island Supply Group,emp-004,emp-019
+V10,Jetstream Logistics,emp-019,emp-010
+V11,Keystone Merchants,emp-001,emp-014
+V12,Lakeside Ventures,emp-003,emp-002
+V13,Meridian Export Co,emp-010,emp-003
+V14,Northstar Goods LLC,emp-023,emp-023

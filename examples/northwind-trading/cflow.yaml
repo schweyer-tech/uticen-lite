@@ -1,0 +1,7 @@
+name: northwind-trading
+framework: nist-800-53
+system:
+  name: Northwind Trading Co.
+  description: Wholesale distributor (~600 employees) — financial controls audit
+defaults:
+  severity: medium

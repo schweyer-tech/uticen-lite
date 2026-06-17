@@ -1,0 +1,41 @@
+entry_id,period,posting_date,account,amount,entry_type,prepared_by,reviewed_by
+JE-001,2026-Q1,2026-01-03,Revenue,125000.00,automated,emp-007,emp-008
+JE-002,2026-Q1,2026-01-05,COGS,87500.00,automated,emp-008,emp-013
+JE-003,2026-Q1,2026-01-08,AP Accrual,34200.00,automated,emp-007,emp-008
+JE-004,2026-Q1,2026-01-10,Revenue,98000.00,automated,emp-013,emp-007
+JE-005,2026-Q1,2026-01-13,Prepaid Expense,12000.00,manual,emp-007,emp-008
+JE-006,2026-Q1,2026-01-15,AR Adjustment,8500.00,manual,emp-008,emp-013
+JE-007,2026-Q1,2026-01-18,Revenue,215000.00,automated,emp-007,emp-008
+JE-008,2026-Q1,2026-01-21,COGS,143500.00,automated,emp-013,emp-007
+JE-009,2026-Q1,2026-01-24,Depreciation,22000.00,automated,emp-008,emp-013
+JE-010,2026-Q1,2026-01-28,Bonus Accrual,45000.00,manual,emp-007,emp-008
+JE-011,2026-Q1,2026-01-31,Revenue,189000.00,automated,emp-013,emp-007
+JE-012,2026-Q1,2026-02-03,AP Accrual,67000.00,automated,emp-008,emp-013
+JE-013,2026-Q1,2026-02-06,Travel Expense,3200.00,manual,emp-007,emp-008
+JE-014,2026-Q1,2026-02-10,COGS,105000.00,automated,emp-013,emp-007
+JE-015,2026-Q1,2026-02-14,Revenue,178000.00,automated,emp-007,emp-008
+JE-016,2026-Q1,2026-02-17,Payroll Accrual,98000.00,automated,emp-008,emp-013
+JE-017,2026-Q1,2026-02-21,Misc Expense,7800.00,manual,emp-013,emp-007
+JE-018,2026-Q1,2026-02-25,Depreciation,22000.00,automated,emp-007,emp-008
+JE-019,2026-Q1,2026-02-28,Revenue,244000.00,automated,emp-013,emp-007
+JE-020,2026-Q1,2026-03-04,AP Accrual,52000.00,automated,emp-008,emp-013
+JE-021,2026-Q1,2026-03-07,COGS,165000.00,automated,emp-007,emp-008
+JE-022,2026-Q1,2026-03-10,Revenue,198000.00,automated,emp-013,emp-007
+JE-023,2026-Q1,2026-03-14,Prepaid Rent,38000.00,manual,emp-007,emp-013
+JE-024,2026-Q1,2026-03-17,Inventory Adj,28500.00,manual,emp-008,emp-007
+JE-025,2026-Q1,2026-03-21,Revenue,312000.00,automated,emp-007,emp-008
+JE-026,2026-Q1,2026-03-24,Depreciation,22000.00,automated,emp-013,emp-007
+JE-027,2026-Q1,2026-03-28,COGS,188000.00,automated,emp-008,emp-013
+JE-028,2026-Q1,2026-03-31,Revenue,275000.00,automated,emp-007,emp-008
+JE-029,2026-Q1,2026-03-31,AP Accrual,89000.00,automated,emp-013,emp-007
+JE-030,2026-Q1,2026-03-31,Payroll Accrual,112000.00,automated,emp-008,emp-013
+JE-V01,2026-Q1,2026-02-08,Intercompany,75000.00,manual,emp-001,emp-001
+JE-V02,2026-Q1,2026-03-05,Asset Write-off,62000.00,manual,emp-002,
+JE-V03,2026-Q1,2026-03-18,Goodwill Adj,88000.00,manual,emp-002,emp-002
+JE-V04,2026-Q1,2026-01-20,Asset Adj,55000.00,manual,emp-007,emp-008
+JE-V05,2026-Q1,2026-02-22,Reclassification,68000.00,manual,emp-008,emp-013
+JE-CL1,2025-Q4,2025-12-05,Year-End Adj,14500.00,manual,emp-007,emp-008
+JE-CL2,2025-Q3,2025-09-30,Q3 Accrual,9200.00,manual,emp-013,emp-007
+JE-037,2026-Q1,2026-01-30,Inventory Adj,4200.00,manual,emp-007,emp-008
+JE-038,2026-Q1,2026-02-18,Office Expense,1800.00,manual,emp-013,emp-007
+JE-039,2026-Q1,2026-03-26,Misc Accrual,6500.00,manual,emp-008,emp-013

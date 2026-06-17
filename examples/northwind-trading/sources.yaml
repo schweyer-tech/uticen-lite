@@ -1,0 +1,268 @@
+sources:
+  - id: journal_entries
+    type: file
+    config:
+      path: data/journal_entries.csv
+      format: csv
+    key_config:
+      mode: single
+      columns:
+        - entry_id
+    column_mappings:
+      - original_name: entry_id
+        display_name: Entry ID
+        data_type: text
+        is_key: true
+      - original_name: period
+        display_name: Period
+        data_type: text
+        is_key: false
+      - original_name: posting_date
+        display_name: Posting Date
+        data_type: date
+        is_key: false
+      - original_name: account
+        display_name: Account
+        data_type: text
+        is_key: false
+      - original_name: amount
+        display_name: Amount
+        data_type: number
+        is_key: false
+      - original_name: entry_type
+        display_name: Entry Type
+        data_type: text
+        is_key: false
+      - original_name: prepared_by
+        display_name: Prepared By
+        data_type: text
+        is_key: false
+      - original_name: reviewed_by
+        display_name: Reviewed By
+        data_type: text
+        is_key: false
+
+  - id: closed_periods
+    type: file
+    config:
+      path: data/closed_periods.csv
+      format: csv
+    key_config:
+      mode: single
+      columns:
+        - period
+    column_mappings:
+      - original_name: period
+        display_name: Period
+        data_type: text
+        is_key: true
+      - original_name: status
+        display_name: Status
+        data_type: text
+        is_key: false
+
+  - id: purchase_orders
+    type: file
+    config:
+      path: data/purchase_orders.csv
+      format: csv
+    key_config:
+      mode: single
+      columns:
+        - po_id
+    column_mappings:
+      - original_name: po_id
+        display_name: PO ID
+        data_type: text
+        is_key: true
+      - original_name: vendor_id
+        display_name: Vendor ID
+        data_type: text
+        is_key: false
+      - original_name: amount
+        display_name: Amount
+        data_type: number
+        is_key: false
+      - original_name: approved_by
+        display_name: Approved By
+        data_type: text
+        is_key: false
+      - original_name: status
+        display_name: Status
+        data_type: text
+        is_key: false
+
+  - id: invoices
+    type: file
+    config:
+      path: data/invoices.csv
+      format: csv
+    key_config:
+      mode: single
+      columns:
+        - invoice_id
+    column_mappings:
+      - original_name: invoice_id
+        display_name: Invoice ID
+        data_type: text
+        is_key: true
+      - original_name: po_id
+        display_name: PO ID
+        data_type: text
+        is_key: false
+      - original_name: vendor_id
+        display_name: Vendor ID
+        data_type: text
+        is_key: false
+      - original_name: amount
+        display_name: Amount
+        data_type: number
+        is_key: false
+      - original_name: invoice_date
+        display_name: Invoice Date
+        data_type: date
+        is_key: false
+
+  - id: payments
+    type: file
+    config:
+      path: data/payments.csv
+      format: csv
+    key_config:
+      mode: single
+      columns:
+        - payment_id
+    column_mappings:
+      - original_name: payment_id
+        display_name: Payment ID
+        data_type: text
+        is_key: true
+      - original_name: invoice_id
+        display_name: Invoice ID
+        data_type: text
+        is_key: false
+      - original_name: vendor_id
+        display_name: Vendor ID
+        data_type: text
+        is_key: false
+      - original_name: amount
+        display_name: Amount
+        data_type: number
+        is_key: false
+      - original_name: paid_date
+        display_name: Paid Date
+        data_type: date
+        is_key: false
+      - original_name: approved_by
+        display_name: Approved By
+        data_type: text
+        is_key: false
+      - original_name: entered_by
+        display_name: Entered By
+        data_type: text
+        is_key: false
+
+  - id: employees
+    type: file
+    config:
+      path: data/employees.csv
+      format: csv
+    key_config:
+      mode: single
+      columns:
+        - employee_id
+    column_mappings:
+      - original_name: employee_id
+        display_name: Employee ID
+        data_type: text
+        is_key: true
+      - original_name: name
+        display_name: Name
+        data_type: text
+        is_key: false
+      - original_name: status
+        display_name: Status
+        data_type: text
+        is_key: false
+      - original_name: termination_date
+        display_name: Termination Date
+        data_type: date
+        is_key: false
+      - original_name: department
+        display_name: Department
+        data_type: text
+        is_key: false
+
+  - id: access_accounts
+    type: file
+    config:
+      path: data/access_accounts.csv
+      format: csv
+    key_config:
+      mode: single
+      columns:
+        - account_id
+    column_mappings:
+      - original_name: account_id
+        display_name: Account ID
+        data_type: text
+        is_key: true
+      - original_name: employee_id
+        display_name: Employee ID
+        data_type: text
+        is_key: false
+      - original_name: system
+        display_name: System
+        data_type: text
+        is_key: false
+      - original_name: role
+        display_name: Role
+        data_type: text
+        is_key: false
+      - original_name: is_privileged
+        display_name: Is Privileged
+        data_type: boolean
+        is_key: false
+      - original_name: mfa_enabled
+        display_name: MFA Enabled
+        data_type: boolean
+        is_key: false
+      - original_name: is_active
+        display_name: Is Active
+        data_type: boolean
+        is_key: false
+      - original_name: approved_by
+        display_name: Approved By
+        data_type: text
+        is_key: false
+      - original_name: last_review_date
+        display_name: Last Review Date
+        data_type: date
+        is_key: false
+
+  - id: vendor_master
+    type: file
+    config:
+      path: data/vendor_master.csv
+      format: csv
+    key_config:
+      mode: single
+      columns:
+        - vendor_id
+    column_mappings:
+      - original_name: vendor_id
+        display_name: Vendor ID
+        data_type: text
+        is_key: true
+      - original_name: vendor_name
+        display_name: Vendor Name
+        data_type: text
+        is_key: false
+      - original_name: created_by
+        display_name: Created By
+        data_type: text
+        is_key: false
+      - original_name: last_modified_by
+        display_name: Last Modified By
+        data_type: text
+        is_key: false
