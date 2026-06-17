@@ -94,12 +94,32 @@ class TestRenderMarkdown:
         assert "AC-2" in md
         assert "AU-6" in md
 
-    def test_full_population_no_sampling_statement(self, workpaper: Workpaper) -> None:
-        """Each procedure's results section must assert full-population coverage."""
+    def test_full_population_stated_once_in_header(self, workpaper: Workpaper) -> None:
+        """Full-population coverage is stated once (header), not per procedure."""
         md = render_markdown(workpaper)
-        assert "No sampling was applied" in md
-        # The population size (100) must appear in the statement
-        assert "100 record(s)" in md
+        assert "Full-population test" in md
+        assert "no sampling applied" in md
+        # The old per-procedure restatement is gone.
+        assert "No sampling was applied" not in md
+
+    def test_threshold_conclusion(self, workpaper: Workpaper) -> None:
+        """Conclusion states the threshold determination (implicit-0 fixture)."""
+        md = render_markdown(workpaper)
+        assert "## Conclusion" in md
+        assert "zero exceptions tolerated" in md
+        assert "did not operate effectively" in md
+
+    def test_evaluation_section_removed(self, workpaper: Workpaper) -> None:
+        md = render_markdown(workpaper)
+        assert "## Evaluation" not in md
+
+    def test_results_table_has_no_failed_row(self, workpaper: Workpaper) -> None:
+        md = render_markdown(workpaper)
+        results = md[md.index("## Results") : md.index("## Objective")]
+        assert "| Records tested |" in results
+        assert "| Passed |" in results
+        assert "| Exceptions |" in results
+        assert "| Failed |" not in results
 
     def test_contains_test_code_fenced_block(self, workpaper: Workpaper) -> None:
         md = render_markdown(workpaper)
@@ -195,9 +215,11 @@ class TestRenderHtml:
         html = render_html(workpaper)
         assert html.startswith("<!doctype html>")
 
-    def test_no_script_tags(self, workpaper: Workpaper) -> None:
+    def test_single_inline_script(self, workpaper: Workpaper) -> None:
+        # The data-table widget is the ONE permitted inline script; no others.
         html = render_html(workpaper)
-        assert "<script" not in html.lower()
+        assert html.lower().count("<script") == 1
+        assert "jquery" not in html.lower()
 
     def test_escapes_xss_description(self, workpaper: Workpaper) -> None:
         html = render_html(workpaper)
@@ -242,8 +264,8 @@ class TestRenderHtml:
         assert "AC-2" in html
         assert "AU-6" in html
 
-    def test_full_population_no_sampling_statement(self, workpaper: Workpaper) -> None:
-        """Each procedure's results section must assert full-population coverage."""
+    def test_full_population_stated_once_in_header(self, workpaper: Workpaper) -> None:
+        """Full-population coverage is stated once (header caption), not per proc."""
         html = render_html(workpaper)
-        assert "No sampling was applied" in html
-        assert "100 record(s)" in html
+        assert html.count("no sampling applied") == 1
+        assert "No sampling was applied" not in html

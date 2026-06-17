@@ -2,8 +2,8 @@
 
 Section model mirrors the canonical app-ordered taxonomy used by the HTML
 renderer (Results, Objective & scope, Control, Data sources, Procedures,
-Evaluation, Exceptions, Conclusion). Markdown has no collapse or jump-nav, but
-the section names and order hold for parity.
+Exceptions, Conclusion). Markdown has no collapse, jump-nav, or interactive
+data table, but the section names and order hold for parity.
 
 Pure string-building; no template engine or external dependencies.
 Pyodide-safe (stdlib only, no pandas/pydantic).
@@ -14,9 +14,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from controlflow_sdk.model.run import RunRecord, SourceProvenance
+    from controlflow_sdk.model.run import SourceProvenance
     from controlflow_sdk.model.violation import Violation
-    from controlflow_sdk.model.workpaper import Workpaper
+    from controlflow_sdk.model.workpaper import DataSample, Workpaper
+
+# Rows shown in the Markdown static preview table per data source.
+_MD_PREVIEW_ROWS = 10
 
 
 def _md_cell(text: object) -> str:
@@ -59,37 +62,40 @@ def render_markdown(wp: Workpaper) -> str:
     Conclusion.
     """
     lines: list[str] = []
-    runs: list[RunRecord] = [p.result for p in wp.procedures]
-    records_tested = sum(r.population_size for r in runs)
-    total_failed = sum(r.failed for r in runs)
-    total_passed = records_tested - total_failed
-    exceptions = sum(len(r.violations) for r in runs)
-    failed_procedures = sum(1 for r in runs if r.failed > 0)
+    records_tested = wp.records_tested
+    exceptions = wp.exception_count
+    total_passed = records_tested - exceptions
     pass_rate = round(total_passed / records_tested * 100, 2) if records_tested else 0.0
-    verdict = "Operated effectively" if total_failed == 0 else "Operated with deficiencies"
+    determination = wp.determination
+    verdict = determination.verdict
 
     sources = _dedup_provenance(wp)
+    samples_by_id: dict[str, DataSample] = {s.source_id: s for s in wp.data_samples}
     violations = _all_violations(wp)
     nist_refs: list[str] = wp.framework_refs.get("nist", [])
     extra: dict[str, list[str]] = wp.framework_refs.get("extra", {})
 
     # ── Header ────────────────────────────────────────────────────────────────
+    # Full-population methodology stated ONCE here, not per section/procedure.
     lines.append(f"# {wp.title}")
     lines.append("")
     lines.append(f"**Control ID:** {wp.control_id}")
     lines.append(f"**Generated:** {wp.generated_at}")
     lines.append("")
+    lines.append("_Full-population test — every record evaluated; no sampling applied._")
+    lines.append("")
 
-    # ── Results ───────────────────────────────────────────────────────────────
+    # ── Results (Records tested · Passed · Exceptions; no Failed) ──────────────
     lines.append("## Results")
     lines.append("")
-    lines.append(f"`{total_passed} pass · {total_failed} fail · {exceptions} exc` — **{verdict}**")
+    lines.append(
+        f"`{records_tested} records · {total_passed} pass · {exceptions} exc` — **{verdict}**"
+    )
     lines.append("")
     lines.append("| Metric | Value |")
     lines.append("| --- | --- |")
-    lines.append(f"| Passed | {total_passed} |")
-    lines.append(f"| Failed | {total_failed} |")
     lines.append(f"| Records tested | {records_tested} |")
+    lines.append(f"| Passed | {total_passed} |")
     lines.append(f"| Exceptions | {exceptions} |")
     lines.append(f"| Pass rate | {pass_rate}% |")
     lines.append("")
@@ -98,8 +104,6 @@ def render_markdown(wp: Workpaper) -> str:
     lines.append("## Objective & scope")
     lines.append("")
     lines.append(wp.objective)
-    lines.append("")
-    lines.append("Full population — no sampling.")
     lines.append("")
 
     # ── Control (framework refs fold in here) ─────────────────────────────────
@@ -129,6 +133,10 @@ def render_markdown(wp: Workpaper) -> str:
             lines.append(f"- **{prov.path}** — {prov.row_count} rows")
             lines.append(f"  - SHA-256: `{prov.sha256}`")
             lines.append(f"  - Source: `{prov.source_id}`")
+            lines.append("")
+            sample = samples_by_id.get(prov.source_id)
+            if sample is not None and sample.columns:
+                _append_preview_table(lines, sample)
     else:
         lines.append("No data sources recorded.")
     lines.append("")
@@ -156,11 +164,6 @@ def render_markdown(wp: Workpaper) -> str:
         lines.append(f"| Failed | {_md_cell(run.failed)} |")
         lines.append(f"| Pass Rate | {_md_cell(run.pass_rate)}% |")
         lines.append("")
-        lines.append(
-            f"> **Full population tested: {run.population_size} record(s)."
-            " No sampling was applied.**"
-        )
-        lines.append("")
         if run.violations:
             lines.append("| Item Key | Severity | Description |")
             lines.append("| --- | --- | --- |")
@@ -170,12 +173,6 @@ def render_markdown(wp: Workpaper) -> str:
                 desc = _md_cell(v.description)
                 lines.append(f"| {key} | {sev} | {desc} |")
             lines.append("")
-
-    # ── Evaluation ────────────────────────────────────────────────────────────
-    lines.append("## Evaluation")
-    lines.append("")
-    lines.append(f"Failed procedures: {failed_procedures} · Open exceptions: {exceptions}")
-    lines.append("")
 
     # ── Exceptions ────────────────────────────────────────────────────────────
     lines.append("## Exceptions")
@@ -192,16 +189,31 @@ def render_markdown(wp: Workpaper) -> str:
         lines.append("No exceptions — control operated without deviations.")
     lines.append("")
 
-    # ── Conclusion ────────────────────────────────────────────────────────────
+    # ── Conclusion (threshold determination) ──────────────────────────────────
     lines.append("## Conclusion")
     lines.append("")
-    if total_failed == 0:
-        lines.append("Operated effectively. Full population tested with no exceptions.")
-    else:
-        lines.append(
-            f"Operated with deficiencies. {total_failed} exception(s) "
-            f"across {records_tested} record(s) tested."
-        )
+    threshold_text, result_text = determination.conclusion_text()
+    lines.append(threshold_text)
+    lines.append("")
+    lines.append(f"**{result_text}**")
     lines.append("")
 
     return "\n".join(lines)
+
+
+def _append_preview_table(lines: list[str], sample: DataSample) -> None:
+    """Append a small static preview table (first ~N rows) for a data source."""
+    preview = sample.rows[:_MD_PREVIEW_ROWS]
+    header = "| " + " | ".join(_md_cell(c) for c in sample.columns) + " |"
+    divider = "| " + " | ".join("---" for _ in sample.columns) + " |"
+    lines.append(header)
+    lines.append(divider)
+    for row in preview:
+        lines.append("| " + " | ".join(_md_cell(c) for c in row) + " |")
+    lines.append("")
+    shown = len(preview)
+    if sample.total_rows > shown:
+        lines.append(f"_showing first {shown} of {sample.total_rows} rows_")
+    else:
+        lines.append(f"_{sample.total_rows} rows_")
+    lines.append("")

@@ -7,10 +7,10 @@ sidebar, shared design tokens) — not a pixel-exact mirror of the React app.
 Renderer guarantees (all preserved):
 
 - Single self-contained document: starts with ``<!doctype html>``; **inline
-  ``<style>`` only** — no ``<link rel="stylesheet">``, no external assets.
-- **No ``<script>`` anywhere.** Collapse uses ``<details>/<summary>`` and the
-  jump-nav uses anchor links; scroll-spy active-state highlighting is omitted
-  (it would need JS).
+  ``<style>`` only** — no ``<link rel="stylesheet">``, no external assets / CDN.
+- **Exactly one inline ``<script>``** — a vanilla-JS data-table widget (no
+  jQuery, no network, no ``eval``); every interpolated value is HTML-escaped.
+  Collapse uses ``<details>/<summary>`` and the jump-nav uses anchor links.
 - **All author/data-derived text** passes through ``html.escape`` (``_e``).
 - Pure stdlib; Pyodide-safe (no template engine, pandas, or pydantic).
 """
@@ -21,14 +21,17 @@ import html as _html
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from controlflow_sdk.model.run import RunRecord, SourceProvenance
+    from controlflow_sdk.model.run import SourceProvenance
     from controlflow_sdk.model.violation import Violation
-    from controlflow_sdk.model.workpaper import Workpaper
+    from controlflow_sdk.model.workpaper import DataSample, Determination, Workpaper
+
+# Default page length for the interactive data table (configurable constant).
+_TABLE_PAGE_LENGTH = 10
 
 # ---------------------------------------------------------------------------
-# Canonical section model (app-ordered). The sidebar lists these 8 entries.
-# Sign-off (app section 7) is omitted entirely — a static placeholder would be
-# misleading in an export; the footer carries a one-line disclaimer instead.
+# Canonical section model (app-ordered). The sidebar lists these 7 entries.
+# Sign-off (app section 7) and Evaluation (round-2 revision) are omitted; the
+# footer carries a one-line disclaimer instead of a sign-off placeholder.
 # ---------------------------------------------------------------------------
 
 # (anchor id, sidebar index badge, label, source tag)
@@ -36,11 +39,10 @@ _SECTIONS: list[tuple[str, str, str, str]] = [
     ("results", "★", "Results", "read-only · run_record"),
     ("objective-scope", "0", "Objective & scope", "objective"),
     ("control", "1", "Control", "control · framework_refs"),
-    ("data-sources", "2", "Data sources", "provenance"),
+    ("data-sources", "2", "Data sources", "provenance · data"),
     ("procedures", "3", "Procedures", "procedures · run_record"),
-    ("evaluation", "4", "Evaluation", "derived"),
-    ("exceptions", "5", "Exceptions", "violations"),
-    ("conclusion", "6", "Conclusion", "derived"),
+    ("exceptions", "4", "Exceptions", "violations"),
+    ("conclusion", "5", "Conclusion", "threshold"),
 ]
 
 
@@ -87,6 +89,9 @@ a { color: inherit; text-decoration: none; }
 }
 .wp-header .wp-meta { color: var(--text-secondary); font-size: 12px; line-height: 16px; }
 .wp-header .wp-meta .mono { color: var(--text-primary); }
+.wp-header .wp-method {
+  color: var(--text-tertiary); font-size: 12px; line-height: 16px; margin-top: 4px;
+}
 .chip {
   display: inline-block; background: var(--bg-surface-2); color: var(--text-primary);
   border: 1px solid var(--border-default); border-radius: var(--radius-badge);
@@ -272,12 +277,177 @@ pre {
 .fullpop { font-weight: 600; color: var(--text-primary); margin: 8px 0; }
 .empty-state { color: var(--text-secondary); }
 
+/* ── conclusion (threshold determination) ────────────────────────────────── */
+.concl-result { font-weight: 600; }
+.concl-result.ok { color: var(--status-success); }
+.concl-result.bad { color: var(--status-critical); }
+
+/* ── interactive data table (single inline-JS widget) ────────────────────── */
+.dt-wrap { margin: 8px 0 4px; }
+.dt-controls {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 6px;
+}
+.dt-search {
+  background: var(--bg-input); border: 1px solid var(--border-default);
+  border-radius: var(--radius-input); color: var(--text-primary);
+  font-family: var(--font-sans); font-size: 12px; padding: 5px 10px; min-width: 180px;
+}
+.dt-search:focus { outline: none; border-color: var(--accent-primary); }
+.dt-cap {
+  color: var(--text-tertiary); font-size: 11px; font-family: var(--font-mono);
+}
+table.dt-table th { cursor: pointer; user-select: none; white-space: nowrap; }
+table.dt-table th .dt-arrow { color: var(--text-tertiary); font-size: 9px; margin-left: 4px; }
+table.dt-table td { font-family: var(--font-mono); font-size: 11px; }
+.dt-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-top: 6px;
+}
+.dt-info { color: var(--text-secondary); font-size: 11px; }
+.dt-pager { display: flex; gap: 4px; flex-wrap: wrap; }
+.dt-pager button {
+  background: var(--bg-surface-2); border: 1px solid var(--border-default);
+  border-radius: var(--radius-input); color: var(--text-secondary);
+  font-family: var(--font-mono); font-size: 11px; padding: 3px 8px; cursor: pointer;
+}
+.dt-pager button:hover:not(:disabled) {
+  background: var(--bg-surface-3); color: var(--text-primary);
+}
+.dt-pager button[disabled] { opacity: 0.4; cursor: default; }
+.dt-pager button.active {
+  background: var(--accent-muted); border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
 /* ── footer ──────────────────────────────────────────────────────────────── */
 .wp-footer {
   margin-top: 32px; padding-top: 12px; border-top: 1px solid var(--border-default);
   color: var(--text-tertiary); font-size: 12px;
 }
 """
+
+
+# ---------------------------------------------------------------------------
+# Inline data-table widget (the one permitted <script>).
+#
+# Vanilla JS, no jQuery / no network / no eval. It reads rows straight from the
+# already-rendered (HTML-escaped) DOM, so NO data is interpolated into JS — the
+# full table is present even with JS off (graceful degradation). It paginates,
+# filters and sorts each table marked with `data-datatable` on DOMContentLoaded.
+# Page length is baked from _TABLE_PAGE_LENGTH below.
+# ---------------------------------------------------------------------------
+
+_DATATABLE_JS = """
+(function () {
+  var PAGE = __PAGE_LENGTH__;
+  function initOne(wrap) {
+    var table = wrap.querySelector("table.dt-table");
+    if (!table) return;
+    var tbody = table.tBodies[0];
+    if (!tbody) return;
+    var allRows = Array.prototype.slice.call(tbody.rows);
+    var search = wrap.querySelector(".dt-search");
+    var info = wrap.querySelector(".dt-info");
+    var pager = wrap.querySelector(".dt-pager");
+    var headers = Array.prototype.slice.call(table.tHead.rows[0].cells);
+    var page = 0;
+    var sortCol = -1;
+    var sortDir = 1;
+    var filtered = allRows;
+
+    function cellText(row, i) {
+      var c = row.cells[i];
+      return c ? (c.textContent || "").trim() : "";
+    }
+    function applyFilter() {
+      var q = (search && search.value ? search.value : "").toLowerCase();
+      if (!q) { filtered = allRows; return; }
+      filtered = allRows.filter(function (row) {
+        return (row.textContent || "").toLowerCase().indexOf(q) !== -1;
+      });
+    }
+    function applySort() {
+      if (sortCol < 0) return;
+      filtered = filtered.slice().sort(function (a, b) {
+        var x = cellText(a, sortCol), y = cellText(b, sortCol);
+        var nx = parseFloat(x), ny = parseFloat(y);
+        var bothNum = !isNaN(nx) && !isNaN(ny) && x !== "" && y !== "";
+        if (bothNum) return (nx - ny) * sortDir;
+        return x.localeCompare(y) * sortDir;
+      });
+    }
+    function render() {
+      applyFilter();
+      applySort();
+      var total = filtered.length;
+      var pages = Math.max(1, Math.ceil(total / PAGE));
+      if (page >= pages) page = pages - 1;
+      if (page < 0) page = 0;
+      var start = page * PAGE;
+      var end = Math.min(start + PAGE, total);
+      allRows.forEach(function (r) { r.style.display = "none"; });
+      for (var i = start; i < end; i++) filtered[i].style.display = "";
+      if (info) {
+        info.textContent = total === 0
+          ? "Showing 0 to 0 of 0 entries"
+          : "Showing " + (start + 1) + " to " + end + " of " + total + " entries";
+      }
+      renderPager(pages);
+    }
+    function makeBtn(label, targetPage, disabled, active) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = label;
+      if (disabled) b.disabled = true;
+      if (active) b.className = "active";
+      if (!disabled) b.addEventListener("click", function () { page = targetPage; render(); });
+      return b;
+    }
+    function renderPager(pages) {
+      if (!pager) return;
+      pager.innerHTML = "";
+      pager.appendChild(makeBtn("‹", page - 1, page === 0, false));
+      var maxBtns = 7;
+      var from = Math.max(0, page - 3);
+      var to = Math.min(pages, from + maxBtns);
+      from = Math.max(0, to - maxBtns);
+      for (var p = from; p < to; p++) {
+        pager.appendChild(makeBtn(String(p + 1), p, false, p === page));
+      }
+      pager.appendChild(makeBtn("›", page + 1, page >= pages - 1, false));
+    }
+    if (search) {
+      search.addEventListener("input", function () { page = 0; render(); });
+    }
+    headers.forEach(function (th, i) {
+      th.addEventListener("click", function () {
+        if (sortCol === i) { sortDir = -sortDir; } else { sortCol = i; sortDir = 1; }
+        headers.forEach(function (h) {
+          var a = h.querySelector(".dt-arrow"); if (a) a.textContent = "";
+        });
+        var arrow = th.querySelector(".dt-arrow");
+        if (arrow) arrow.textContent = sortDir === 1 ? "\\u25B2" : "\\u25BC";
+        page = 0; render();
+      });
+    });
+    render();
+  }
+  function initAll() {
+    var wraps = document.querySelectorAll("[data-datatable]");
+    Array.prototype.forEach.call(wraps, initOne);
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initAll);
+  } else {
+    initAll();
+  }
+})();
+"""
+
+_DATATABLE_SCRIPT = (
+    "<script>" + _DATATABLE_JS.replace("__PAGE_LENGTH__", str(_TABLE_PAGE_LENGTH)) + "</script>"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -323,15 +493,18 @@ def _all_violations(wp: Workpaper) -> list[Violation]:
 
 
 class _Agg:
-    """Aggregate Results across all procedures' run records."""
+    """Aggregate Results across all procedures' run records.
+
+    The verdict is derived from the workpaper's :class:`Determination` (the
+    threshold model) so the Results-bar pill and the Conclusion line can never
+    disagree.
+    """
 
     def __init__(self, wp: Workpaper) -> None:
-        runs: list[RunRecord] = [p.result for p in wp.procedures]
-        self.records_tested = sum(r.population_size for r in runs)
-        self.total_failed = sum(r.failed for r in runs)
-        self.total_passed = self.records_tested - self.total_failed
-        self.exceptions = sum(len(r.violations) for r in runs)
-        self.failed_procedures = sum(1 for r in runs if r.failed > 0)
+        self.records_tested = wp.records_tested
+        self.exceptions = wp.exception_count
+        self.total_passed = self.records_tested - self.exceptions
+        self.determination: Determination = wp.determination
 
     @property
     def pass_rate(self) -> float:
@@ -341,8 +514,12 @@ class _Agg:
 
     @property
     def verdict(self) -> str:
-        """Single source of truth, shared by the sticky pill and conclusion line."""
-        return "Operated effectively" if self.total_failed == 0 else "Operated with deficiencies"
+        """Single source of truth (threshold determination)."""
+        return self.determination.verdict
+
+    @property
+    def passed(self) -> bool:
+        return self.determination.passed
 
 
 # ---------------------------------------------------------------------------
@@ -378,6 +555,8 @@ def render_html(wp: Workpaper) -> str:
     emit("<body>")
 
     # ── document header ───────────────────────────────────────────────────────
+    # The full-population methodology is stated ONCE here (quiet caption), not
+    # repeated per section/procedure.
     emit('<header class="wp-header">')
     emit(f"<h1>{_e(wp.title)}</h1>")
     emit(
@@ -385,20 +564,23 @@ def render_html(wp: Workpaper) -> str:
         f'<span class="chip">{_e(wp.control_id)}</span> '
         f'&middot; Generated <span class="mono">{_e(wp.generated_at)}</span></p>'
     )
+    emit(
+        '<p class="wp-method">Full-population test &mdash; every record evaluated; '
+        "no sampling applied.</p>"
+    )
     emit("</header>")
 
     # ── layout: sidebar + content ─────────────────────────────────────────────
     emit('<div class="wp-layout">')
-    _emit_sidebar(emit, wp, sources, violations, agg)
+    _emit_sidebar(emit, wp, sources, violations)
     emit('<main class="wp-content">')
 
     _emit_resultbar(emit, agg)
     _emit_results(emit, agg)
     _emit_objective_scope(emit, wp)
     _emit_control(emit, wp, nist_refs, extra)
-    _emit_data_sources(emit, sources)
+    _emit_data_sources(emit, sources, wp.data_samples)
     _emit_procedures(emit, wp)
-    _emit_evaluation(emit, agg)
     _emit_exceptions(emit, violations)
     _emit_conclusion(emit, agg)
 
@@ -410,6 +592,9 @@ def render_html(wp: Workpaper) -> str:
         '<footer class="wp-footer">Generated by controlflow-sdk &middot; '
         f"{_e(wp.generated_at)} &middot; not a finalized workpaper</footer>"
     )
+
+    # ── data-table widget (single inline vanilla-JS script) ───────────────────
+    emit(_DATATABLE_SCRIPT)
 
     emit("</body>")
     emit("</html>")
@@ -427,11 +612,11 @@ def _emit_sidebar(
     wp: Workpaper,
     sources: list[SourceProvenance],
     violations: list[Violation],
-    agg: _Agg,
 ) -> None:
+    any_proc_failed = any(p.result.failed > 0 for p in wp.procedures)
     counts: dict[str, tuple[int, bool]] = {
         "data-sources": (len(sources), False),
-        "procedures": (len(wp.procedures), agg.failed_procedures > 0),
+        "procedures": (len(wp.procedures), any_proc_failed),
         "exceptions": (len(violations), len(violations) > 0),
     }
     emit('<nav class="wp-sidebar">')
@@ -469,14 +654,15 @@ def _section_open(emit, anchor: str) -> None:
 
 
 def _emit_resultbar(emit, agg: _Agg) -> None:
-    pill_cls = "ok" if agg.total_failed == 0 else "bad"
+    # Records-led order, single finding metric (Exceptions). No separate "fail".
+    pill_cls = "ok" if agg.passed else "bad"
     emit('<div class="wp-resultbar">')
     emit('<span class="rb-label">Result</span>')
     emit(
         '<span class="rb-metrics">'
-        f'<span class="pass">{agg.total_passed} pass</span>'
+        f'<span class="mono">{agg.records_tested} records</span>'
         '<span class="sep"> &middot; </span>'
-        f'<span class="fail">{agg.total_failed} fail</span>'
+        f'<span class="pass">{agg.total_passed} pass</span>'
         '<span class="sep"> &middot; </span>'
         f'<span class="exc">{agg.exceptions} exc</span>'
         "</span>"
@@ -491,20 +677,17 @@ def _emit_resultbar(emit, agg: _Agg) -> None:
 
 
 def _emit_results(emit, agg: _Agg) -> None:
+    # Tile order: Records tested · Passed · Exceptions. The "Failed" tile is
+    # removed in the SDK (Failed == Exceptions for a static single run).
     _section_open(emit, "results")
     emit('<div class="tiles">')
     emit(
-        '<div class="tile ok"><div class="tile-label">Passed</div>'
-        f'<div class="tile-value">{agg.total_passed}</div></div>'
-    )
-    failed_cls = "tile bad" if agg.total_failed > 0 else "tile"
-    emit(
-        f'<div class="{failed_cls}"><div class="tile-label">Failed</div>'
-        f'<div class="tile-value">{agg.total_failed}</div></div>'
-    )
-    emit(
         '<div class="tile"><div class="tile-label">Records tested</div>'
         f'<div class="tile-value">{agg.records_tested}</div></div>'
+    )
+    emit(
+        '<div class="tile ok"><div class="tile-label">Passed</div>'
+        f'<div class="tile-value">{agg.total_passed}</div></div>'
     )
     exc_cls = "tile warn" if agg.exceptions > 0 else "tile"
     emit(
@@ -522,9 +705,9 @@ def _emit_results(emit, agg: _Agg) -> None:
 
 
 def _emit_objective_scope(emit, wp: Workpaper) -> None:
+    # The full-population methodology is stated once in the header, not here.
     _section_open(emit, "objective-scope")
     emit(f"<p>{_e(wp.objective)}</p>")
-    emit('<p class="fullpop">Full population &mdash; no sampling.</p>')
     emit("</section>")
 
 
@@ -565,12 +748,17 @@ def _emit_control(
 # ---------------------------------------------------------------------------
 
 
-def _emit_data_sources(emit, sources: list[SourceProvenance]) -> None:
+def _emit_data_sources(
+    emit,
+    sources: list[SourceProvenance],
+    data_samples: list[DataSample],
+) -> None:
     _section_open(emit, "data-sources")
     if not sources:
         emit('<p class="empty-state">No data sources recorded.</p>')
         emit("</section>")
         return
+    samples_by_id: dict[str, DataSample] = {s.source_id: s for s in data_samples}
     for prov in sources:
         emit("<details>")
         emit(
@@ -581,6 +769,7 @@ def _emit_data_sources(emit, sources: list[SourceProvenance]) -> None:
             "</summary>"
         )
         emit('<div class="details-body">')
+        # provenance chip (sha256 + row count + file location)
         emit('<div class="prov-chips">')
         emit(f'<span class="prov-chip">sha256 {_e(str(prov.sha256)[:8])}&hellip;</span>')
         emit(f'<span class="prov-chip">{_e(prov.row_count)} rows</span>')
@@ -588,9 +777,48 @@ def _emit_data_sources(emit, sources: list[SourceProvenance]) -> None:
         emit("</div>")
         emit(f'<div class="prov-path">{_e(prov.sha256)}</div>')
         emit(f'<div class="prov-path">{_e(prov.path)}</div>')
+        # interactive data table of the source rows
+        sample = samples_by_id.get(prov.source_id)
+        if sample is not None and sample.columns:
+            _emit_data_table(emit, sample)
         emit("</div>")  # /details-body
         emit("</details>")
     emit("</section>")
+
+
+def _emit_data_table(emit, sample: DataSample) -> None:
+    """Render one source's rows as an interactive (vanilla-JS) DataTable.
+
+    Degrades to a plain full table when JS is disabled: the full row set is in
+    the DOM; the inline script paginates/filters/sorts it on load. All cell
+    values are HTML-escaped.
+    """
+    shown = len(sample.rows)
+    if sample.capped:
+        cap_note = f"showing first {shown} of {sample.total_rows} rows"
+    else:
+        cap_note = f"{sample.total_rows} rows"
+
+    emit('<div class="dt-wrap" data-datatable>')
+    emit('<div class="dt-controls">')
+    emit('<input class="dt-search" type="text" placeholder="Search…" aria-label="Search table">')
+    emit(f'<span class="dt-cap">{_e(cap_note)}</span>')
+    emit("</div>")
+    emit('<table class="dt-table">')
+    emit("<thead><tr>")
+    for col in sample.columns:
+        emit(f'<th scope="col">{_e(col)}<span class="dt-arrow"></span></th>')
+    emit("</tr></thead>")
+    emit("<tbody>")
+    for row in sample.rows:
+        emit("<tr>")
+        for cell in row:
+            emit(f"<td>{_e(cell)}</td>")
+        emit("</tr>")
+    emit("</tbody>")
+    emit("</table>")
+    emit('<div class="dt-foot"><span class="dt-info"></span><span class="dt-pager"></span></div>')
+    emit("</div>")  # /dt-wrap
 
 
 # ---------------------------------------------------------------------------
@@ -629,17 +857,13 @@ def _emit_procedures(emit, wp: Workpaper) -> None:
         emit("</div>")
         emit("</details>")
 
-        # results metric line
+        # results metric line (full-population is stated once in the header)
         emit(
             '<p class="muted">'
             f'Population <span class="mono">{_e(run.population_size)}</span> &middot; '
             f'Passed <span class="mono">{_e(run.passed)}</span> &middot; '
             f'Failed <span class="mono">{_e(run.failed)}</span> &middot; '
             f'Pass rate <span class="mono">{_e(run.pass_rate)}%</span></p>'
-        )
-        emit(
-            f'<p class="fullpop">Full population tested: {_e(run.population_size)} record(s). '
-            "No sampling was applied.</p>"
         )
 
         # per-procedure violations table
@@ -661,22 +885,7 @@ def _emit_procedures(emit, wp: Workpaper) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 4 Evaluation (derived, read-only)
-# ---------------------------------------------------------------------------
-
-
-def _emit_evaluation(emit, agg: _Agg) -> None:
-    _section_open(emit, "evaluation")
-    emit(
-        "<p>Failed procedures: "
-        f'<span class="mono">{agg.failed_procedures}</span> &middot; '
-        f'Open exceptions: <span class="mono">{agg.exceptions}</span></p>'
-    )
-    emit("</section>")
-
-
-# ---------------------------------------------------------------------------
-# 5 Exceptions (collapsible per violation)
+# 4 Exceptions (collapsible per violation)
 # ---------------------------------------------------------------------------
 
 
@@ -728,18 +937,14 @@ def _emit_exceptions(emit, violations: list[Violation]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 6 Conclusion (derived verdict — same source of truth as the sticky pill)
+# 5 Conclusion (threshold determination — same source of truth as the pill)
 # ---------------------------------------------------------------------------
 
 
 def _emit_conclusion(emit, agg: _Agg) -> None:
     _section_open(emit, "conclusion")
-    if agg.total_failed == 0:
-        statement = "Operated effectively. Full population tested with no exceptions."
-    else:
-        statement = (
-            f"Operated with deficiencies. {agg.total_failed} exception(s) "
-            f"across {agg.records_tested} record(s) tested."
-        )
-    emit(f"<p>{_e(statement)}</p>")
+    threshold_text, result_text = agg.determination.conclusion_text()
+    result_cls = "concl-result ok" if agg.passed else "concl-result bad"
+    emit(f"<p>{_e(threshold_text)}</p>")
+    emit(f'<p class="{result_cls}">{_e(result_text)}</p>')
     emit("</section>")
