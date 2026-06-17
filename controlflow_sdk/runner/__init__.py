@@ -20,7 +20,13 @@ Public API
 
 from __future__ import annotations
 
-from controlflow_sdk.runner.execute import RunnerError, run_control
+from controlflow_sdk.runner.execute import RunnerError, collect_data_samples, run_control
 from controlflow_sdk.runner.runlog import append_run, read_runs
 
-__all__ = ["RunnerError", "run_control", "append_run", "read_runs"]
+__all__ = [
+    "RunnerError",
+    "run_control",
+    "collect_data_samples",
+    "append_run",
+    "read_runs",
+]

@@ -6,9 +6,18 @@ import pathlib
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from controlflow_sdk.model.control import Threshold
+
 if TYPE_CHECKING:
     from controlflow_sdk.model.control import ControlDef
     from controlflow_sdk.model.run import RunRecord
+
+
+def _fmt_num(value: float) -> str:
+    """Format a number for prose: drop a trailing ``.0`` (5.0 → "5", 13.33 → "13.33")."""
+    if value == int(value):
+        return str(int(value))
+    return str(value)
 
 
 @dataclass
@@ -33,6 +42,94 @@ class Procedure:
         }
 
 
+# Max rows embedded per data source in the rendered workpaper's data table.
+MAX_SAMPLE_ROWS = 500
+
+
+@dataclass
+class DataSample:
+    """A capped, render-only sample of a bound source's rows.
+
+    Carries the included columns' display names and up to :data:`MAX_SAMPLE_ROWS`
+    rows so the HTML renderer can embed an interactive data table.  ``total_rows``
+    is the *full* row count, so the renderer can show "first 500 of N" when capped.
+
+    This is **render-only**: it is never serialised into the import bundle (the
+    bundle keeps its no-raw-rows trust boundary).
+    """
+
+    source_id: str
+    path: str
+    columns: list[str]
+    rows: list[list[str]] = field(default_factory=list)
+    total_rows: int = 0
+
+    @property
+    def capped(self) -> bool:
+        return self.total_rows > len(self.rows)
+
+
+@dataclass(frozen=True)
+class Determination:
+    """The threshold-based pass/fail determination — single source of truth.
+
+    Both the Results-bar verdict pill and the Conclusion section derive from
+    this, so they can never disagree.
+    """
+
+    threshold: Threshold
+    exception_count: int
+    records_tested: int
+
+    @property
+    def exception_rate(self) -> float:
+        if self.records_tested == 0:
+            return 0.0
+        return round(self.exception_count / self.records_tested * 100, 2)
+
+    @property
+    def passed(self) -> bool:
+        return self.threshold.passes(self.exception_count, self.records_tested)
+
+    @property
+    def verdict(self) -> str:
+        return "Operated effectively" if self.passed else "Operated with deficiencies"
+
+    def conclusion_text(self) -> tuple[str, str]:
+        """Return ``(threshold_text, result_text)`` prose for the Conclusion.
+
+        The threshold sentence states the pass rule; the result sentence states
+        the measured outcome and the determination.  Renderers wrap these in
+        their own markup (the result outcome is bolded / colour-coded).
+        """
+        n = self.exception_count
+        records = self.records_tested
+        rate = self.exception_rate
+        outcome = (
+            "within threshold → control operated effectively."
+            if self.passed
+            else "exceeds threshold → control did not operate effectively."
+        )
+
+        if self.threshold.is_implicit_zero:
+            threshold_text = "Threshold: zero exceptions tolerated."
+            if n == 0:
+                result_text = "Result: 0 exceptions → operated effectively."
+            else:
+                result_text = f"Result: {n} exception(s) → did not operate effectively."
+            return threshold_text, result_text
+
+        bounds: list[str] = []
+        if self.threshold.failure_threshold_pct is not None:
+            pct_str = _fmt_num(self.threshold.failure_threshold_pct)
+            bounds.append(f"the exception rate is at or below {pct_str}%")
+        if self.threshold.failure_threshold_count is not None:
+            bounds.append(f"no more than {self.threshold.failure_threshold_count} exception(s)")
+        threshold_text = "Threshold: control passes when " + " and ".join(bounds) + "."
+        result_text = f"Result: {_fmt_num(rate)}% ({n} / {records} records) → {outcome}"
+        return threshold_text, result_text
+
+
 @dataclass
 class Workpaper:
     """Structured audit workpaper assembled from a control definition and run record.
@@ -49,6 +146,28 @@ class Workpaper:
     framework_refs: dict[str, Any]
     procedures: list[Procedure] = field(default_factory=list)
     generated_at: str = ""
+    threshold: Threshold = field(default_factory=Threshold)
+    # Render-only capped row samples per bound source (never serialised to bundle).
+    data_samples: list[DataSample] = field(default_factory=list)
+
+    # ── derived ──────────────────────────────────────────────────────────────
+
+    @property
+    def records_tested(self) -> int:
+        return sum(p.result.population_size for p in self.procedures)
+
+    @property
+    def exception_count(self) -> int:
+        return sum(len(p.result.violations) for p in self.procedures)
+
+    @property
+    def determination(self) -> Determination:
+        """Threshold-based pass/fail — the single source of truth for the verdict."""
+        return Determination(
+            threshold=self.threshold,
+            exception_count=self.exception_count,
+            records_tested=self.records_tested,
+        )
 
     # ── factory ──────────────────────────────────────────────────────────────
 
@@ -58,12 +177,15 @@ class Workpaper:
         control: ControlDef,
         run: RunRecord,
         generated_at: str,
+        data_samples: list[DataSample] | None = None,
     ) -> Workpaper:
         """Build a Workpaper from a ControlDef and a RunRecord.
 
         Reads the test source from ``control.test_path`` and wraps the run in a
         single :class:`Procedure`.  ``generated_at`` must be supplied by the
         caller (ISO-8601 string) so this stays deterministic and testable.
+        ``data_samples`` (optional) carries capped per-source row samples for the
+        HTML renderer's interactive data table.
         """
         test_code = pathlib.Path(control.test_path).read_text(encoding="utf-8")
 
@@ -88,12 +210,18 @@ class Workpaper:
             framework_refs=framework_refs,
             procedures=[procedure],
             generated_at=generated_at,
+            threshold=control.threshold,
+            data_samples=list(data_samples or []),
         )
 
     # ── serialisation ────────────────────────────────────────────────────────
 
     def to_dict(self) -> dict[str, Any]:
-        """Return the structured, import-ready representation."""
+        """Return the structured, import-ready representation.
+
+        ``data_samples`` are intentionally **excluded** — raw rows never cross
+        the import bundle's trust boundary; they exist only for the HTML render.
+        """
         return {
             "control_id": self.control_id,
             "title": self.title,
@@ -102,4 +230,5 @@ class Workpaper:
             "framework_refs": self.framework_refs,
             "procedures": [p.to_dict() for p in self.procedures],
             "generated_at": self.generated_at,
+            "threshold": self.threshold.to_dict(),
         }

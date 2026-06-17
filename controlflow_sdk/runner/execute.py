@@ -18,11 +18,48 @@ from controlflow_sdk.model.control import ControlDef, SourceBinding
 from controlflow_sdk.model.population import Population
 from controlflow_sdk.model.run import RunRecord, SourceProvenance
 from controlflow_sdk.model.violation import Violation
+from controlflow_sdk.model.workpaper import MAX_SAMPLE_ROWS, DataSample
 from controlflow_sdk.project.discovery import load_test_callable
 
 
 class RunnerError(Exception):
     """Wraps author-code failures with the control id and an original traceback summary."""
+
+
+def _sample_from_population(pop: Population, path: str) -> DataSample:
+    """Build a capped, render-only :class:`DataSample` from a loaded population.
+
+    Columns are the population's *included* columns' display names; rows are the
+    first :data:`MAX_SAMPLE_ROWS` rows, every cell stringified (the renderer
+    HTML-escapes them).  ``total_rows`` records the full population size so the
+    renderer can show "first 500 of N" when capped.
+    """
+    cols = [c for c in pop.columns if c.include]
+    display_names = [c.display_name for c in cols]
+    original_names = [c.original_name for c in cols]
+
+    rows: list[list[str]] = []
+    head = pop.df.head(MAX_SAMPLE_ROWS)
+    for record in head.to_dict(orient="records"):
+        rows.append([_cell_str(record.get(name, "")) for name in original_names])
+
+    return DataSample(
+        source_id=pop.source_id,
+        path=path,
+        columns=display_names,
+        rows=rows,
+        total_rows=pop.size,
+    )
+
+
+def _cell_str(value: object) -> str:
+    """Stringify a cell value for the data table (renderer escapes it)."""
+    if value is None:
+        return ""
+    # pandas NaN / NaT compare unequal to themselves.
+    if value != value:  # noqa: PLR0124
+        return ""
+    return str(value)
 
 
 def _clean_traceback_summary(exc: BaseException) -> str:
@@ -177,3 +214,30 @@ def run_control(
         violations=violations,
         provenance=prov_records,
     )
+
+
+def collect_data_samples(
+    control: ControlDef,
+    sources: dict[str, SourceBinding],
+    root: Path,
+) -> list[DataSample]:
+    """Load each bound source and return capped, render-only row samples.
+
+    Used by ``cflow run`` to embed an interactive data table in the HTML
+    workpaper.  Each source contributes at most :data:`MAX_SAMPLE_ROWS` rows.
+    Sources are deduped by id (first binding wins) so a source bound to several
+    procedures is sampled once.  This is **render-only** — samples never enter
+    the import bundle.
+    """
+    samples: list[DataSample] = []
+    seen: set[str] = set()
+    for binding in control.sources:
+        if binding.id in seen:
+            continue
+        seen.add(binding.id)
+        src_binding = sources[binding.id]
+        adapter = source_for(src_binding, root)
+        pop = adapter.load()
+        path = adapter.provenance()["path"]
+        samples.append(_sample_from_population(pop, path))
+    return samples

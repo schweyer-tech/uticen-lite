@@ -34,7 +34,7 @@ from controlflow_sdk.model.workpaper import Workpaper
 from controlflow_sdk.project.discovery import Project
 from controlflow_sdk.render.html import render_html
 from controlflow_sdk.render.markdown import render_markdown
-from controlflow_sdk.runner.execute import RunnerError, run_control
+from controlflow_sdk.runner.execute import RunnerError, collect_data_samples, run_control
 from controlflow_sdk.runner.runlog import append_run
 
 
@@ -78,13 +78,14 @@ def run_cmd(args: argparse.Namespace) -> int:
     for control in controls:
         try:
             run = run_control(control, project.sources, root, executed_at)
+            data_samples = collect_data_samples(control, project.sources, root)
         except RunnerError as exc:
             print(f"  ERROR  {control.id}: {exc}", file=sys.stderr)
             any_errored = True
             continue
 
         # Assemble workpaper
-        wp = Workpaper.assemble(control, run, generated_at=executed_at)
+        wp = Workpaper.assemble(control, run, generated_at=executed_at, data_samples=data_samples)
 
         # Write markdown
         md_path = workpapers_dir / f"{control.id}.md"
