@@ -60,6 +60,17 @@ applied"** statement, source provenance (SHA-256 + row counts), the test code th
 of every exception with a plain-English reason
 (e.g. *"Payment references invoice 'INV-099' which does not exist in the invoice register"*).
 
+> **Workpaper parity.** `render_html()` produces a workpaper that is **structurally equivalent and
+> visually close** to ControlFlow's in-app workpaper view: the same section model and order
+> (Results, Objective & scope, Control, Data sources, Procedures, Evaluation, Exceptions,
+> Conclusion), the same sticky results bar and jump-nav sidebar, and the same shared design tokens
+> (dark enterprise palette, Inter / JetBrains Mono). It is **not** a pixel-exact mirror of the React
+> app, and it is intentionally static: collapsible sections and the sidebar work without any
+> JavaScript (`<details>/<summary>` + anchor links), the whole document is a single self-contained
+> HTML file with inline styles and no scripts, and interactive / finalization features that exist
+> only in the app (sign-off, severity selectors, disposition forms) are omitted because the SDK has
+> no data for them.
+
 Then package the engagement for the ControlFlow app:
 
 ```bash

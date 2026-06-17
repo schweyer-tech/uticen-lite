@@ -156,10 +156,15 @@ class TestRenderMarkdown:
 
         md = render_markdown(wp)
 
-        # Find the violations table row
+        # The violation renders in two tables now: the 3-column per-procedure
+        # violations table and the 4-column Exceptions summary table. Both must
+        # escape the pipe; assert on the per-procedure row (3 columns → 4
+        # delimiter pipes, so no leading "E-" ref cell).
         rows = [line for line in md.splitlines() if "INV" in line]
-        assert len(rows) == 1, "Violation must render as exactly one table row"
-        row = rows[0]
+        assert len(rows) == 2, "Violation must render in the procedure + exceptions tables"
+        proc_rows = [r for r in rows if not r.lstrip("| ").startswith("E-")]
+        assert len(proc_rows) == 1, "Exactly one per-procedure violation row expected"
+        row = proc_rows[0]
 
         # Pipe in item_key must be escaped as \|
         assert "INV\\|002" in row
