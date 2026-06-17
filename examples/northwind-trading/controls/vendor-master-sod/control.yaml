@@ -1,0 +1,28 @@
+id: vendor-master-sod
+title: Vendor Master Segregation of Duties
+objective: >
+  Ensure that no employee who created or last modified a vendor master record
+  is also approving payments to that vendor, preventing a single individual
+  from both establishing vendor data and authorizing disbursements.
+narrative: >
+  Segregation of duties in the procure-to-pay cycle requires that the employee
+  who maintains the vendor master (creates or modifies vendor records) be
+  different from the employee who approves payments to that vendor. This control
+  cross-references the payment approval roster against the vendor master audit
+  fields (created_by and last_modified_by). Any payment whose approved_by
+  matches either vendor master field is flagged as a potential SoD violation
+  and escalated to the Internal Audit team and CFO for immediate review.
+framework_refs:
+  nist:
+    - AC-5
+risk:
+  name: Vendor Master Manipulation and Unauthorized Disbursement
+  description: >
+    When a single employee can both maintain vendor records and approve
+    payments to those vendors, they could create fictitious or modified vendor
+    entries and authorize fraudulent disbursements without independent oversight,
+    representing a high fraud-risk control gap.
+  inherent_rating: high
+sources:
+  - id: payments
+  - id: vendor_master

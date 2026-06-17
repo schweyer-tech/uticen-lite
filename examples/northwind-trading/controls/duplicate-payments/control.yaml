@@ -1,0 +1,24 @@
+id: duplicate-payments
+title: Duplicate Payment Detection
+objective: >
+  Identify outgoing payments where the same vendor received the same dollar
+  amount more than once within a five-day window, indicating a duplicate
+  disbursement that may result in double-payment to a vendor.
+narrative: >
+  The AP team reviews the payment register at each period close and flags any
+  payment that shares both vendor and amount with another payment issued within
+  five calendar days. The later payment of each duplicate pair is placed on hold
+  and routed to the AP Manager and CFO for investigation and recovery. This
+  control is designed to catch duplicate keying errors, re-submitted payment
+  files, and manual re-entries before period-end reconciliation.
+framework_refs:
+  nist: []
+risk:
+  name: Duplicate Vendor Disbursement
+  description: >
+    Paying the same invoice or obligation twice erodes cash reserves, creates
+    vendor over-payment liabilities, and may signal fraudulent payment
+    manipulation if not detected and recovered promptly.
+  inherent_rating: high
+sources:
+  - id: payments
