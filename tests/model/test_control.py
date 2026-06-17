@@ -241,6 +241,7 @@ class TestControlDef:
             "risk",
             "sources",
             "severity_policy",
+            "threshold",
             "test_path",
         }
         assert keys == expected, f"Unexpected keys: {keys ^ expected}"

@@ -49,6 +49,30 @@ class TestDiscoverControls:
         assert p.name == "test.py"
         assert p.exists()
 
+    def test_threshold_defaults_to_implicit_zero(self):
+        """A control with no ``threshold:`` block gets an implicit-zero threshold."""
+        controls = discover_controls(SAMPLE)
+        assert controls[0].threshold.is_implicit_zero is True
+
+    def test_threshold_block_parsed(self, tmp_path):
+        """A ``threshold:`` block in control.yaml is parsed onto the ControlDef."""
+        from controlflow_sdk.model.control import SourceBinding
+        from controlflow_sdk.project.discovery import _parse_control
+
+        doc = {
+            "id": "thresholded",
+            "title": "Thresholded Control",
+            "objective": "Obj.",
+            "narrative": "Narr.",
+            "sources": [],
+            "threshold": {"failure_threshold_pct": 5, "failure_threshold_count": 2},
+        }
+        sources_map: dict[str, SourceBinding] = {}
+        (tmp_path / "test.py").write_text("def test(df):\n    return []\n", encoding="utf-8")
+        ctrl = _parse_control(doc, sources_map, tmp_path)
+        assert ctrl.threshold.failure_threshold_pct == 5.0
+        assert ctrl.threshold.failure_threshold_count == 2
+
     def test_unknown_source_raises_project_error(self, tmp_path):
         """A control.yaml referencing an unknown source id raises ProjectError."""
         # Minimal cflow.yaml

@@ -65,6 +65,22 @@
       "type": "object",
       "description": "Optional severity escalation rules."
     },
+    "threshold": {
+      "type": ["object", "null"],
+      "description": "Optional pass/fail tolerance. A control passes when the exception rate is <= failure_threshold_pct AND the count is <= failure_threshold_count (each ignored when null). Both null means zero tolerance.",
+      "properties": {
+        "failure_threshold_pct": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "failure_threshold_count": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
     "test_path": {
       "type": "string",
       "description": "Relative path to the test script."

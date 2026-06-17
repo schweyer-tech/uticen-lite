@@ -22,6 +22,7 @@ from controlflow_sdk.model.control import (
     FrameworkRefs,
     RiskRef,
     SourceBinding,
+    Threshold,
 )
 from controlflow_sdk.project.loader import (
     ProjectConfig,
@@ -80,6 +81,9 @@ def _parse_control(
             inherent_rating=risk_raw.get("inherent_rating"),
         )
 
+    # Parse optional threshold block (pass/fail tolerance).
+    threshold = Threshold.from_raw(doc.get("threshold"))
+
     # Resolve test_path to an absolute path at construction time so that
     # load_test_callable can use it directly without needing the project root.
     test_path: str = str((control_dir / doc.get("test_path", "test.py")).resolve())
@@ -94,6 +98,7 @@ def _parse_control(
         sources=resolved_sources,
         test_path=test_path,
         severity_policy=dict(doc.get("severity_policy") or {}),
+        threshold=threshold,
     )
 
 
