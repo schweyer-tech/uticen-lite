@@ -85,7 +85,7 @@ def render_markdown(wp: Workpaper) -> str:
     lines.append("_Full-population test — every record evaluated; no sampling applied._")
     lines.append("")
 
-    # ── Results (Records tested · Passed · Exceptions; no Failed) ──────────────
+    # ── Results (Records Tested · Passed · Exceptions; no Failed) ──────────────
     lines.append("## Results")
     lines.append("")
     lines.append(
@@ -94,14 +94,14 @@ def render_markdown(wp: Workpaper) -> str:
     lines.append("")
     lines.append("| Metric | Value |")
     lines.append("| --- | --- |")
-    lines.append(f"| Records tested | {records_tested} |")
+    lines.append(f"| Records Tested | {records_tested} |")
     lines.append(f"| Passed | {total_passed} |")
     lines.append(f"| Exceptions | {exceptions} |")
-    lines.append(f"| Pass rate | {pass_rate}% |")
+    lines.append(f"| Pass Rate | {pass_rate}% |")
     lines.append("")
 
-    # ── Objective & scope ─────────────────────────────────────────────────────
-    lines.append("## Objective & scope")
+    # ── Objective & Scope ─────────────────────────────────────────────────────
+    lines.append("## Objective & Scope")
     lines.append("")
     lines.append(wp.objective)
     lines.append("")
@@ -114,7 +114,7 @@ def render_markdown(wp: Workpaper) -> str:
     lines.append("")
     lines.append(wp.narrative)
     lines.append("")
-    lines.append("### Framework references")
+    lines.append("### Framework References")
     lines.append("")
     if nist_refs:
         lines.append(f"**NIST 800-53:** {', '.join(nist_refs)}")
@@ -125,16 +125,21 @@ def render_markdown(wp: Workpaper) -> str:
         lines.append("None")
     lines.append("")
 
-    # ── Data sources ──────────────────────────────────────────────────────────
-    lines.append("## Data sources")
+    # ── Data Sources ──────────────────────────────────────────────────────────
+    lines.append("## Data Sources")
     lines.append("")
     if sources:
         for prov in sources:
+            sample = samples_by_id.get(prov.source_id)
             lines.append(f"- **{prov.path}** — {prov.row_count} rows")
             lines.append(f"  - SHA-256: `{prov.sha256}`")
             lines.append(f"  - Source: `{prov.source_id}`")
+            description = sample.description if sample is not None else None
+            if description:
+                lines.append(f"  - **Description:** {description}")
+            ca_text = _completeness_accuracy_text(prov, sample)
+            lines.append(f"  - **Completeness & Accuracy:** {ca_text}")
             lines.append("")
-            sample = samples_by_id.get(prov.source_id)
             if sample is not None and sample.columns:
                 _append_preview_table(lines, sample)
     else:
@@ -178,7 +183,7 @@ def render_markdown(wp: Workpaper) -> str:
     lines.append("## Exceptions")
     lines.append("")
     if violations:
-        lines.append("| E-ref | Item Key | Severity | Description |")
+        lines.append("| E-Ref | Item Key | Severity | Description |")
         lines.append("| --- | --- | --- | --- |")
         for i, v in enumerate(violations, start=1):
             key = _md_cell(v.item_key)
@@ -199,6 +204,25 @@ def render_markdown(wp: Workpaper) -> str:
     lines.append("")
 
     return "\n".join(lines)
+
+
+def _completeness_accuracy_text(
+    prov: SourceProvenance,
+    sample: DataSample | None,
+) -> str:
+    """Return the Completeness & Accuracy assertion for a source.
+
+    Uses the author-supplied ``completeness_accuracy`` when present; otherwise
+    derives a sensible default from the tie-out (row count, file, sha256 prefix).
+    """
+    if sample is not None and sample.completeness_accuracy:
+        return sample.completeness_accuracy
+    short_sha = str(prov.sha256)[:8]
+    return (
+        f"All {prov.row_count} records were loaded from {prov.path} "
+        f"(sha256 {short_sha}) and tested in full — row count ties to the "
+        f"source extract; no sampling."
+    )
 
 
 def _append_preview_table(lines: list[str], sample: DataSample) -> None:

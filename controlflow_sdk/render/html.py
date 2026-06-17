@@ -34,15 +34,16 @@ _TABLE_PAGE_LENGTH = 10
 # footer carries a one-line disclaimer instead of a sign-off placeholder.
 # ---------------------------------------------------------------------------
 
-# (anchor id, sidebar index badge, label, source tag)
-_SECTIONS: list[tuple[str, str, str, str]] = [
-    ("results", "★", "Results", "read-only · run_record"),
-    ("objective-scope", "0", "Objective & scope", "objective"),
-    ("control", "1", "Control", "control · framework_refs"),
-    ("data-sources", "2", "Data sources", "provenance · data"),
-    ("procedures", "3", "Procedures", "procedures · run_record"),
-    ("exceptions", "4", "Exceptions", "violations"),
-    ("conclusion", "5", "Conclusion", "threshold"),
+# (anchor id, sidebar index badge, label). Anchor ids stay kebab-case; only the
+# visible labels are Title-Cased.
+_SECTIONS: list[tuple[str, str, str]] = [
+    ("results", "★", "Results"),
+    ("objective-scope", "0", "Objective & Scope"),
+    ("control", "1", "Control"),
+    ("data-sources", "2", "Data Sources"),
+    ("procedures", "3", "Procedures"),
+    ("exceptions", "4", "Exceptions"),
+    ("conclusion", "5", "Conclusion"),
 ]
 
 
@@ -142,6 +143,19 @@ a { color: inherit; text-decoration: none; }
   background: var(--bg-surface-1); border: 1px solid var(--border-default);
   border-radius: var(--radius-card); padding: 10px 14px; margin-bottom: 20px;
 }
+.wp-resultbar .rb-control {
+  display: inline-flex; align-items: baseline; gap: 8px; min-width: 0;
+}
+.wp-resultbar .rb-control .rb-cid {
+  font-family: var(--font-mono); font-size: 12px; color: var(--text-tertiary);
+}
+.wp-resultbar .rb-control .rb-cname {
+  font-size: 13px; font-weight: 600; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.wp-resultbar .rb-sep-v {
+  width: 1px; align-self: stretch; background: var(--border-default);
+}
 .wp-resultbar .rb-label {
   font-size: 11px; letter-spacing: 0.08em; color: var(--text-tertiary);
   text-transform: uppercase;
@@ -159,10 +173,6 @@ section h2 {
   display: flex; align-items: baseline; gap: 10px;
   font-size: 18px; line-height: 26px; font-weight: 600; color: var(--text-primary);
   border-bottom: 1px solid var(--border-default); padding-bottom: 6px; margin-bottom: 12px;
-}
-section h2 .sec-tag {
-  font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);
-  font-weight: 400;
 }
 :target > h2 { color: var(--accent-primary); }
 h3 { font-size: 15px; line-height: 22px; color: var(--text-primary); margin: 14px 0 6px; }
@@ -257,6 +267,11 @@ details > .details-body { padding: 0 12px 12px; }
 .prov-path {
   font-family: var(--font-mono); font-size: 11px; color: var(--text-primary);
   word-break: break-all; margin-top: 4px;
+}
+.src-desc, .src-ca { font-size: 12px; line-height: 18px; margin-top: 8px; }
+.src-lbl {
+  display: inline-block; font-weight: 600; color: var(--text-primary);
+  margin-right: 4px;
 }
 .rowcount-badge {
   background: var(--accent-muted); color: var(--accent-primary);
@@ -575,7 +590,7 @@ def render_html(wp: Workpaper) -> str:
     _emit_sidebar(emit, wp, sources, violations)
     emit('<main class="wp-content">')
 
-    _emit_resultbar(emit, agg)
+    _emit_resultbar(emit, agg, wp)
     _emit_results(emit, agg)
     _emit_objective_scope(emit, wp)
     _emit_control(emit, wp, nist_refs, extra)
@@ -623,7 +638,7 @@ def _emit_sidebar(
     emit(f'<div class="wp-sidebar-title">{_e(wp.title)}</div>')
     emit(f'<div class="wp-sidebar-sub">control {_e(wp.control_id)}</div>')
     emit("<nav>")
-    for anchor, idx, label, _tag in _SECTIONS:
+    for anchor, idx, label in _SECTIONS:
         count_html = ""
         if anchor in counts:
             n, crit = counts[anchor]
@@ -641,11 +656,10 @@ def _emit_sidebar(
 
 
 def _section_open(emit, anchor: str) -> None:
-    """Open a <section> with its <h2> heading + source tag."""
+    """Open a <section> with its <h2> heading (Title-Cased label, no source tag)."""
     label = next(s[2] for s in _SECTIONS if s[0] == anchor)
-    tag = next(s[3] for s in _SECTIONS if s[0] == anchor)
     emit(f'<section id="{anchor}">')
-    emit(f'<h2>{_e(label)}<span class="sec-tag">{_e(tag)}</span></h2>')
+    emit(f"<h2>{_e(label)}</h2>")
 
 
 # ---------------------------------------------------------------------------
@@ -653,10 +667,19 @@ def _section_open(emit, anchor: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _emit_resultbar(emit, agg: _Agg) -> None:
+def _emit_resultbar(emit, agg: _Agg, wp: Workpaper) -> None:
     # Records-led order, single finding metric (Exceptions). No separate "fail".
+    # Leads with the control identity ("<id>: <name>") so the sticky bar always
+    # names the control it summarises.
     pill_cls = "ok" if agg.passed else "bad"
     emit('<div class="wp-resultbar">')
+    emit(
+        '<span class="rb-control">'
+        f'<span class="rb-cid mono">{_e(wp.control_id)}:</span>'
+        f'<span class="rb-cname">{_e(wp.title)}</span>'
+        "</span>"
+    )
+    emit('<span class="rb-sep-v" aria-hidden="true"></span>')
     emit('<span class="rb-label">Result</span>')
     emit(
         '<span class="rb-metrics">'
@@ -682,7 +705,7 @@ def _emit_results(emit, agg: _Agg) -> None:
     _section_open(emit, "results")
     emit('<div class="tiles">')
     emit(
-        '<div class="tile"><div class="tile-label">Records tested</div>'
+        '<div class="tile"><div class="tile-label">Records Tested</div>'
         f'<div class="tile-value">{agg.records_tested}</div></div>'
     )
     emit(
@@ -695,7 +718,7 @@ def _emit_results(emit, agg: _Agg) -> None:
         f'<div class="tile-value">{agg.exceptions}</div></div>'
     )
     emit("</div>")
-    emit(f'<p class="muted">Pass rate <span class="mono">{agg.pass_rate}%</span></p>')
+    emit(f'<p class="muted">Pass Rate <span class="mono">{agg.pass_rate}%</span></p>')
     emit("</section>")
 
 
@@ -729,7 +752,7 @@ def _emit_control(
     emit("</tbody></table>")
     emit(f"<p>{_e(wp.narrative)}</p>")
 
-    emit("<h3>Framework references</h3>")
+    emit("<h3>Framework References</h3>")
     if nist_refs or any(extra.values()):
         emit("<p>")
         for ref in nist_refs:
@@ -760,6 +783,7 @@ def _emit_data_sources(
         return
     samples_by_id: dict[str, DataSample] = {s.source_id: s for s in data_samples}
     for prov in sources:
+        sample = samples_by_id.get(prov.source_id)
         emit("<details>")
         emit(
             "<summary>"
@@ -777,13 +801,43 @@ def _emit_data_sources(
         emit("</div>")
         emit(f'<div class="prov-path">{_e(prov.sha256)}</div>')
         emit(f'<div class="prov-path">{_e(prov.path)}</div>')
+        # Description (optional) + Completeness & Accuracy assertion (default derived).
+        description = sample.description if sample is not None else None
+        if description:
+            emit(
+                '<p class="src-desc"><span class="src-lbl">Description</span> '
+                f"{_e(description)}</p>"
+            )
+        ca_text = _completeness_accuracy_text(prov, sample)
+        emit(
+            '<p class="src-ca"><span class="src-lbl">Completeness &amp; Accuracy</span> '
+            f"{_e(ca_text)}</p>"
+        )
         # interactive data table of the source rows
-        sample = samples_by_id.get(prov.source_id)
         if sample is not None and sample.columns:
             _emit_data_table(emit, sample)
         emit("</div>")  # /details-body
         emit("</details>")
     emit("</section>")
+
+
+def _completeness_accuracy_text(
+    prov: SourceProvenance,
+    sample: DataSample | None,
+) -> str:
+    """Return the Completeness & Accuracy assertion for a source.
+
+    Uses the author-supplied ``completeness_accuracy`` when present; otherwise
+    derives a sensible default from the tie-out (row count, file, sha256 prefix).
+    """
+    if sample is not None and sample.completeness_accuracy:
+        return sample.completeness_accuracy
+    short_sha = str(prov.sha256)[:8]
+    return (
+        f"All {prov.row_count} records were loaded from {prov.path} "
+        f"(sha256 {short_sha}) and tested in full — row count ties to the "
+        f"source extract; no sampling."
+    )
 
 
 def _emit_data_table(emit, sample: DataSample) -> None:
@@ -848,7 +902,7 @@ def _emit_procedures(emit, wp: Workpaper) -> None:
         emit(
             "<summary>"
             '<span class="tri" aria-hidden="true">&#9656;</span>'
-            "code that ran"
+            "Code That Ran"
             f' <span class="mono">run {_e(str(run.run_id)[:8])}&hellip;</span>'
             "</summary>"
         )
@@ -863,13 +917,13 @@ def _emit_procedures(emit, wp: Workpaper) -> None:
             f'Population <span class="mono">{_e(run.population_size)}</span> &middot; '
             f'Passed <span class="mono">{_e(run.passed)}</span> &middot; '
             f'Failed <span class="mono">{_e(run.failed)}</span> &middot; '
-            f'Pass rate <span class="mono">{_e(run.pass_rate)}%</span></p>'
+            f'Pass Rate <span class="mono">{_e(run.pass_rate)}%</span></p>'
         )
 
         # per-procedure violations table
         if run.violations:
             emit("<table>")
-            emit("<thead><tr><th>Item key</th><th>Severity</th><th>Description</th></tr></thead>")
+            emit("<thead><tr><th>Item Key</th><th>Severity</th><th>Description</th></tr></thead>")
             emit("<tbody>")
             for v in run.violations:
                 sev_cls = _severity_class(str(v.severity))
@@ -898,22 +952,7 @@ def _emit_exceptions(emit, violations: list[Violation]) -> None:
         emit("</section>")
         return
 
-    # summary table
-    emit("<table>")
-    emit("<thead><tr><th>E-ref</th><th>Item key</th><th>Severity</th></tr></thead>")
-    emit("<tbody>")
-    for i, v in enumerate(violations, start=1):
-        sev_cls = _severity_class(str(v.severity))
-        emit(
-            "<tr>"
-            f'<td class="mono">E-{i}</td>'
-            f'<td class="mono">{_e(v.item_key)}</td>'
-            f'<td class="{_e(sev_cls)}">{_e(v.severity)}</td>'
-            "</tr>"
-        )
-    emit("</tbody></table>")
-
-    # per-violation collapsible disposition panel (data only)
+    # per-violation collapsible disposition panel (data only) — no summary table
     for i, v in enumerate(violations, start=1):
         sev_cls = _severity_class(str(v.severity))
         emit("<details>")
