@@ -25,6 +25,10 @@
             "type": "string",
             "description": "Optional Completeness & Accuracy assertion for the extract, shown in the workpaper's Data Sources section."
           },
+          "extract_date": {
+            "type": "string",
+            "description": "Optional as-of date of the extract (the date the data is current as of), shown as the Extract Date in the workpaper's Data Sources section."
+          },
           "type": {
             "type": "string",
             "description": "Source type (e.g. file, s3, snowflake, rest).",

@@ -11,7 +11,10 @@ Pyodide-safe (stdlib only, no pandas/pydantic).
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+
+from controlflow_sdk.render.dates import format_display_date
 
 if TYPE_CHECKING:
     from controlflow_sdk.model.run import SourceProvenance
@@ -20,6 +23,10 @@ if TYPE_CHECKING:
 
 # Rows shown in the Markdown static preview table per data source.
 _MD_PREVIEW_ROWS = 10
+
+# Default "Generated" date display format and timezone (mm/dd/yyyy in EST).
+_DEFAULT_DATE_FORMAT = "%m/%d/%Y"
+_DEFAULT_TZ = "America/New_York"
 
 
 def _md_cell(text: object) -> str:
@@ -54,12 +61,22 @@ def _all_violations(wp: Workpaper) -> list[Violation]:
     return out
 
 
-def render_markdown(wp: Workpaper) -> str:
+def render_markdown(
+    wp: Workpaper,
+    *,
+    generated_at: datetime | None = None,
+    date_format: str = _DEFAULT_DATE_FORMAT,
+    tz: str = _DEFAULT_TZ,
+) -> str:
     """Return a Markdown string representing the full audit workpaper.
 
     Sections (canonical order): Results, Objective & scope, Control (with
-    framework references), Data sources, Procedures, Evaluation, Exceptions,
-    Conclusion.
+    framework references), Data sources, Procedures, Exceptions, Conclusion.
+
+    ``generated_at`` is the actual render-time clock (defaults to now in UTC) —
+    distinct from the run's execution/as-of date, which surfaces per source as
+    the Extract Date. ``date_format`` / ``tz`` control all displayed dates
+    (default ``mm/dd/yyyy`` in US Eastern).
     """
     lines: list[str] = []
     records_tested = wp.records_tested
@@ -69,20 +86,21 @@ def render_markdown(wp: Workpaper) -> str:
     determination = wp.determination
     verdict = determination.verdict
 
+    gen_dt = generated_at if generated_at is not None else datetime.now(UTC)
+    generated_display = format_display_date(gen_dt, date_format=date_format, tz=tz)
+
     sources = _dedup_provenance(wp)
     samples_by_id: dict[str, DataSample] = {s.source_id: s for s in wp.data_samples}
     violations = _all_violations(wp)
     nist_refs: list[str] = wp.framework_refs.get("nist", [])
     extra: dict[str, list[str]] = wp.framework_refs.get("extra", {})
+    run_executed_at = wp.procedures[0].result.executed_at if wp.procedures else ""
 
     # ── Header ────────────────────────────────────────────────────────────────
-    # Full-population methodology stated ONCE here, not per section/procedure.
     lines.append(f"# {wp.title}")
     lines.append("")
     lines.append(f"**Control ID:** {wp.control_id}")
-    lines.append(f"**Generated:** {wp.generated_at}")
-    lines.append("")
-    lines.append("_Full-population test — every record evaluated; no sampling applied._")
+    lines.append(f"**Generated:** {generated_display}")
     lines.append("")
 
     # ── Results (Records Tested · Passed · Exceptions; no Failed) ──────────────
@@ -134,6 +152,11 @@ def render_markdown(wp: Workpaper) -> str:
             lines.append(f"- **{prov.path}** — {prov.row_count} rows")
             lines.append(f"  - SHA-256: `{prov.sha256}`")
             lines.append(f"  - Source: `{prov.source_id}`")
+            raw_extract = sample.extract_date if sample is not None else None
+            extract_display = format_display_date(
+                raw_extract or run_executed_at, date_format=date_format, tz=tz
+            )
+            lines.append(f"  - **Extract Date:** {extract_display}")
             description = sample.description if sample is not None else None
             if description:
                 lines.append(f"  - **Description:** {description}")
@@ -153,8 +176,6 @@ def render_markdown(wp: Workpaper) -> str:
         run = proc.result
         status = "PASS" if run.failed == 0 else "FAIL"
         lines.append(f"### P{i}: {proc.title} — {status}")
-        lines.append("")
-        lines.append(f"`run {str(run.run_id)[:8]}… · {run.executed_at}`")
         lines.append("")
         lines.append(proc.narrative)
         lines.append("")

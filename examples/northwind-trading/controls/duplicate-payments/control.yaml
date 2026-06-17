@@ -1,4 +1,4 @@
-id: duplicate-payments
+id: Finance.AP.3
 title: Duplicate Payment Detection
 objective: >
   Identify outgoing payments where the same vendor received the same dollar

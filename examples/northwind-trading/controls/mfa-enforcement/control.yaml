@@ -1,4 +1,4 @@
-id: mfa-enforcement
+id: IT.AC.3
 title: Multi-Factor Authentication Enforcement
 objective: >
   Ensure that all active system accounts have multi-factor authentication (MFA)

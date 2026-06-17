@@ -18,12 +18,19 @@ Renderer guarantees (all preserved):
 from __future__ import annotations
 
 import html as _html
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+
+from controlflow_sdk.render.dates import format_display_date
 
 if TYPE_CHECKING:
     from controlflow_sdk.model.run import SourceProvenance
     from controlflow_sdk.model.violation import Violation
     from controlflow_sdk.model.workpaper import DataSample, Determination, Workpaper
+
+# Default "Generated" date display format and timezone (mm/dd/yyyy in EST).
+_DEFAULT_DATE_FORMAT = "%m/%d/%Y"
+_DEFAULT_TZ = "America/New_York"
 
 # Default page length for the interactive data table (configurable constant).
 _TABLE_PAGE_LENGTH = 10
@@ -34,16 +41,16 @@ _TABLE_PAGE_LENGTH = 10
 # footer carries a one-line disclaimer instead of a sign-off placeholder.
 # ---------------------------------------------------------------------------
 
-# (anchor id, sidebar index badge, label). Anchor ids stay kebab-case; only the
-# visible labels are Title-Cased.
-_SECTIONS: list[tuple[str, str, str]] = [
-    ("results", "★", "Results"),
-    ("objective-scope", "0", "Objective & Scope"),
-    ("control", "1", "Control"),
-    ("data-sources", "2", "Data Sources"),
-    ("procedures", "3", "Procedures"),
-    ("exceptions", "4", "Exceptions"),
-    ("conclusion", "5", "Conclusion"),
+# (anchor id, label). Anchor ids stay kebab-case; only the visible labels are
+# Title-Cased. The sidebar does not number the sections.
+_SECTIONS: list[tuple[str, str]] = [
+    ("results", "Results"),
+    ("objective-scope", "Objective & Scope"),
+    ("control", "Control"),
+    ("data-sources", "Data Sources"),
+    ("procedures", "Procedures"),
+    ("exceptions", "Exceptions"),
+    ("conclusion", "Conclusion"),
 ]
 
 
@@ -90,9 +97,6 @@ a { color: inherit; text-decoration: none; }
 }
 .wp-header .wp-meta { color: var(--text-secondary); font-size: 12px; line-height: 16px; }
 .wp-header .wp-meta .mono { color: var(--text-primary); }
-.wp-header .wp-method {
-  color: var(--text-tertiary); font-size: 12px; line-height: 16px; margin-top: 4px;
-}
 .chip {
   display: inline-block; background: var(--bg-surface-2); color: var(--text-primary);
   border: 1px solid var(--border-default); border-radius: var(--radius-badge);
@@ -107,24 +111,12 @@ a { color: inherit; text-decoration: none; }
   background: var(--bg-surface-1); border-right: 1px solid var(--border-default);
   padding: 12px; border-radius: var(--radius-card);
 }
-.wp-sidebar .wp-sidebar-title {
-  color: var(--text-primary); font-weight: 600; font-size: 13px; line-height: 18px;
-  margin-bottom: 2px;
-}
-.wp-sidebar .wp-sidebar-sub {
-  color: var(--text-secondary); font-family: var(--font-mono); font-size: 12px;
-  margin-bottom: 12px; word-break: break-all;
-}
 .wp-sidebar nav a {
   display: flex; align-items: center; gap: 8px;
   padding: 5px 6px; border-radius: var(--radius-input);
   color: var(--text-secondary); font-size: 13px; line-height: 18px;
 }
 .wp-sidebar nav a:hover { background: var(--bg-surface-2); color: var(--text-primary); }
-.wp-sidebar nav a .nav-idx {
-  flex: 0 0 auto; width: 18px; text-align: center;
-  font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);
-}
 .wp-sidebar nav a .nav-label { flex: 1 1 auto; }
 .wp-sidebar nav a .nav-count {
   flex: 0 0 auto; font-family: var(--font-mono); font-size: 11px;
@@ -287,9 +279,6 @@ pre {
   overflow-x: auto; white-space: pre-wrap; word-break: break-all; margin: 6px 0;
 }
 
-/* ── per-procedure integrity line ────────────────────────────────────────── */
-.integrity { font-family: var(--font-mono); font-size: 11px; color: var(--status-success); }
-.fullpop { font-weight: 600; color: var(--text-primary); margin: 8px 0; }
 .empty-state { color: var(--text-secondary); }
 
 /* ── conclusion (threshold determination) ────────────────────────────────── */
@@ -542,21 +531,50 @@ class _Agg:
 # ---------------------------------------------------------------------------
 
 
-def render_html(wp: Workpaper) -> str:
+def render_html(
+    wp: Workpaper,
+    *,
+    generated_at: datetime | None = None,
+    date_format: str = _DEFAULT_DATE_FORMAT,
+    tz: str = _DEFAULT_TZ,
+) -> str:
     """Return a self-contained HTML document for *wp*.
 
-    Guarantee: no ``<script`` tags; all author/data text is html-escaped.
+    Parameters
+    ----------
+    wp:
+        The assembled workpaper.
+    generated_at:
+        Actual generation time (defaults to ``datetime.now`` in UTC). This is the
+        render-time clock — distinct from the run's execution/as-of date, which
+        surfaces per source as the Extract Date.
+    date_format:
+        ``strftime`` pattern for all displayed dates (default ``mm/dd/yyyy``).
+    tz:
+        IANA timezone name for date display (default US Eastern). Falls back to
+        UTC defensively if the tz database is unavailable.
+
+    Guarantee: exactly one inline ``<script>`` (the data-table widget) and no
+    ``<link>`` stylesheet; all author/data text is html-escaped. An ``<a href>``
+    credit link in the footer is permitted (the no-link rule is about external
+    stylesheets, not anchors).
     """
     parts: list[str] = []
 
     def emit(s: str = "") -> None:
         parts.append(s)
 
+    gen_dt = generated_at if generated_at is not None else datetime.now(UTC)
+    generated_display = format_display_date(gen_dt, date_format=date_format, tz=tz)
+
     agg = _Agg(wp)
     sources = _dedup_provenance(wp)
     violations = _all_violations(wp)
     nist_refs: list[str] = wp.framework_refs.get("nist", [])
     extra: dict[str, list[str]] = wp.framework_refs.get("extra", {})
+    # The run's execution/as-of date — the default Extract Date for any source
+    # that does not declare its own.
+    run_executed_at = wp.procedures[0].result.executed_at if wp.procedures else ""
 
     # ── head ──────────────────────────────────────────────────────────────────
     emit("<!doctype html>")
@@ -569,19 +587,13 @@ def render_html(wp: Workpaper) -> str:
     emit("</head>")
     emit("<body>")
 
-    # ── document header ───────────────────────────────────────────────────────
-    # The full-population methodology is stated ONCE here (quiet caption), not
-    # repeated per section/procedure.
-    emit('<header class="wp-header">')
+    # ── document header (anchored as the document top) ────────────────────────
+    emit('<header class="wp-header" id="top">')
     emit(f"<h1>{_e(wp.title)}</h1>")
     emit(
         '<p class="wp-meta">Control '
         f'<span class="chip">{_e(wp.control_id)}</span> '
-        f'&middot; Generated <span class="mono">{_e(wp.generated_at)}</span></p>'
-    )
-    emit(
-        '<p class="wp-method">Full-population test &mdash; every record evaluated; '
-        "no sampling applied.</p>"
+        f'&middot; Generated <span class="mono">{_e(generated_display)}</span></p>'
     )
     emit("</header>")
 
@@ -594,7 +606,7 @@ def render_html(wp: Workpaper) -> str:
     _emit_results(emit, agg)
     _emit_objective_scope(emit, wp)
     _emit_control(emit, wp, nist_refs, extra)
-    _emit_data_sources(emit, sources, wp.data_samples)
+    _emit_data_sources(emit, sources, wp.data_samples, run_executed_at, date_format, tz)
     _emit_procedures(emit, wp)
     _emit_exceptions(emit, violations)
     _emit_conclusion(emit, agg)
@@ -602,10 +614,11 @@ def render_html(wp: Workpaper) -> str:
     emit("</main>")
     emit("</div>")  # /wp-layout
 
-    # ── footer disclaimer ─────────────────────────────────────────────────────
+    # ── footer ────────────────────────────────────────────────────────────────
     emit(
         '<footer class="wp-footer">Generated by controlflow-sdk &middot; '
-        f"{_e(wp.generated_at)} &middot; not a finalized workpaper</footer>"
+        f"{_e(generated_display)} &middot; "
+        'Created by <a href="https://schweyer.tech">schweyer.tech</a></footer>'
     )
 
     # ── data-table widget (single inline vanilla-JS script) ───────────────────
@@ -628,36 +641,39 @@ def _emit_sidebar(
     sources: list[SourceProvenance],
     violations: list[Violation],
 ) -> None:
-    any_proc_failed = any(p.result.failed > 0 for p in wp.procedures)
+    # Count badges. Only the Exceptions badge may be critical (red); more
+    # procedures / sources is never "bad", so those stay neutral.
     counts: dict[str, tuple[int, bool]] = {
         "data-sources": (len(sources), False),
-        "procedures": (len(wp.procedures), any_proc_failed),
+        "procedures": (len(wp.procedures), False),
         "exceptions": (len(violations), len(violations) > 0),
     }
+    # The sidebar lists only the section links (no title block, no numbering).
+    # The first link jumps to the top of the document (#top) instead of the
+    # Results section anchor.
     emit('<nav class="wp-sidebar">')
-    emit(f'<div class="wp-sidebar-title">{_e(wp.title)}</div>')
-    emit(f'<div class="wp-sidebar-sub">control {_e(wp.control_id)}</div>')
     emit("<nav>")
-    for anchor, idx, label in _SECTIONS:
+    for i, (anchor, label) in enumerate(_SECTIONS):
+        if i == 0:
+            href = "#top"
+            nav_label = "↑ Jump to Top"
+        else:
+            href = f"#{anchor}"
+            nav_label = label
         count_html = ""
         if anchor in counts:
             n, crit = counts[anchor]
             if n > 0:
                 cls = "nav-count crit" if crit else "nav-count"
                 count_html = f'<span class="{cls}">{n}</span>'
-        emit(
-            f'<a href="#{anchor}">'
-            f'<span class="nav-idx">{_e(idx)}</span>'
-            f'<span class="nav-label">{_e(label)}</span>'
-            f"{count_html}</a>"
-        )
+        emit(f'<a href="{href}"><span class="nav-label">{_e(nav_label)}</span>{count_html}</a>')
     emit("</nav>")
     emit("</nav>")
 
 
 def _section_open(emit, anchor: str) -> None:
     """Open a <section> with its <h2> heading (Title-Cased label, no source tag)."""
-    label = next(s[2] for s in _SECTIONS if s[0] == anchor)
+    label = next(s[1] for s in _SECTIONS if s[0] == anchor)
     emit(f'<section id="{anchor}">')
     emit(f"<h2>{_e(label)}</h2>")
 
@@ -775,6 +791,9 @@ def _emit_data_sources(
     emit,
     sources: list[SourceProvenance],
     data_samples: list[DataSample],
+    run_executed_at: str,
+    date_format: str,
+    tz: str,
 ) -> None:
     _section_open(emit, "data-sources")
     if not sources:
@@ -801,6 +820,14 @@ def _emit_data_sources(
         emit("</div>")
         emit(f'<div class="prov-path">{_e(prov.sha256)}</div>')
         emit(f'<div class="prov-path">{_e(prov.path)}</div>')
+        # Extract Date — author-supplied as-of date, else the run's as-of date.
+        raw_extract = sample.extract_date if sample is not None else None
+        extract_display = format_display_date(
+            raw_extract or run_executed_at, date_format=date_format, tz=tz
+        )
+        emit(
+            f'<p class="src-ca"><span class="src-lbl">Extract Date</span> {_e(extract_display)}</p>'
+        )
         # Description (optional) + Completeness & Accuracy assertion (default derived).
         description = sample.description if sample is not None else None
         if description:
@@ -891,21 +918,12 @@ def _emit_procedures(emit, wp: Workpaper) -> None:
             else '<span class="badge fail">FAIL</span>'
         )
         emit(f"<h3>P{i}: {_e(proc.title)} {badge}</h3>")
-        emit(
-            f'<div class="integrity">run {_e(str(run.run_id)[:8])}&hellip; '
-            f"&middot; {_e(run.executed_at)}</div>"
-        )
         emit(f"<p>{_e(proc.narrative)}</p>")
 
-        # collapsible code block
+        # collapsible code block (the single header "Generated" date suffices —
+        # no per-procedure run-id/date line)
         emit("<details>")
-        emit(
-            "<summary>"
-            '<span class="tri" aria-hidden="true">&#9656;</span>'
-            "Code That Ran"
-            f' <span class="mono">run {_e(str(run.run_id)[:8])}&hellip;</span>'
-            "</summary>"
-        )
+        emit('<summary><span class="tri" aria-hidden="true">&#9656;</span>Code That Ran</summary>')
         emit('<div class="details-body">')
         emit(f"<pre>{_e(proc.test_code)}</pre>")
         emit("</div>")

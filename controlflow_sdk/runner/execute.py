@@ -53,6 +53,7 @@ def _sample_from_population(pop: Population, path: str, binding: SourceBinding) 
         total_rows=pop.size,
         description=binding.description,
         completeness_accuracy=binding.completeness_accuracy,
+        extract_date=binding.extract_date,
     )
 
 

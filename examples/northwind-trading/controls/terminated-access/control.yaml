@@ -1,4 +1,4 @@
-id: terminated-access
+id: IT.AC.1
 title: Terminated Employee Access Revocation
 objective: >
   Ensure that system access accounts belonging to terminated employees are

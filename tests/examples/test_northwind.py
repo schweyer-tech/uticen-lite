@@ -25,14 +25,14 @@ AT = "2026-03-31T00:00:00Z"
 
 # Exact expected failed-exception counts for each control at the snapshot date.
 EXPECTED: dict[str, int] = {
-    "manual-je-review": 3,
-    "closed-period-postings": 2,
-    "three-way-match": 4,
-    "terminated-access": 3,
-    "privileged-access-review": 2,
-    "mfa-enforcement": 0,
-    "duplicate-payments": 2,
-    "vendor-master-sod": 2,
+    "Finance.GL.1": 3,
+    "Finance.GL.2": 2,
+    "Finance.AP.1": 4,
+    "IT.AC.1": 3,
+    "IT.AC.2": 2,
+    "IT.AC.3": 0,
+    "Finance.AP.3": 2,
+    "Finance.AP.2": 2,
 }
 
 
@@ -75,14 +75,12 @@ def test_northwind_runs_and_builds(tmp_path: Path) -> None:
 
     # 3b. Threshold flips a failing control to PASS -----------------------------
     # three-way-match has 4/30 exceptions (13.3%) but a 15% tolerance → PASSES.
-    twm_html = (proj / "target" / "workpapers" / "three-way-match.html").read_text(encoding="utf-8")
+    twm_html = (proj / "target" / "workpapers" / "Finance.AP.1.html").read_text(encoding="utf-8")
     body = twm_html[twm_html.index("</style>") :]
     assert "Operated effectively" in body, "three-way-match should pass under its 15% threshold"
     assert "within threshold" in body
     # A control with no threshold still fails on any exception (implicit-0).
-    mjr_html = (proj / "target" / "workpapers" / "manual-je-review.html").read_text(
-        encoding="utf-8"
-    )
+    mjr_html = (proj / "target" / "workpapers" / "Finance.GL.1.html").read_text(encoding="utf-8")
     assert "Operated with deficiencies" in mjr_html
     assert "zero exceptions tolerated" in mjr_html
 
