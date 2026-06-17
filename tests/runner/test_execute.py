@@ -247,6 +247,36 @@ class TestRunControlErrorHandling:
                 executed_at="2026-06-16T00:00:00Z",
             )
 
+    def test_runner_error_strips_sdk_internal_frames(self, tmp_path: Path) -> None:
+        """RunnerError must NOT contain SDK-internal or site-packages frames.
+
+        The message must still name the control id and the exception text,
+        but SDK frames (controlflow_sdk/runner/execute.py, site-packages) must
+        be absent so the user sees only their own test.py context.
+        """
+        from controlflow_sdk.runner import RunnerError, run_control
+
+        crashing_test = textwrap.dedent("""\
+            def test(pop):
+                raise ValueError("intentional crash for frame test")
+        """)
+        root = _build_project(tmp_path, test_py_content=crashing_test)
+        control, sources = _load_control_and_sources(root)
+        with pytest.raises(RunnerError) as exc_info:
+            run_control(
+                control=control,
+                sources=sources,
+                root=root,
+                executed_at="2026-06-16T00:00:00Z",
+            )
+        msg = str(exc_info.value)
+        # Must still name the control id and exception text
+        assert "amount_check" in msg
+        assert "intentional crash for frame test" in msg
+        # Must NOT contain SDK-internal paths
+        assert "controlflow_sdk/runner/execute.py" not in msg
+        assert "site-packages" not in msg
+
     def test_malformed_violation_raises_runner_error(self, tmp_path: Path) -> None:
         """A violation missing 'description' is rejected and raises RunnerError."""
         from controlflow_sdk.runner import RunnerError, run_control
