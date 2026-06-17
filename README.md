@@ -62,14 +62,18 @@ of every exception with a plain-English reason
 
 > **Workpaper parity.** `render_html()` produces a workpaper that is **structurally equivalent and
 > visually close** to ControlFlow's in-app workpaper view: the same section model and order
-> (Results, Objective & scope, Control, Data sources, Procedures, Evaluation, Exceptions,
-> Conclusion), the same sticky results bar and jump-nav sidebar, and the same shared design tokens
-> (dark enterprise palette, Inter / JetBrains Mono). It is **not** a pixel-exact mirror of the React
-> app, and it is intentionally static: collapsible sections and the sidebar work without any
-> JavaScript (`<details>/<summary>` + anchor links), the whole document is a single self-contained
-> HTML file with inline styles and no scripts, and interactive / finalization features that exist
-> only in the app (sign-off, severity selectors, disposition forms) are omitted because the SDK has
-> no data for them.
+> (Results, Objective & scope, Control, Data sources, Procedures, Exceptions, Conclusion), the same
+> sticky results bar and jump-nav sidebar, and the same shared design tokens (dark enterprise
+> palette, Inter / JetBrains Mono). The Results bar leads with **Records tested · Passed ·
+> Exceptions**, the Conclusion states the **pass/fail threshold determination** (a control may set
+> `failure_threshold_pct` / `failure_threshold_count`; otherwise zero exceptions are tolerated), and
+> each data source renders an **interactive data table** (search / sort / paginate). That table is
+> the one place the export uses JavaScript — a single inline vanilla-JS widget (no jQuery, no CDN, no
+> network) that degrades to a plain full table when JS is off, and is capped at the first 500 rows.
+> Otherwise the document is intentionally static: collapsible sections and the sidebar work without
+> JavaScript (`<details>/<summary>` + anchor links), the whole file is self-contained with inline
+> styles, and interactive / finalization features that exist only in the app (sign-off, severity
+> selectors, the Evaluation judgment narrative) are omitted because the SDK has no data for them.
 
 Then package the engagement for the ControlFlow app:
 

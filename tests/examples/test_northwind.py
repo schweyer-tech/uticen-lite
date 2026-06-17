@@ -70,6 +70,22 @@ def test_northwind_runs_and_builds(tmp_path: Path) -> None:
         f"Unexpected controls in run log: {set(by_control.keys()) ^ set(EXPECTED.keys())}"
     )
 
+    # Total exceptions across the population are unchanged at 18.
+    assert sum(by_control.values()) == 18, "Northwind seeded exception total drifted from 18"
+
+    # 3b. Threshold flips a failing control to PASS -----------------------------
+    # three-way-match has 4/30 exceptions (13.3%) but a 15% tolerance → PASSES.
+    twm_html = (proj / "target" / "workpapers" / "three-way-match.html").read_text(encoding="utf-8")
+    body = twm_html[twm_html.index("</style>") :]
+    assert "Operated effectively" in body, "three-way-match should pass under its 15% threshold"
+    assert "within threshold" in body
+    # A control with no threshold still fails on any exception (implicit-0).
+    mjr_html = (proj / "target" / "workpapers" / "manual-je-review.html").read_text(
+        encoding="utf-8"
+    )
+    assert "Operated with deficiencies" in mjr_html
+    assert "zero exceptions tolerated" in mjr_html
+
     # 4. Build bundle -----------------------------------------------------------
     out = proj / "bundle.zip"
     assert main(["build", str(proj), "--out", str(out), "--at", AT]) == 0, "cflow build failed"

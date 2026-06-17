@@ -22,3 +22,8 @@ risk:
   inherent_rating: high
 sources:
   - id: payments
+# Up to 2 flagged duplicate-pairs per close are tolerated: each is placed on
+# hold and recovered before payment, so they do not constitute an operating
+# failure. 2 exceptions <= 2 → passes. (Count-based threshold demo.)
+threshold:
+  failure_threshold_count: 2
