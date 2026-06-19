@@ -1,5 +1,8 @@
 {% extends "base.html" %}
 {% block title %}{{ project.name }} — {% if control %}Edit: {{ control.title }}{% else %}New Control{% endif %}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="/static/codemirror.min.css">
+{% endblock %}
 {% block body %}
 <h1>{% if control %}Edit Control: {{ control.title }}{% else %}New Control{% endif %}</h1>
 <p><a href="/">← Dashboard</a></p>
@@ -85,4 +88,20 @@
 
   <p><button type="submit">{% if control %}Save Changes{% else %}Create Control{% endif %}</button></p>
 </form>
+
+<script src="/static/codemirror.min.js"></script>
+<script src="/static/codemirror-python.min.js"></script>
+<script>
+  if (typeof window.CodeMirror !== "undefined") {
+    var textarea = document.querySelector('textarea[name="test_code"]');
+    if (textarea) {
+      window.CodeMirror.fromTextArea(textarea, {
+        mode: "python",
+        lineNumbers: true,
+        indentUnit: 4,
+        matchBrackets: true
+      });
+    }
+  }
+</script>
 {% endblock %}
