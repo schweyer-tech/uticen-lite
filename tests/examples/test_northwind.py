@@ -101,3 +101,6 @@ def test_northwind_runs_and_builds(tmp_path: Path) -> None:
     assert len(manifest["controls"]) == 8, (
         f"Expected 8 controls in manifest, got {len(manifest['controls'])}"
     )
+    assert sum(len(c["runs"]) for c in manifest["controls"]) == 8, (
+        "Expected exactly 8 run entries across all controls in the bundle"
+    )
