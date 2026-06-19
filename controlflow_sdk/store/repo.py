@@ -106,3 +106,69 @@ def list_sources(conn: sqlite3.Connection) -> list[dict]:
         if src is not None:
             sources.append(src)
     return sources
+
+
+# ---- controls + bindings ---------------------------------------------------
+def upsert_control(
+    conn: sqlite3.Connection, *, id: str, title: str, objective: str, narrative: str,
+    framework_refs: dict, test_kind: str, rule_spec: dict | None = None,
+    test_code: str | None = None, failure_threshold_pct: float | None = None,
+    failure_threshold_count: int | None = None, created_at: str = "", updated_at: str = "",
+) -> None:
+    conn.execute(
+        """INSERT INTO controls
+             (id, title, objective, narrative, framework_refs,
+              failure_threshold_pct, failure_threshold_count,
+              test_kind, rule_spec, test_code, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             title=excluded.title, objective=excluded.objective,
+             narrative=excluded.narrative, framework_refs=excluded.framework_refs,
+             failure_threshold_pct=excluded.failure_threshold_pct,
+             failure_threshold_count=excluded.failure_threshold_count,
+             test_kind=excluded.test_kind, rule_spec=excluded.rule_spec,
+             test_code=excluded.test_code, updated_at=excluded.updated_at""",
+        (id, title, objective, narrative, json.dumps(framework_refs),
+         failure_threshold_pct, failure_threshold_count, test_kind,
+         json.dumps(rule_spec) if rule_spec is not None else None,
+         test_code, created_at, updated_at),
+    )
+    conn.commit()
+
+
+def set_control_sources(conn: sqlite3.Connection, control_id: str, source_ids: list[str]) -> None:
+    conn.execute("DELETE FROM control_sources WHERE control_id = ?", (control_id,))
+    conn.executemany(
+        "INSERT INTO control_sources (control_id, source_id, ordinal) VALUES (?, ?, ?)",
+        [(control_id, sid, i) for i, sid in enumerate(source_ids)],
+    )
+    conn.commit()
+
+
+def _source_ids_for(conn: sqlite3.Connection, control_id: str) -> list[str]:
+    rows = conn.execute(
+        "SELECT source_id FROM control_sources WHERE control_id = ? ORDER BY ordinal",
+        (control_id,),
+    ).fetchall()
+    return [r["source_id"] for r in rows]
+
+
+def get_control(conn: sqlite3.Connection, control_id: str) -> dict | None:
+    row = conn.execute("SELECT * FROM controls WHERE id = ?", (control_id,)).fetchone()
+    if row is None:
+        return None
+    d = dict(row)
+    d["framework_refs"] = _loads(d.get("framework_refs"), {})
+    d["rule_spec"] = _loads(d.get("rule_spec"), None)
+    d["source_ids"] = _source_ids_for(conn, control_id)
+    return d
+
+
+def list_controls(conn: sqlite3.Connection) -> list[dict]:
+    ids = [r["id"] for r in conn.execute("SELECT id FROM controls ORDER BY id").fetchall()]
+    controls = []
+    for cid in ids:
+        ctrl = get_control(conn, cid)
+        if ctrl is not None:
+            controls.append(ctrl)
+    return controls
