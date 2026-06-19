@@ -20,6 +20,19 @@ violations + render) · `plane/` (web app) · `runner/`,`render/`,`bundle/`,`mod
 (the reused core) · `contract/bundle.schema.json` (the app integration contract) ·
 `examples/northwind-trading/` (runnable demo + cold-user template + CI fixture).
 
+## Strategy, product map & roadmap
+
+- **Why it exists + scope/non-goals → [`STRATEGY.md`](STRATEGY.md).** Read it before brainstorming or
+  planning a feature: proposals must fit the authoring-ladder north-star and respect the non-goals
+  (the CCM loop, multi-tenancy, live connectors, and a general data tool are all out of scope — they
+  live in or belong to the ControlFlow SaaS).
+- **What's shipped now → [`PRODUCT-MAP.md`](PRODUCT-MAP.md).** Present-state inventory; update it when
+  a surface ships, changes, or is retired.
+- **What's next → GitHub issues** (the canonical roadmap). Priorities: **#9** no-code authoring
+  usability, **#10** AI-assisted authoring, **#11** distribution + first-run onboarding; backlog
+  **#12** test_code-resolution DRY, **#13** control-plane CI browser smoke test, **#14** run history.
+- **Bundle contract details → [`docs/CONTRACT.md`](docs/CONTRACT.md) + `contract/bundle.schema.json`.**
+
 ## Cardinal rule — stay compatible with the ControlFlow app
 
 **The bundle is the contract.** `contract/bundle.schema.json` is the single integration surface with
@@ -48,3 +61,22 @@ to `INDEX.md` (newest on top). Capture reusable RULES, not stories or one-off tr
 - Packaging: verify by actually building (`python -m build --wheel`) and inspecting the wheel — a
   pyproject-parse test does not prove the wheel builds (see 0003).
 - Specs/plans live in `docs/superpowers/{specs,plans}/`.
+
+## Grounding loop (per cycle)
+
+1. **Before brainstorming/planning** a feature: read `STRATEGY.md` and the relevant `docs/learnings/`
+   entries; check the open issues so you build the right thing.
+2. **Build** with the dev gates green (tests pristine, ruff, mypy) and the cardinal contract intact.
+3. **After finishing a cycle:** capture durable rules in `docs/learnings/` (+ `INDEX.md`), update
+   `PRODUCT-MAP.md` if a surface shipped/changed, and close/open issues to keep the roadmap honest.
+
+## Current state (hand-off snapshot — 2026-06-19; refresh as you go)
+
+The **control plane shipped to `main` (PR #5)**: the SQLite-backed local web app, the no-code rule
+builder + Python escape hatch, and full reuse of the run/render/bundle core. **420 tests green**,
+ruff/mypy clean, the wheel builds and ships the web assets. It was **end-to-end smoke-tested as an end
+user**: clean venv → `pip install '[plane]'` → author a source + a rule control in the browser → run
+(correct full-population result) → the audit-grade workpaper renders → export validates against
+`contract/bundle.schema.json`. **Not yet published to PyPI** (install is from the repo today — issue
+#11). The earlier SDK foundation (CLI, multi-source `test()`, Northwind demo, the app-side importer)
+is also shipped. Next up: issues **#9 → #10 → #11**.
