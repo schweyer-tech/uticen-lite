@@ -8,3 +8,6 @@ dist/
 .venv/
 import-bundle.zip
 *.zip
+.ruff_cache/
+.compound/
+.claude/worktrees/
