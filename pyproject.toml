@@ -25,3 +25,8 @@ cflow = "controlflow_sdk.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["controlflow_sdk"]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+  "ignore::starlette.exceptions.StarletteDeprecationWarning",
+]
