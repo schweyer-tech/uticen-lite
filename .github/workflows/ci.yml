@@ -1,10 +1,17 @@
 name: CI
 
 on:
+  # Run on pushes to main (post-merge) and on every PR. A branch with an open PR is
+  # covered by the pull_request event, so this avoids the double run that
+  # `push: ["**"]` + `pull_request` caused.
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
-    branches: ["**"]
+
+concurrency:
+  # Cancel superseded runs for the same branch / PR instead of letting stale runs finish.
+  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -20,6 +27,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: "pip"
+          cache-dependency-path: "pyproject.toml"
 
       - name: Install dependencies
         run: pip install -e ".[adapters,dev]"
