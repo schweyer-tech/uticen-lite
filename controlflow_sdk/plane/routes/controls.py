@@ -30,9 +30,9 @@ def _rule_spec_from_form(form: Any) -> dict[str, Any]:
     values = form.getlist("cond_value")
     conditions: list[dict[str, Any]] = []
     for col, op, raw in zip(columns, ops, values):
-        if not col:
+        if not col.strip():
             continue
-        cond: dict[str, Any] = {"column": col, "op": op}
+        cond: dict[str, Any] = {"column": col.strip(), "op": op}
         if op in ("is_empty", "not_empty", "is_duplicate"):
             pass
         elif op in ("in", "not_in"):

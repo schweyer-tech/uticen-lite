@@ -52,7 +52,7 @@
             <option value="is_duplicate" {% if cond.op == 'is_duplicate' %}selected{% endif %}>is_duplicate</option>
           </select>
           <input type="text" name="cond_value"
-                 value="{{ cond.value if cond.value is defined else '' }}"
+                 value="{{ cond.value if cond.value is not none and cond.value is defined else '' }}"
                  placeholder="Value">
         </div>
         {% endfor %}
