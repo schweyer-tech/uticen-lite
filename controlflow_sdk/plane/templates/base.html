@@ -9,7 +9,25 @@
   {% block head %}{% endblock %}
 </head>
 <body>
-  <header><strong>ControlFlow Control Plane</strong> — {{ project.name }}</header>
+  {% set path = request.url.path %}
+  <header class="app-header">
+    <div class="app-header-inner">
+      <a class="brand" href="/">
+        <span class="brand-mark">ControlFlow</span>
+        <span class="brand-sub">Control Plane</span>
+      </a>
+      <nav class="app-nav">
+        <a class="nav-link {% if path == '/' or path.startswith('/controls') %}active{% endif %}" href="/">Controls</a>
+        <a class="nav-link {% if path.startswith('/sources') %}active{% endif %}" href="/sources">Sources</a>
+        <a class="nav-link {% if path.startswith('/export') %}active{% endif %}" href="/export">Export</a>
+      </nav>
+      <div class="app-header-project"><span class="chip">{{ project.name }}</span></div>
+    </div>
+  </header>
   <main>{% block body %}{% endblock %}</main>
+  <footer class="app-footer">
+    ControlFlow Control Plane · local authoring surface · created by
+    <a href="https://schweyer.tech">schweyer.tech</a>
+  </footer>
 </body>
 </html>

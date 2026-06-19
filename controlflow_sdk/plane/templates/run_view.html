@@ -1,47 +1,66 @@
 {% extends "base.html" %}
 {% block title %}Run {{ run.run_id }} — {{ project.name }}{% endblock %}
 {% block body %}
-<h2>Run Results — {{ control_id }}</h2>
+<a class="crumb" href="/controls/{{ control_id }}">← {{ control_id }}</a>
+<div class="page-head">
+  <div class="card-head" style="border:none;padding:0;margin:0;">
+    <h1>Run results</h1>
+    <div class="spacer"></div>
+    {% if run.failed == 0 %}
+      <span class="pill ok">Operated effectively</span>
+    {% else %}
+      <span class="pill bad">Operated with deficiencies</span>
+    {% endif %}
+  </div>
+  <p class="muted mono">{{ control_id }}</p>
+</div>
 
-<section>
-  <h3>Totals</h3>
-  <ul>
-    <li>Total: {{ run.total }}</li>
-    <li>Failed: {{ run.failed }}</li>
-    <li>Pass rate: {{ run.pass_rate }}</li>
-  </ul>
-</section>
+<div class="tiles">
+  <div class="tile">
+    <div class="tile-label">Records tested</div>
+    <div class="tile-value">{{ run.total }}</div>
+  </div>
+  <div class="tile {{ 'bad' if run.failed else 'ok' }}">
+    <div class="tile-label">Failed</div>
+    <div class="tile-value">{{ run.failed }}</div>
+  </div>
+  <div class="tile {{ 'ok' if run.failed == 0 else 'warn' }}">
+    <div class="tile-label">Pass rate</div>
+    <div class="tile-value">{{ run.pass_rate }}%</div>
+  </div>
+</div>
 
 {% if run.violations %}
-<section>
-  <h3>Violations</h3>
+<h2>Exceptions</h2>
+<div class="table-wrap">
   <table>
     <thead>
       <tr>
-        <th>Item Key</th>
+        <th>Item key</th>
         <th>Description</th>
-        <th>Severity</th>
+        <th class="shrink">Severity</th>
       </tr>
     </thead>
     <tbody>
       {% for v in run.violations %}
       <tr>
-        <td>{{ v.item_key }}</td>
+        <td class="mono">{{ v.item_key }}</td>
         <td>{{ v.description }}</td>
-        <td>{{ v.severity }}</td>
+        <td class="shrink"><span class="sev-{{ v.severity }}">{{ v.severity }}</span></td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
-</section>
+</div>
 {% else %}
-<p>No violations.</p>
+<div class="empty-state">
+  <h3>No exceptions</h3>
+  <p>Every record in the population passed this control.</p>
+</div>
 {% endif %}
 
 {% if workpaper_html %}
-<section>
-  <h3>Workpaper</h3>
-  <iframe srcdoc="{{ workpaper_html | e }}" style="width:100%;height:600px;border:1px solid #ccc;"></iframe>
-</section>
+<h2 style="margin-top:24px;">Workpaper</h2>
+<iframe class="workpaper-frame" srcdoc="{{ workpaper_html | e }}"></iframe>
 {% endif %}
 {% endblock %}
