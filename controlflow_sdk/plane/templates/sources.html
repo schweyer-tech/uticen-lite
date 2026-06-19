@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — Sources{% endblock %}
+{% block body %}
+<h1>Data Sources</h1>
+
+<h2>Upload a new source</h2>
+<form method="post" action="/sources" enctype="multipart/form-data">
+  <p>
+    <label>Source ID: <input type="text" name="source_id" required></label>
+  </p>
+  <p>
+    <label>Format:
+      <select name="format">
+        <option value="csv">CSV</option>
+      </select>
+    </label>
+  </p>
+  <p>
+    <label>File: <input type="file" name="file" accept=".csv" required></label>
+  </p>
+  <button type="submit">Upload</button>
+</form>
+
+{% if sources %}
+<h2>Existing sources</h2>
+<table>
+  <thead><tr><th>ID</th><th>Format</th><th>Path</th><th></th></tr></thead>
+  <tbody>
+  {% for src in sources %}
+    <tr>
+      <td><a href="/sources/{{ src.id }}">{{ src.id }}</a></td>
+      <td>{{ src.format }}</td>
+      <td>{{ src.path }}</td>
+      <td><a href="/sources/{{ src.id }}">Edit columns</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}
