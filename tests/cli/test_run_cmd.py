@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -12,6 +14,7 @@ from controlflow_sdk.cli import main
 from controlflow_sdk.cli.import_cmd import import_cmd
 from controlflow_sdk.store import repo
 from controlflow_sdk.store.db import connect
+from controlflow_sdk.store.run_service import run_control_in_store as _real_run_control_in_store
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -69,6 +72,8 @@ class TestRunAll:
         main(["run", str(root), "--at", FIXED_AT])
         ev = root / "target" / "evidence" / f"{CONTROL_ID}-violations.json"
         assert ev.exists(), f"Expected {ev} to be created"
+        data = json.loads(ev.read_text())
+        assert isinstance(data, list), f"violations.json must be a list, got {type(data)}"
 
     def test_runs_persisted_to_store(self, tmp_path: Path) -> None:
         """Runs must be written to the SQLite store, not a run-log.json."""
@@ -143,3 +148,55 @@ class TestAtDefault:
         main(["run", str(root)])
         wp = root / "target" / "workpapers" / f"{CONTROL_ID}.md"
         assert wp.exists()
+
+
+# ---------------------------------------------------------------------------
+# Partial-failure contract
+# ---------------------------------------------------------------------------
+
+
+class TestPartialFailure:
+    def test_partial_failure_continues_and_exits_1(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture
+    ) -> None:
+        """When one control raises, run_cmd must: continue all others, return 1,
+        and print the failing control id to stderr."""
+        root = _engagement(tmp_path)
+        conn = connect(root)
+
+        # Discover the full control list so we can pick one to fail.
+        from controlflow_sdk.store.loader import load_project_from_store
+
+        project = load_project_from_store(conn)
+        all_ids = [c.id for c in project.controls]
+        assert len(all_ids) >= 2, "Need at least 2 controls to test partial failure"
+        failing_id = all_ids[0]
+
+        call_log: list[str] = []
+
+        def _patched(conn_, root_, control_id: str, executed_at: str):  # noqa: ANN001
+            call_log.append(control_id)
+            if control_id == failing_id:
+                raise RuntimeError(f"injected failure for {control_id}")
+            return _real_run_control_in_store(conn_, root_, control_id, executed_at)
+
+        with patch(
+            "controlflow_sdk.cli.run_cmd.run_control_in_store",
+            side_effect=_patched,
+        ):
+            rc = main(["run", str(root), "--at", FIXED_AT])
+
+        captured = capsys.readouterr()
+
+        # Contract: exit code 1 on any error.
+        assert rc == 1, f"Expected exit code 1, got {rc}"
+
+        # Contract: every control was attempted (not short-circuited).
+        assert set(call_log) == set(all_ids), (
+            f"Expected all controls to be called; called={call_log}"
+        )
+
+        # Contract: the failing control id appears in stderr.
+        assert failing_id in captured.err, (
+            f"Expected '{failing_id}' in stderr; got: {captured.err!r}"
+        )

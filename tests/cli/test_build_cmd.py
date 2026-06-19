@@ -100,8 +100,9 @@ class TestBuildHappyPath:
         out_zip = tmp_path / "bundle.zip"
         main(["build", str(root), "--out", str(out_zip), "--at", FIXED_AT])
         out = capsys.readouterr().out
-        # Should mention "8 controls" and "8 runs"
-        assert "8" in out
+        # Summary line: "  BUNDLE  <path>  8 controls / 8 runs"
+        assert "8 controls" in out
+        assert "8 runs" in out
 
 
 # ---------------------------------------------------------------------------
