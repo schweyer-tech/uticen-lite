@@ -28,5 +28,5 @@ packages = ["controlflow_sdk"]
 
 [tool.pytest.ini_options]
 filterwarnings = [
-  "ignore::starlette.exceptions.StarletteDeprecationWarning",
+  "ignore:Using .httpx. with .starlette.testclient.:starlette.exceptions.StarletteDeprecationWarning",
 ]
