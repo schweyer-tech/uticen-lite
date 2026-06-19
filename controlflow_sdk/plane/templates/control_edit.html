@@ -2,106 +2,146 @@
 {% block title %}{{ project.name }} — {% if control %}Edit: {{ control.title }}{% else %}New Control{% endif %}{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="/static/codemirror.min.css">
+<style>
+  /* Dark CodeMirror theme to match the control-plane palette. Loaded after
+     codemirror.min.css so these win. */
+  .CodeMirror {
+    background: var(--bg-input); color: var(--text-primary);
+    border: 1px solid var(--border-default); border-radius: var(--radius-input);
+    font-family: var(--font-mono); font-size: 12px; height: auto;
+  }
+  .CodeMirror-gutters { background: var(--bg-surface-1); border-right: 1px solid var(--border-default); }
+  .CodeMirror-linenumber { color: var(--text-tertiary); }
+  .CodeMirror-cursor { border-left: 1px solid var(--text-primary); }
+  .CodeMirror-selected { background: var(--accent-muted) !important; }
+  .cm-s-default .cm-keyword { color: var(--cm-keyword); }
+  .cm-s-default .cm-def, .cm-s-default .cm-variable { color: var(--text-primary); }
+  .cm-s-default .cm-string { color: var(--cm-string); }
+  .cm-s-default .cm-number { color: var(--cm-number); }
+  .cm-s-default .cm-comment { color: var(--text-tertiary); }
+  .cm-s-default .cm-builtin, .cm-s-default .cm-atom { color: var(--cm-builtin); }
+  .cm-s-default .cm-operator { color: var(--text-secondary); }
+</style>
 {% endblock %}
 {% block body %}
-<h1>{% if control %}Edit Control: {{ control.title }}{% else %}New Control{% endif %}</h1>
-<p><a href="/">← Dashboard</a></p>
+<a class="crumb" href="/">← Controls</a>
+<div class="page-head">
+  <h1>{% if control %}{{ control.title }}{% else %}New control{% endif %}</h1>
+  {% if control %}<p class="muted mono">{{ control.id }}</p>{% endif %}
+</div>
 
 <form method="post" action="{% if control %}/controls/{{ control.id }}{% else %}/controls{% endif %}">
-  <p>
-    <label>ID:<br>
-      <input type="text" name="id" value="{{ control.id if control else '' }}"
-             {% if control %}readonly{% endif %} required>
-    </label>
-  </p>
-  <p>
-    <label>Title:<br>
-      <input type="text" name="title" value="{{ control.title if control else '' }}" required>
-    </label>
-  </p>
-  <p>
-    <label>Objective:<br>
-      <textarea name="objective" rows="3" cols="60">{{ control.objective if control else '' }}</textarea>
-    </label>
-  </p>
-  <p>
-    <label>Narrative:<br>
-      <textarea name="narrative" rows="5" cols="60">{{ control.narrative if control else '' }}</textarea>
-    </label>
-  </p>
-  <p>
-    <label>NIST Framework References (comma-separated, e.g. AC-2, AC-5):<br>
-      <input type="text" name="framework_nist"
+  <div class="card">
+    <h2>Details</h2>
+    <div class="field">
+      <label for="f-id">Control ID</label>
+      <input id="f-id" type="text" name="id" value="{{ control.id if control else '' }}"
+             {% if control %}readonly{% endif %} placeholder="e.g. AC-2-01" required>
+    </div>
+    <div class="field">
+      <label for="f-title">Title</label>
+      <input id="f-title" type="text" name="title" value="{{ control.title if control else '' }}" required>
+    </div>
+    <div class="field">
+      <label for="f-obj">Objective</label>
+      <textarea id="f-obj" name="objective" rows="3">{{ control.objective if control else '' }}</textarea>
+    </div>
+    <div class="field">
+      <label for="f-narr">Narrative</label>
+      <textarea id="f-narr" name="narrative" rows="5">{{ control.narrative if control else '' }}</textarea>
+    </div>
+    <div class="field">
+      <label for="f-nist">NIST framework references</label>
+      <span class="hint">Comma-separated, e.g. AC-2, AC-5</span>
+      <input id="f-nist" type="text" name="framework_nist"
              value="{{ control.framework_refs.nist | join(', ') if control and control.framework_refs and control.framework_refs.nist else '' }}">
-    </label>
-  </p>
-  <p>
-    <label>Failure threshold % (optional):<br>
-      <input type="number" step="0.01" name="failure_threshold_pct"
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Failure thresholds</h2>
+    <p class="lead">Optional. The conclusion fails the control when either threshold is exceeded.</p>
+    <div class="field">
+      <label for="f-pct">Failure threshold %</label>
+      <input id="f-pct" type="number" step="0.01" name="failure_threshold_pct"
              value="{{ control.failure_threshold_pct if control and control.failure_threshold_pct is not none else '' }}">
-    </label>
-  </p>
-  <p>
-    <label>Failure threshold count (optional):<br>
-      <input type="number" name="failure_threshold_count"
+    </div>
+    <div class="field">
+      <label for="f-cnt">Failure threshold count</label>
+      <input id="f-cnt" type="number" name="failure_threshold_count"
              value="{{ control.failure_threshold_count if control and control.failure_threshold_count is not none else '' }}">
-    </label>
-  </p>
+    </div>
+  </div>
 
-  <fieldset>
-    <legend>Data Sources</legend>
-    {% for source in sources %}
-    <label>
-      <input type="checkbox" name="source_ids" value="{{ source.id }}"
-             {% if control and source.id in control.source_ids %}checked{% endif %}>
-      {{ source.id }}
-    </label><br>
-    {% endfor %}
-    {% if not sources %}
-    <p><em>No sources available. <a href="/sources">Add a source</a> first.</em></p>
+  <div class="card">
+    <h2>Data sources</h2>
+    {% if sources %}
+    <div class="check-list">
+      {% for source in sources %}
+      <label>
+        <input type="checkbox" name="source_ids" value="{{ source.id }}"
+               {% if control and source.id in control.source_ids %}checked{% endif %}>
+        <span class="mono">{{ source.id }}</span>
+      </label>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted">No sources available. <a href="/sources">Add a source</a> first.</p>
     {% endif %}
-  </fieldset>
+  </div>
 
-  <fieldset>
-    <legend>Test Type</legend>
-    <label>
-      <input type="radio" name="test_kind" value="rule"
-             {% if not control or control.test_kind == 'rule' %}checked{% endif %}>
-      Rule
-    </label>
-    <label>
-      <input type="radio" name="test_kind" value="python"
-             {% if control and control.test_kind == 'python' %}checked{% endif %}>
-      Python
-    </label>
-  </fieldset>
+  <div class="card">
+    <div class="card-head">
+      <h2>Test logic</h2>
+      <div class="spacer"></div>
+      <div class="radio-row">
+        <label><input type="radio" name="test_kind" value="rule" data-test-toggle
+                      {% if not control or control.test_kind == 'rule' %}checked{% endif %}> No-code rule</label>
+        <label><input type="radio" name="test_kind" value="python" data-test-toggle
+                      {% if control and control.test_kind == 'python' %}checked{% endif %}> Python</label>
+      </div>
+    </div>
 
-  <fieldset>
-    <legend>Python Test Code</legend>
-    <textarea name="test_code" rows="15" cols="80">{{ control.test_code if control and control.test_code else '' }}</textarea>
-  </fieldset>
+    <div data-pane="rule">
+      {% include "partials/rule_builder.html" %}
+    </div>
 
-  <fieldset>
-    <legend>Rule Builder</legend>
-    {% include "partials/rule_builder.html" %}
-  </fieldset>
+    <div data-pane="python">
+      <p class="lead">Escape hatch — return violations from a Python <code class="mono">test()</code> function.</p>
+      <textarea name="test_code" rows="15">{{ control.test_code if control and control.test_code else '' }}</textarea>
+    </div>
+  </div>
 
-  <p><button type="submit">{% if control %}Save Changes{% else %}Create Control{% endif %}</button></p>
+  <div class="page-actions">
+    <button class="btn btn-primary" type="submit">{% if control %}Save changes{% else %}Create control{% endif %}</button>
+    <a class="btn btn-ghost" href="/">Cancel</a>
+  </div>
 </form>
 
 <script src="/static/codemirror.min.js"></script>
 <script src="/static/codemirror-python.min.js"></script>
 <script>
-  if (typeof window.CodeMirror !== "undefined") {
+  (function () {
+    var cm = null;
     var textarea = document.querySelector('textarea[name="test_code"]');
-    if (textarea) {
-      window.CodeMirror.fromTextArea(textarea, {
-        mode: "python",
-        lineNumbers: true,
-        indentUnit: 4,
-        matchBrackets: true
+    if (textarea && typeof window.CodeMirror !== "undefined") {
+      cm = window.CodeMirror.fromTextArea(textarea, {
+        mode: "python", lineNumbers: true, indentUnit: 4, matchBrackets: true
       });
     }
-  }
+
+    function syncPanes() {
+      var kind = document.querySelector('input[name="test_kind"]:checked');
+      kind = kind ? kind.value : "rule";
+      document.querySelectorAll('[data-pane]').forEach(function (pane) {
+        pane.style.display = pane.getAttribute('data-pane') === kind ? "" : "none";
+      });
+      if (cm && kind === "python") { cm.refresh(); }
+    }
+    document.querySelectorAll('[data-test-toggle]').forEach(function (el) {
+      el.addEventListener('change', syncPanes);
+    });
+    syncPanes();
+  })();
 </script>
 {% endblock %}
