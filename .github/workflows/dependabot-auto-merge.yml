@@ -1,0 +1,43 @@
+# Auto-merge Dependabot PRs into main once CI is green. The test suite
+# (ruff + mypy + pytest on 3.11/3.12, required via branch protection) is the gate:
+# native auto-merge waits for those required checks before merging. Zero token cost.
+#
+# main-only package: Dependabot PRs target main directly (no staging here), so this
+# is the whole automation — no retarget / queue-keeper machinery (those exist only
+# for the staging-integration-branch apps).
+#
+# Note: pull_request_target reads this workflow from the default branch (main), so it
+# takes effect once merged there.
+name: Dependabot auto-merge
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Enable native auto-merge
+        # All update types are armed; the required CI checks are the gate. A major
+        # that slips through means the tests need strengthening, not hand-review.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          DEP_NAMES: ${{ steps.meta.outputs.dependency-names }}
+          UPDATE_TYPE: ${{ steps.meta.outputs.update-type }}
+        run: |
+          echo "Arming auto-merge for ${DEP_NAMES} (${UPDATE_TYPE})"
+          gh pr merge "$PR_URL" --auto --squash
