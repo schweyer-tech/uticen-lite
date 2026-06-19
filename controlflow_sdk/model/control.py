@@ -139,6 +139,11 @@ class ControlDef:
 
     Plain data holder — no validation logic lives here (that belongs to the
     YAML parser in task 7).  Only behaviour: ``to_dict()`` for serialisation.
+
+    A control may carry its test in one of three ways:
+    - ``test_path``: path to a ``.py`` file (default; ``test_kind == "python"``)
+    - ``test_code``: inline Python source (``test_kind == "python"``)
+    - ``rule_spec``: no-code rule dict (``test_kind == "rule"``)
     """
 
     id: str
@@ -148,13 +153,20 @@ class ControlDef:
     framework_refs: FrameworkRefs
     risk: RiskRef | None
     sources: list[SourceBinding]
-    test_path: str
+    test_path: str = ""
+    test_code: str | None = None
+    rule_spec: dict[str, Any] | None = None
     severity_policy: dict[str, Any] = field(default_factory=dict)
     threshold: Threshold = field(default_factory=Threshold)
 
+    @property
+    def test_kind(self) -> str:
+        """Return ``"rule"`` when a ``rule_spec`` is set, else ``"python"``."""
+        return "rule" if self.rule_spec is not None else "python"
+
     def to_dict(self) -> dict[str, Any]:
         """Serialise to a plain dict suitable for JSON / API payloads."""
-        return {
+        data: dict[str, Any] = {
             "id": self.id,
             "title": self.title,
             "objective": self.objective,
@@ -176,4 +188,10 @@ class ControlDef:
             "severity_policy": dict(self.severity_policy),
             "threshold": self.threshold.to_dict(),
             "test_path": self.test_path,
+            "test_kind": self.test_kind,
         }
+        if self.test_code is not None:
+            data["test_code"] = self.test_code
+        if self.rule_spec is not None:
+            data["rule_spec"] = self.rule_spec
+        return data
