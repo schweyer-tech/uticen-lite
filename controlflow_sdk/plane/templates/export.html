@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Export Bundle — {{ project.name }}{% endblock %}
+{% block body %}
+<h1>Export Bundle</h1>
+<p>Download a versioned import bundle containing all controls and run history.</p>
+<form method="post" action="/export">
+  <button type="submit">Export bundle</button>
+</form>
+{% endblock %}

@@ -46,7 +46,7 @@ def register(
             dest.write_bytes(raw)
             header = next(csvmod.reader(io.StringIO(raw.decode("utf-8-sig"))), [])
             repo.upsert_source(conn, id=source_id, format=format,
-                               path=f"data/{dest.name}", key_config={})
+                               path=f"data/{dest.name}", key_config={"mode": "auto"})
             repo.set_columns(conn, source_id, [
                 {"original_name": h, "display_name": h, "data_type": "text",
                  "is_key": False, "include": True, "ordinal": i}
@@ -103,7 +103,7 @@ def register(
             elif key_columns:
                 key_config = {"mode": "composite", "columns": key_columns}
             else:
-                key_config = {}
+                key_config = {"mode": "auto"}
             repo.upsert_source(conn, id=source_id, format=existing["format"],
                                path=existing["path"], key_config=key_config)
         finally:
