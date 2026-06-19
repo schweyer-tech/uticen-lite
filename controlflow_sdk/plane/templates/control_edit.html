@@ -62,14 +62,14 @@
   <fieldset>
     <legend>Test Type</legend>
     <label>
-      <input type="radio" name="test_kind" value="python"
-             {% if not control or control.test_kind == 'python' %}checked{% endif %}>
-      Python
+      <input type="radio" name="test_kind" value="rule"
+             {% if not control or control.test_kind == 'rule' %}checked{% endif %}>
+      Rule
     </label>
     <label>
-      <input type="radio" name="test_kind" value="rule"
-             {% if control and control.test_kind == 'rule' %}checked{% endif %}>
-      Rule
+      <input type="radio" name="test_kind" value="python"
+             {% if control and control.test_kind == 'python' %}checked{% endif %}>
+      Python
     </label>
   </fieldset>
 

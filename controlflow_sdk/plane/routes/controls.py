@@ -90,9 +90,9 @@ def register(
         try:
             form = await request.form()
             cid = _save_from_form(conn, form)
+            return RedirectResponse(f"/controls/{cid}", status_code=303)
         finally:
             conn.close()
-        return RedirectResponse(f"/controls/{cid}", status_code=303)
 
     @app.post("/controls/{control_id}")
     async def update_control(control_id: str, request: Request) -> Any:
@@ -101,6 +101,6 @@ def register(
         try:
             form = await request.form()
             _save_from_form(conn, form)
+            return RedirectResponse(f"/controls/{control_id}", status_code=303)
         finally:
             conn.close()
-        return RedirectResponse(f"/controls/{control_id}", status_code=303)

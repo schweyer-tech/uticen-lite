@@ -19,7 +19,9 @@ def test_create_python_control(client):
     assert resp.status_code in (302, 303)
     from controlflow_sdk.store import repo
     from controlflow_sdk.store.db import connect
-    c = repo.get_control(connect(client.app.state.project_root), "py1")
+    conn = connect(client.app.state.project_root)
+    c = repo.get_control(conn, "py1")
+    conn.close()
     assert c["test_kind"] == "python"
     assert c["framework_refs"] == {"nist": ["AC-2", "AC-5"]}
     assert c["source_ids"] == ["users"]
