@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — Controls{% endblock %}
+{% block body %}
+<h1>Controls</h1>
+<p>
+  <a href="/controls/new">New control</a> ·
+  <a href="/sources">New source</a> ·
+  <a href="/export">Export bundle</a>
+</p>
+<table>
+  <thead><tr><th>ID</th><th>Title</th><th>Sources</th><th>Last run</th><th></th></tr></thead>
+  <tbody>
+  {% for row in rows %}
+    <tr>
+      <td><a href="/controls/{{ row.control.id }}">{{ row.control.id }}</a></td>
+      <td>{{ row.control.title }}</td>
+      <td>{{ row.control.source_ids | join(", ") }}</td>
+      <td>{% if row.latest %}{{ row.latest.failed }} / {{ row.latest.total }} ({{ row.latest.pass_rate }}%){% else %}—{% endif %}</td>
+      <td>
+        <form method="post" action="/controls/{{ row.control.id }}/run">
+          <button type="submit">Run</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

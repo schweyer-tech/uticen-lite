@@ -165,18 +165,41 @@ def load_test_callable(control: ControlDef) -> Callable[..., list[Any]]:
     so it does **not** need to be on ``sys.path``.  The ``test`` callable is
     returned as-is; it is **not** executed.
 
+    When ``control.test_code`` is set (e.g. a store-backed control), the inline
+    source is compiled and executed in a fresh namespace and its ``test``
+    callable is returned directly — no file I/O required.  When only
+    ``control.test_path`` is set (YAML/file controls), the original file-import
+    path is used unchanged.
+
     Args:
         control: A :class:`~controlflow_sdk.model.control.ControlDef` whose
-                 ``test_path`` holds the absolute path to the test script (as
-                 set by :func:`discover_controls` / :func:`_parse_control`).
+                 ``test_code`` (inline source) or ``test_path`` (file path)
+                 identifies the test implementation.
 
     Returns:
-        The ``test`` callable from the control's ``test.py``.
+        The ``test`` callable from the control's test source.
 
     Raises:
         ProjectError: If ``test.py`` is missing, if ``test`` is not defined in
                       it, or if ``test`` is not callable.
     """
+    # Inline code (control-plane store) takes precedence over a file path.
+    inline_code: str | None = getattr(control, "test_code", None)
+    if inline_code:
+        namespace: dict[str, Any] = {}
+        try:
+            exec(compile(inline_code, f"<control:{control.id}>", "exec"), namespace)  # noqa: S102
+        except SyntaxError as exc:
+            raise ProjectError(
+                f"control {control.id}: test code has a syntax error: {exc}"
+            ) from exc
+        fn = namespace.get("test")
+        if not callable(fn):
+            raise ProjectError(
+                f"control {control.id}: inline test code defines no callable 'test'"
+            )
+        return fn  # type: ignore[no-any-return]
+
     test_file = Path(control.test_path)
 
     if not test_file.exists():

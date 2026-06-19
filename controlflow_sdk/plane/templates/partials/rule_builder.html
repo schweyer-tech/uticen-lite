@@ -1,0 +1,68 @@
+<div id="rule-builder">
+  <p>
+    <label>Logic:
+      <select name="rule_logic">
+        <option value="all" {% if not control or not control.rule_spec or control.rule_spec.logic == 'all' %}selected{% endif %}>all (AND)</option>
+        <option value="any" {% if control and control.rule_spec and control.rule_spec.logic == 'any' %}selected{% endif %}>any (OR)</option>
+      </select>
+    </label>
+  </p>
+  <p>
+    <label>Severity:
+      <select name="rule_severity">
+        <option value="low" {% if control and control.rule_spec and control.rule_spec.severity == 'low' %}selected{% endif %}>low</option>
+        <option value="medium" {% if not control or not control.rule_spec or control.rule_spec.severity == 'medium' %}selected{% endif %}>medium</option>
+        <option value="high" {% if control and control.rule_spec and control.rule_spec.severity == 'high' %}selected{% endif %}>high</option>
+        <option value="critical" {% if control and control.rule_spec and control.rule_spec.severity == 'critical' %}selected{% endif %}>critical</option>
+      </select>
+    </label>
+  </p>
+  <p>
+    <label>Description template:<br>
+      <input type="text" name="rule_description" style="width:60ch"
+             value="{{ control.rule_spec.description_template if control and control.rule_spec else '' }}">
+    </label>
+  </p>
+  <p>
+    <label>Item key column:<br>
+      <input type="text" name="rule_item_key"
+             value="{{ control.rule_spec.item_key_column if control and control.rule_spec else '' }}">
+    </label>
+  </p>
+
+  <fieldset>
+    <legend>Conditions</legend>
+    <div id="conditions">
+      {% if control and control.rule_spec and control.rule_spec.conditions %}
+        {% for cond in control.rule_spec.conditions %}
+        <div class="condition-row">
+          <input type="text" name="cond_column" value="{{ cond.column }}" placeholder="Column name">
+          <select name="cond_op">
+            <option value="eq" {% if cond.op == 'eq' %}selected{% endif %}>eq (=)</option>
+            <option value="ne" {% if cond.op == 'ne' %}selected{% endif %}>ne (≠)</option>
+            <option value="gt" {% if cond.op == 'gt' %}selected{% endif %}>gt (&gt;)</option>
+            <option value="ge" {% if cond.op == 'ge' %}selected{% endif %}>ge (≥)</option>
+            <option value="lt" {% if cond.op == 'lt' %}selected{% endif %}>lt (&lt;)</option>
+            <option value="le" {% if cond.op == 'le' %}selected{% endif %}>le (≤)</option>
+            <option value="is_empty" {% if cond.op == 'is_empty' %}selected{% endif %}>is_empty</option>
+            <option value="not_empty" {% if cond.op == 'not_empty' %}selected{% endif %}>not_empty</option>
+            <option value="in" {% if cond.op == 'in' %}selected{% endif %}>in (pipe-separated)</option>
+            <option value="not_in" {% if cond.op == 'not_in' %}selected{% endif %}>not_in (pipe-separated)</option>
+            <option value="regex" {% if cond.op == 'regex' %}selected{% endif %}>regex</option>
+            <option value="is_duplicate" {% if cond.op == 'is_duplicate' %}selected{% endif %}>is_duplicate</option>
+          </select>
+          <input type="text" name="cond_value"
+                 value="{{ cond.value if cond.value is not none and cond.value is defined else '' }}"
+                 placeholder="Value">
+        </div>
+        {% endfor %}
+      {% else %}
+        {% include "partials/rule_condition.html" %}
+      {% endif %}
+    </div>
+    <button type="button"
+            hx-get="/controls/_condition_row"
+            hx-target="#conditions"
+            hx-swap="beforeend">+ Add condition</button>
+  </fieldset>
+</div>

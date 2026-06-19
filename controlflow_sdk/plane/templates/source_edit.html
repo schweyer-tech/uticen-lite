@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — Edit Source: {{ source.id }}{% endblock %}
+{% block body %}
+<h1>Edit Source: {{ source.id }}</h1>
+<p><a href="/sources">← Back to sources</a></p>
+
+<form method="post" action="/sources/{{ source.id }}">
+  <p>
+    <label>Key columns (comma-separated original names):<br>
+      <input type="text" name="key_columns"
+             value="{{ source.key_config.columns | join(', ') if source.key_config and source.key_config.columns else '' }}">
+    </label>
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Original name</th>
+        <th>Display name</th>
+        <th>Data type</th>
+        <th>Is key</th>
+        <th>Include</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for col in source.columns %}
+      <tr>
+        <td>{{ col.original_name }}</td>
+        <td>
+          <input type="text"
+                 name="display_name__{{ col.original_name }}"
+                 value="{{ col.display_name }}">
+        </td>
+        <td>
+          <select name="data_type__{{ col.original_name }}">
+            <option value="text" {% if col.data_type == 'text' %}selected{% endif %}>text</option>
+            <option value="number" {% if col.data_type == 'number' %}selected{% endif %}>number</option>
+            <option value="date" {% if col.data_type == 'date' %}selected{% endif %}>date</option>
+            <option value="boolean" {% if col.data_type == 'boolean' %}selected{% endif %}>boolean</option>
+          </select>
+        </td>
+        <td>
+          <input type="checkbox"
+                 name="is_key__{{ col.original_name }}"
+                 {% if col.is_key %}checked{% endif %}>
+        </td>
+        <td>
+          <input type="checkbox"
+                 name="include__{{ col.original_name }}"
+                 {% if col.include %}checked{% endif %}>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <p><button type="submit">Save column mapping</button></p>
+</form>
+{% endblock %}

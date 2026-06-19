@@ -15,9 +15,10 @@ from __future__ import annotations
 import textwrap
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
-from controlflow_sdk.model.control import ControlDef, SourceBinding
+from controlflow_sdk.model.control import ControlDef, FrameworkRefs, SourceBinding
 from controlflow_sdk.model.run import RunRecord
 
 # ---------------------------------------------------------------------------
@@ -540,3 +541,58 @@ class TestRunControlMultiSource:
                 root=root,
                 executed_at="2026-06-16T00:00:00Z",
             )
+
+
+# ---------------------------------------------------------------------------
+# Rule-spec execution tests (Task 11)
+# ---------------------------------------------------------------------------
+
+
+def _csv(tmp_path: Path) -> Path:
+    p = tmp_path / "data"
+    p.mkdir()
+    pd.DataFrame({"user_id": ["U1", "U2"], "can_create": ["true", "true"],
+                  "can_approve": ["true", "false"]}).to_csv(p / "users.csv", index=False)
+    return tmp_path
+
+
+def _users_binding() -> SourceBinding:
+    return SourceBinding(
+        id="users", type="file",
+        config={"path": "data/users.csv", "format": "csv"},
+        key_config={"mode": "single", "columns": ["user_id"]},
+        column_mappings=[
+            {"original_name": "user_id", "display_name": "User ID",
+             "data_type": "text", "is_key": True, "include": True},
+            {"original_name": "can_create", "display_name": "Can Create",
+             "data_type": "boolean", "is_key": False, "include": True},
+            {"original_name": "can_approve", "display_name": "Can Approve",
+             "data_type": "boolean", "is_key": False, "include": True},
+        ],
+    )
+
+
+def test_run_control_executes_a_rule(tmp_path: Path):
+    from controlflow_sdk.runner import run_control
+
+    root = _csv(tmp_path)
+    binding = _users_binding()
+    control = ControlDef(
+        id="sod", title="SoD", objective="o", narrative="n",
+        framework_refs=FrameworkRefs(), risk=None, sources=[binding],
+        rule_spec={
+            "logic": "all",
+            "conditions": [
+                {"column": "can_create", "op": "eq", "value": True},
+                {"column": "can_approve", "op": "eq", "value": True},
+            ],
+            "severity": "high",
+            "description_template": "User {user_id} can create and approve",
+            "item_key_column": "user_id",
+        },
+    )
+    run = run_control(control, {"users": binding}, root, "2026-03-31T00:00:00+00:00")
+    assert run.population_size == 2
+    assert run.failed == 1
+    assert run.violations[0].item_key == "U1"
+    assert run.provenance[0].source_id == "users"

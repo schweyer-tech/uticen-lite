@@ -4,20 +4,32 @@ Author and run full-population control tests; export audit-grade workpapers impo
 
 ## About
 
-ControlFlow SDK is a pure-Python library for authoring control tests against full populations of data. Test results (violations) are formatted to import directly into the ControlFlow audit platform for collaborative exception tracking and workpaper generation.
+ControlFlow SDK is a pure-Python library for authoring, running, and packaging control tests against
+full populations of data. The **control plane** (`controlplane`) is a local web app — served entirely
+on `127.0.0.1`, zero network egress — where you author sources and controls through a browser UI, run
+tests, and export an import bundle for the ControlFlow audit platform.
+
+Test results and workpapers produced by the SDK are structurally equivalent to those generated
+in-app: the same section model, the same NIST 800-53 references, and the same bundle format that
+lands controls, runs, exceptions, and workpapers directly into your tenant.
 
 ## Installation
 
-Since this package is not yet published to PyPI, install it in editable mode from the source repository:
-
 ```bash
-pip install -e .
+pip install 'controlflow-sdk[plane]'
 ```
 
-For development, include test dependencies:
+This installs the SDK plus the local web app dependencies (FastAPI, uvicorn, Jinja2). For source
+installs (clone + editable):
 
 ```bash
-pip install -e ".[dev]"
+pip install -e ".[plane]"
+```
+
+For CSV/Parquet/Excel adapter support, add `adapters`:
+
+```bash
+pip install 'controlflow-sdk[plane,adapters]'
 ```
 
 ## See it in action — the Northwind demo
@@ -25,313 +37,170 @@ pip install -e ".[dev]"
 The repo ships a complete, runnable engagement under
 [`examples/northwind-trading/`](examples/northwind-trading/) — a fictional wholesale distributor with
 **8 real audit controls** spanning financial close, IT access, and procurement, over 8 seeded data
-extracts. Run it to watch the SDK turn raw CSVs into audit-grade, full-population workpapers in
-seconds — no authoring required:
+extracts.
+
+**Import it, then browse or run headless:**
 
 ```bash
 git clone https://github.com/dom-schweyer-tech/controlflow-sdk
 cd controlflow-sdk
-pip install -e ".[adapters]"            # the library + Parquet/Excel support
+pip install -e ".[plane,adapters]"
 
-# run all 8 controls over their FULL populations (the fixed --at keeps results deterministic)
-cflow run examples/northwind-trading --at 2026-03-31T00:00:00Z
+# Import the YAML project into a local engagement store
+cflow import examples/northwind-trading --into demo
+```
+
+**Option A — browser authoring and viewing (recommended):**
+
+```bash
+controlplane --project demo
+# → opens http://127.0.0.1:8765
+```
+
+From the dashboard you can browse sources, run controls, view workpapers, and export the bundle.
+
+**Option B — headless CLI:**
+
+```bash
+cflow run demo --at 2026-03-31T00:00:00Z
+cflow build demo --out bundle.zip --at 2026-03-31T00:00:00Z
 ```
 
 ```text
-  RUN  manual-je-review          3 violation(s) / 40 records   92.5%
-  RUN  closed-period-postings    2 violation(s) / 40 records   95.0%
-  RUN  three-way-match           4 violation(s) / 30 records   86.67%
-  RUN  terminated-access         3 violation(s) / 38 records   92.11%
-  RUN  privileged-access-review  2 violation(s) / 38 records   94.74%
-  RUN  mfa-enforcement           0 violation(s) / 38 records   100.0%   ← a clean, passing control
-  RUN  duplicate-payments        2 violation(s) / 30 records   93.33%
-  RUN  vendor-master-sod         2 violation(s) / 30 records   93.33%
-```
-
-Every control wrote a workpaper. Open one — `three-way-match` joins **three** sources
-(payments ↔ invoices ↔ purchase orders):
-
-```bash
-open examples/northwind-trading/target/workpapers/three-way-match.html
-```
-
-It shows the control's objective and narrative, an explicit **"full population tested — no sampling
-applied"** statement, source provenance (SHA-256 + row counts), the test code that ran, and a table
-of every exception with a plain-English reason
-(e.g. *"Payment references invoice 'INV-099' which does not exist in the invoice register"*).
-
-> **Workpaper parity.** `render_html()` produces a workpaper that is **structurally equivalent and
-> visually close** to ControlFlow's in-app workpaper view: the same section model and order
-> (Results, Objective & scope, Control, Data sources, Procedures, Exceptions, Conclusion), the same
-> sticky results bar and jump-nav sidebar, and the same shared design tokens (dark enterprise
-> palette, Inter / JetBrains Mono). The Results bar leads with **Records tested · Passed ·
-> Exceptions**, the Conclusion states the **pass/fail threshold determination** (a control may set
-> `failure_threshold_pct` / `failure_threshold_count`; otherwise zero exceptions are tolerated), and
-> each data source renders an **interactive data table** (search / sort / paginate). That table is
-> the one place the export uses JavaScript — a single inline vanilla-JS widget (no jQuery, no CDN, no
-> network) that degrades to a plain full table when JS is off, and is capped at the first 500 rows.
-> Otherwise the document is intentionally static: collapsible sections and the sidebar work without
-> JavaScript (`<details>/<summary>` + anchor links), the whole file is self-contained with inline
-> styles, and interactive / finalization features that exist only in the app (sign-off, severity
-> selectors, the Evaluation judgment narrative) are omitted because the SDK has no data for them.
-
-Then package the engagement for the ControlFlow app:
-
-```bash
-cflow build examples/northwind-trading --out bundle.zip --at 2026-03-31T00:00:00Z
-#   BUNDLE  bundle.zip  8 controls / 8 runs
+  RUN  Finance.GL.1    3 violation(s) / 40 records   92.5%
+  RUN  Finance.GL.2    2 violation(s) / 40 records   95.0%
+  RUN  Finance.AP.1    4 violation(s) / 30 records   86.67%   ← passes under 15% threshold
+  RUN  Finance.AP.2    2 violation(s) / 30 records   93.33%
+  RUN  Finance.AP.3    2 violation(s) / 30 records   93.33%
+  RUN  IT.AC.1         3 violation(s) / 38 records   92.11%
+  RUN  IT.AC.2         2 violation(s) / 38 records   94.74%
+  RUN  IT.AC.3         0 violation(s) / 38 records   100.0%   ← a clean, passing control
+  BUNDLE  bundle.zip  8 controls / 8 runs
 ```
 
 Upload `bundle.zip` in the app at **Settings → Imports** (admin) and the 8 controls, their
 workpapers, and all **18 exceptions** land in your tenant — with the NIST 800-53 references carried
 through.
 
-The example doubles as a **template**: copy the directory, swap in your own data and controls, and
-you have a real starting point. See its
-[catalog README](examples/northwind-trading/README.md) for what each control does — or author your
-own from scratch below.
+See the [Northwind catalog README](examples/northwind-trading/README.md) for what each control does.
 
-## Quick Start — author your own control
+## Authoring with the web app
 
-### 1. Initialize a project
+Start the control plane in any engagement directory (or a fresh one):
 
 ```bash
-cflow init my-audit
-cd my-audit
+controlplane --project my-audit
+# → http://127.0.0.1:8765
 ```
 
-`init` takes a single positional argument — the directory name. This scaffolds:
+### Add a data source
 
-- `cflow.yaml` — project metadata (name, framework, system)
-- `sources.yaml` — data source definitions (CSV, Parquet, or Excel files)
-- `controls/` — directory where each control lives in its own subdirectory
+Go to **Sources → New source**. Upload a CSV (or Parquet/Excel with the `adapters` extra), then:
 
-### 2. Add a data source
+- Set the source **ID** (referenced by controls later).
+- Review the **column mapping**: display name, data type (`text` / `number` / `date` / `boolean`),
+  and which columns to include.
+- Pick the **key configuration** — `single` (one column uniquely identifies each row) or `composite`
+  (two or more columns together).
 
-Edit `sources.yaml` to declare the data files your controls will test against.
-Each source gets a unique `id` that controls reference by name:
+### Add a control
 
-```yaml
-sources:
-  - id: users
-    type: file
-    config:
-      path: data/users.csv
-      format: csv
-    key_config:
-      mode: single
-      columns:
-        - user_id
-    column_mappings:
-      - original_name: user_id
-        display_name: User ID
-        data_type: text
-        is_key: true
-        include: true
-      - original_name: can_create
-        display_name: Can Create
-        data_type: boolean
-        is_key: false
-        include: true
-      - original_name: can_approve
-        display_name: Can Approve
-        data_type: boolean
-        is_key: false
-        include: true
-```
+Go to **Controls → New control**. Fill in the metadata form:
 
-Place the matching CSV at `data/users.csv`:
+- **ID**, **title**, **objective**, **narrative**
+- **Framework references** (e.g. NIST 800-53 `AC-5`, `AC-2`)
+- **Source bindings** — select one or more sources from your project
 
-```
-user_id,can_create,can_approve
-U001,true,false
-U002,true,true
-U003,false,true
-```
+### The no-code rule builder
 
-### 3. Scaffold a control
+For single-source controls you can define the test logic without writing Python using the **rule
+builder**:
 
-```bash
-cflow new control ctl-001
-```
+- Add one or more **conditions**: `WHEN <column> <operator> <value>` (operators: `=`, `!=`, `<`,
+  `>`, `<=`, `>=`, `contains`, `not contains`, `is blank`, `is not blank`)
+- Chain conditions with **AND** / **OR**
+- Set the **severity** (`low` / `medium` / `high` / `critical`) and a **description template** that
+  can reference column values (e.g. `"Payment {payment_id} exceeds tolerance"`)
 
-Or pass the project directory as a positional argument (same as `cflow init`):
+Any row that matches the rule is recorded as a violation.
 
-```bash
-cflow new control ctl-001 my-audit
-```
+### The Python escape hatch
 
-Both forms are equivalent; `--dir` is also accepted for scripts that prefer explicit flags:
-
-```bash
-cflow new control ctl-001 --dir my-audit
-```
-
-This creates `controls/ctl-001/control.yaml` and `controls/ctl-001/test.py`.
-
-Edit `controls/ctl-001/control.yaml` to describe the control and bind it to sources:
-
-```yaml
-id: ctl-001
-title: Segregation of Duties
-objective: Verify no user has both create and approve permissions.
-narrative: >
-  All transactions require dual approval. This control ensures
-  users cannot both create and approve their own transactions.
-framework_refs:
-  nist:
-    - AC-2
-    - AC-5
-sources:
-  - id: users
-```
-
-Sources are listed as `- id: <source-id>`, referencing entries defined in `sources.yaml`.
-Do **not** put `type`, `path`, or `key_columns` directly in `control.yaml` — those belong in `sources.yaml`.
-
-Edit `controls/ctl-001/test.py`:
-
-```python
-def test(pop):
-    """Check for users with both create and approve permissions."""
-    violations = []
-    for _, row in pop.df.iterrows():
-        if row.get("can_create") and row.get("can_approve"):
-            violations.append({
-                "item_key": str(row["user_id"]),
-                "description": "User has both create and approve permissions",
-                "severity": "high",
-                "details": {"user_id": str(row["user_id"])},
-            })
-    return violations
-```
-
-The `test` function:
-- Receives a single `pop` argument — a `Population` object whose `.df` is a pandas DataFrame
-- Returns a **list of dicts**, each with at minimum `item_key` and `description`
-- Returns an empty list when all records pass
-
-Each violation dict shape:
-
-```python
-{
-    "item_key": "U002",          # required — unique row identifier
-    "description": "...",        # required — why this item is a violation
-    "severity": "high",          # optional — "low" | "medium" | "high" | "critical"
-    "details": {"key": "value"}, # optional — additional context
-}
-```
-
-### Joining across sources
-
-A control bound to multiple sources can declare a second parameter, `sources`,
-a dict of every bound source keyed by the `id` you gave it in `sources.yaml`
-(the primary is included). `pop` is still the first bound source.
+For cross-source joins or any logic the rule builder cannot express, switch the control to
+**Python mode**. Write a `test` function in the editor:
 
 ```python
 def test(pop, sources):
-    payments = pop.df                       # primary source
-    invoices = sources["invoices"].df       # other bound sources, by id
-    pos      = sources["purchase_orders"].df
+    payments  = pop.df
+    invoices  = sources["invoices"].df
+    pos       = sources["purchase_orders"].df
     merged = payments.merge(invoices, on="invoice_id").merge(pos, on="po_id")
     return [
-        {"item_key": r.payment_id, "description": "no matching approved PO",
-         "severity": "high", "details": {"amount": r.amount_x}}
-        for r in merged.itertuples() if r.status != "approved"
+        {
+            "item_key": str(r.payment_id),
+            "description": "No matching approved PO",
+            "severity": "high",
+            "details": {"amount": r.amount},
+        }
+        for r in merged.itertuples()
+        if r.status != "approved"
     ]
 ```
 
-Single-argument `def test(pop)` is unchanged — the `sources` dict is only
-passed when your function declares it.
+Single-source controls use `def test(pop)` — the `sources` dict is only passed when your function
+declares it.
 
-### 4. Validate the control
+## Running and exporting
 
-```bash
-cflow validate
-```
+**From the browser:** click **Run** on any control, or **Run all** from the dashboard. Workpapers
+appear under the Runs tab.
 
-This checks:
-- `control.yaml` syntax and schema
-- Source IDs in `control.yaml` resolve to entries in `sources.yaml`
-- Data source file paths are referenced correctly
-
-### 5. Run the control
+**Headless:**
 
 ```bash
-cflow run
+cflow run my-audit                          # run all controls
+cflow run my-audit --control Finance.GL.1  # run one control
+cflow run my-audit --at 2026-03-31T00:00:00Z  # deterministic timestamp
+
+cflow build my-audit --out bundle.zip      # package for ControlFlow import
 ```
 
-This will:
-1. Load your control and all bound data sources
-2. Execute your `test()` function against **the complete population** (no sampling)
-3. Write output to the `target/` directory
+Then upload `bundle.zip` at **Settings → Imports** in the ControlFlow app.
 
-#### Output Directory Structure
+## Design principles
 
-```
-target/
-├── workpapers/           # Ready-to-share, signed workpapers
-│   ├── ctl-001.md        # Markdown (portable, git-friendly)
-│   └── ctl-001.html      # HTML (open in browser, styled)
-├── evidence/             # Raw violation data
-│   └── ctl-001-violations.json  # JSON array of violations
-└── run-log.json          # Immutable JSONL ledger of all runs
-```
+- **SQLite is the source of truth.** Every engagement is a self-contained folder:
+  `controlplane.db` (metadata + runs), `data/` (uploaded source files), `target/` (workpaper HTML).
+  Copy or zip the folder and you have a portable snapshot.
+- **Brittle by design.** The SDK trusts the folder convention. It has no locking, no user accounts,
+  and no conflict resolution — it is a local, single-user tool. The hardened multi-user experience
+  (access control, concurrency, audit trails, sign-off workflows) is the paid ControlFlow app.
+- **Localhost only, zero network egress.** `controlplane` listens on `127.0.0.1:8765` and never
+  makes outbound connections. Client data never leaves the machine.
 
-#### Running a Single Control
+## Workpaper quality
 
-```bash
-cflow run --control ctl-001
-```
-
-#### Custom Execution Timestamp
-
-```bash
-cflow run --at 2026-06-16T14:30:00Z
-```
-
-#### Run Provenance & Reproducibility
-
-Every run records:
-- **Execution timestamp** (`executed_at`) — ISO-8601, immutable
-- **Data provenance** — sha256 hash + row count for each bound data source (recorded as the relative `path` from `sources.yaml`)
-- **Run ID** — deterministic 16-char identifier (derived from control ID, timestamp, and data hashes)
-
-### 6. Build an import bundle
-
-Once you have runs, package them into a zip for import into ControlFlow:
-
-```bash
-cflow build
-```
-
-This reads `target/run-log.json`, assembles a validated manifest, and writes `import-bundle.zip`
-(or a custom path with `--out`).
-
-```
-cflow build --out exports/my-bundle.zip
-```
-
-## Features
-
-- `cflow init <dir>` — scaffold a new project
-- `cflow new control <slug> [dir]` — scaffold a new control (positional dir, or `--dir`)
-- `cflow validate [dir]` — validate all controls against `sources.yaml`
-- `cflow run [dir]` — execute tests, write workpapers and evidence
-- `cflow build [dir]` — package runs into an importable zip bundle
+`cflow run` / `controlplane` produce HTML workpapers that are **structurally equivalent and visually
+close** to ControlFlow's in-app workpaper view: the same section model (Results, Objective & scope,
+Control, Data sources, Procedures, Exceptions, Conclusion), sticky results bar, jump-nav sidebar, and
+shared design tokens (dark enterprise palette, Inter / JetBrains Mono). The Conclusion states the
+pass/fail threshold determination — a control may set `failure_threshold_pct` /
+`failure_threshold_count`; otherwise zero exceptions are tolerated. Each data source renders an
+interactive data table (search / sort / paginate). The document is intentionally static — no jQuery,
+no CDN, no network — and degrades gracefully when JavaScript is off.
 
 ## API Reference
 
 ### `Population`
 
-The `test` function receives a single `Population` object:
+The `test` function receives a `Population` as its first argument:
 
 ```python
 def test(pop):
-    # pop.df         → pandas DataFrame (rows = data records)
-    # pop.columns    → list of ColumnMeta objects
-    # pop.source_id  → str (data source ID from sources.yaml)
-    # pop.size       → int (number of rows)
+    # pop.df          → pandas DataFrame (rows = data records)
+    # pop.columns     → list of ColumnMeta objects
+    # pop.source_id   → str (data source ID)
+    # pop.size        → int (number of rows)
     # pop.key_columns → list[str] (key column names)
     violations = []
     for _, row in pop.df.iterrows():
@@ -343,8 +212,6 @@ def test(pop):
     return violations
 ```
 
-The function returns a **list of dicts** (not `Violation` objects, not `list[Population]`).
-
 ### `ColumnMeta`
 
 Column metadata available on `pop.columns`:
@@ -353,45 +220,67 @@ Column metadata available on `pop.columns`:
 from controlflow_sdk import ColumnMeta
 
 # col.original_name  → str (column name from the source file)
-# col.display_name   → str (human-readable label from sources.yaml)
+# col.display_name   → str (human-readable label)
 # col.data_type      → str ("text" | "number" | "date" | "boolean")
 # col.is_key         → bool
 # col.include        → bool
 ```
 
-### Data types in `sources.yaml`
+### Data types
 
-| `data_type` | pandas dtype | Notes |
-|-------------|-------------|-------|
-| `text`      | `str`       | Default; `NaN` becomes `""` |
-| `number`    | `float64`   | Non-numeric values become `NaN` |
-| `date`      | `datetime64`| Non-parseable values become `NaT` |
-| `boolean`   | `bool`      | Recognises `true/false`, `1/0`, `yes/no` |
+| `data_type` | pandas dtype  | Notes |
+|-------------|---------------|-------|
+| `text`      | `str`         | Default; `NaN` becomes `""` |
+| `number`    | `float64`     | Non-numeric values become `NaN` |
+| `date`      | `datetime64`  | Non-parseable values become `NaT` |
+| `boolean`   | `bool`        | Recognises `true/false`, `1/0`, `yes/no` |
 
-### Key configuration in `sources.yaml`
+### Key configuration
 
-`key_config.type` controls how each row is uniquely identified:
-
-- **`single`** — one column is the key (e.g. `invoice_id`). The SDK uses that column's value directly as `item_key` when recording violations.
-- **`composite`** — two or more columns together identify a row. The SDK does **not** auto-concatenate them. Your `test()` function is responsible for constructing `item_key` from the relevant columns:
+- **`single`** — one column is the key (e.g. `invoice_id`). The SDK uses that column's value as
+  `item_key` when recording violations.
+- **`composite`** — two or more columns together identify a row. Your `test()` function is
+  responsible for constructing `item_key`:
 
   ```python
   def test(pop):
-      violations = []
       for _, row in pop.df.iterrows():
           item_key = f"{row['vendor_id']}|{row['invoice_id']}"
           if row["amount"] > 10000 and not row["approved"]:
-              violations.append({
-                  "item_key": item_key,
-                  "description": "Large unapproved transaction",
-              })
-      return violations
+              yield {"item_key": item_key, "description": "Large unapproved transaction"}
   ```
 
-The `sources.yaml` template created by `cflow init` includes commented-out examples for both modes.
+### Violation dict shape
+
+```python
+{
+    "item_key":    "U002",          # required — unique row identifier
+    "description": "...",           # required — why this item is a violation
+    "severity":    "high",          # optional — "low" | "medium" | "high" | "critical"
+    "details":     {"key": "value"} # optional — additional context
+}
+```
+
+### Bundle / import flow
+
+`cflow build` reads the engagement store, projects each control + its latest run + workpaper HTML into
+a `manifest.json`, and writes `bundle.zip`. Upload the zip at **Settings → Imports** (admin) in the
+ControlFlow app. The import is idempotent on `control_id` — re-importing the same bundle updates
+existing records.
+
+## CLI reference
+
+| Command | Description |
+|---------|-------------|
+| `cflow import <src> --into <dir>` | Import a YAML project into an engagement store |
+| `cflow run <dir> [--control <id>] [--at <iso>]` | Run all (or one) controls, persist results |
+| `cflow build <dir> [--out <file>] [--at <iso>]` | Package runs into an importable zip bundle |
+| `cflow validate [<dir>]` | Light schema check (deprecated stub; prefer the web app) |
+| `controlplane [--project <dir>] [--port <n>]` | Launch the local web UI |
 
 ## License
 
 Apache-2.0 — see [LICENSE](LICENSE).
 
-ControlFlow SDK is intended for use authoring control tests that integrate with the [ControlFlow](https://controlflow.app) audit platform.
+ControlFlow SDK is intended for use authoring control tests that integrate with the
+[ControlFlow](https://controlflow.app) audit platform.

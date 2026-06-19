@@ -1,19 +1,22 @@
-"""End-to-end fixture test for the Northwind Trading example.
+"""End-to-end fixture test for the Northwind Trading example (store-backed).
 
-Copies examples/northwind-trading into a tmp_path, drives the CLI in-process,
-asserts the seeded exception counts, and verifies the built bundle is valid.
+Imports examples/northwind-trading into an engagement store, drives the CLI
+in-process, asserts the seeded exception counts, and verifies the built bundle is valid.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import shutil
 import zipfile
 from pathlib import Path
 
 from controlflow_sdk.cli import main
-from controlflow_sdk.runner.runlog import read_runs
+from controlflow_sdk.cli.import_cmd import import_cmd
 from controlflow_sdk.schema.validate import validate_bundle
+from controlflow_sdk.store import repo
+from controlflow_sdk.store.db import connect
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -42,54 +45,54 @@ EXPECTED: dict[str, int] = {
 
 
 def test_northwind_runs_and_builds(tmp_path: Path) -> None:
-    """Full pipeline: validate → run → assert counts → build → validate_bundle."""
-    proj = tmp_path / "northwind"
-    shutil.copytree(EXAMPLE_DIR, proj)
+    """Full pipeline: import → run → assert counts → build → validate_bundle."""
+    # 0. Import YAML project into engagement store ---------------------------
+    into = tmp_path / "northwind"
+    import_cmd(argparse.Namespace(src=str(EXAMPLE_DIR), into=str(into)))
+    shutil.copytree(str(EXAMPLE_DIR / "data"), str(into / "data"))
 
-    # 1. Validate ---------------------------------------------------------------
-    assert main(["validate", str(proj)]) == 0, "cflow validate failed"
+    # 1. Run at deterministic snapshot ------------------------------------------
+    assert main(["run", str(into), "--at", AT]) == 0, "cflow run failed"
 
-    # 2. Run at deterministic snapshot ------------------------------------------
-    assert main(["run", str(proj), "--at", AT]) == 0, "cflow run failed"
-
-    # 3. Assert per-control failed counts from the run log ----------------------
-    runs = read_runs(proj / "target")
-    assert runs, "run-log.json is empty after cflow run"
-
-    by_control: dict[str, int] = {r["control_id"]: r["failed"] for r in runs}
+    # 2. Assert per-control failed counts from the store -------------------------
+    conn = connect(into)
+    by_control: dict[str, int] = {}
+    for cid in EXPECTED:
+        runs = repo.list_runs_for(conn, cid)
+        assert runs, f"No run found in store for control '{cid}'"
+        by_control[cid] = runs[0]["failed"]
 
     for cid, expected_n in EXPECTED.items():
         actual = by_control.get(cid)
-        assert actual is not None, f"No run log entry found for control '{cid}'"
+        assert actual is not None, f"No run entry found for control '{cid}'"
         assert actual == expected_n, (
             f"Control '{cid}': expected {expected_n} violation(s), got {actual}"
         )
 
-    # Exactly the 8 expected controls — no extras, no missing.
+    # Exactly the 8 expected controls.
     assert set(by_control.keys()) == set(EXPECTED.keys()), (
-        f"Unexpected controls in run log: {set(by_control.keys()) ^ set(EXPECTED.keys())}"
+        f"Unexpected controls in run results: {set(by_control.keys()) ^ set(EXPECTED.keys())}"
     )
 
     # Total exceptions across the population are unchanged at 18.
     assert sum(by_control.values()) == 18, "Northwind seeded exception total drifted from 18"
 
-    # 3b. Threshold flips a failing control to PASS -----------------------------
-    # three-way-match has 4/30 exceptions (13.3%) but a 15% tolerance → PASSES.
-    twm_html = (proj / "target" / "workpapers" / "Finance.AP.1.html").read_text(encoding="utf-8")
+    # 2b. Threshold flips a failing control to PASS ----------------------------
+    twm_html = (into / "target" / "workpapers" / "Finance.AP.1.html").read_text(encoding="utf-8")
     body = twm_html[twm_html.index("</style>") :]
     assert "Operated effectively" in body, "three-way-match should pass under its 15% threshold"
     assert "within threshold" in body
     # A control with no threshold still fails on any exception (implicit-0).
-    mjr_html = (proj / "target" / "workpapers" / "Finance.GL.1.html").read_text(encoding="utf-8")
+    mjr_html = (into / "target" / "workpapers" / "Finance.GL.1.html").read_text(encoding="utf-8")
     assert "Operated with deficiencies" in mjr_html
     assert "zero exceptions tolerated" in mjr_html
 
-    # 4. Build bundle -----------------------------------------------------------
-    out = proj / "bundle.zip"
-    assert main(["build", str(proj), "--out", str(out), "--at", AT]) == 0, "cflow build failed"
+    # 3. Build bundle -----------------------------------------------------------
+    out = into / "bundle.zip"
+    assert main(["build", str(into), "--out", str(out), "--at", AT]) == 0, "cflow build failed"
     assert out.exists(), "bundle.zip was not created"
 
-    # 5. Validate bundle manifest -----------------------------------------------
+    # 4. Validate bundle manifest -----------------------------------------------
     with zipfile.ZipFile(out) as zf:
         manifest = json.loads(zf.read("manifest.json"))
 
@@ -97,4 +100,7 @@ def test_northwind_runs_and_builds(tmp_path: Path) -> None:
     assert errors == [], f"validate_bundle reported errors: {errors}"
     assert len(manifest["controls"]) == 8, (
         f"Expected 8 controls in manifest, got {len(manifest['controls'])}"
+    )
+    assert sum(len(c["runs"]) for c in manifest["controls"]) == 8, (
+        "Expected exactly 8 run entries across all controls in the bundle"
     )

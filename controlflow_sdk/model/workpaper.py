@@ -189,6 +189,7 @@ class Workpaper:
         run: RunRecord,
         generated_at: str,
         data_samples: list[DataSample] | None = None,
+        test_code: str | None = None,
     ) -> Workpaper:
         """Build a Workpaper from a ControlDef and a RunRecord.
 
@@ -197,8 +198,12 @@ class Workpaper:
         caller (ISO-8601 string) so this stays deterministic and testable.
         ``data_samples`` (optional) carries capped per-source row samples for the
         HTML renderer's interactive data table.
+        ``test_code`` (optional) overrides reading from ``control.test_path``; pass
+        this when the control has no on-disk test file (e.g. rule controls or
+        store-backed controls with inline code).
         """
-        test_code = pathlib.Path(control.test_path).read_text(encoding="utf-8")
+        if test_code is None:
+            test_code = pathlib.Path(control.test_path).read_text(encoding="utf-8")
 
         # Serialise FrameworkRefs to a plain dict (mirrors ControlDef.to_dict()).
         framework_refs: dict[str, Any] = {

@@ -443,3 +443,154 @@ class TestBundleError:
             assert "forced validation failure" in str(exc_info.value)
         finally:
             assemble_mod.validate_bundle = original  # type: ignore[assignment]
+
+
+# ---------------------------------------------------------------------------
+# Tests: rule control bundles readable test_code
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# FIX 1 regression: workpaper must reflect the LATEST run, not the oldest
+# ---------------------------------------------------------------------------
+
+
+def test_workpaper_reflects_latest_run_not_oldest(test_py_file: pathlib.Path) -> None:
+    """_to_run_dicts must return runs in ASC (chronological) order so runs[-1] is latest.
+
+    This guards against the inversion bug: ``repo.list_runs_for`` returns runs
+    DESC (newest-first), so without the fix ``_to_run_dicts`` feeds DESC-ordered
+    dicts to ``assemble_bundle`` and ``runs[-1]`` selects the *oldest* run.
+
+    The test calls ``_to_run_dicts`` directly (store path) with two persisted
+    runs that differ in ``failed`` count and asserts that ``assemble_bundle``
+    produces a workpaper whose result reflects the NEWER run's numbers.
+    """
+    from controlflow_sdk.model.run import RunRecord
+    from controlflow_sdk.model.violation import Violation
+    from controlflow_sdk.store import repo
+    from controlflow_sdk.store.db import connect
+    from controlflow_sdk.store.export_service import _to_run_dicts
+    from controlflow_sdk.store.loader import load_project_from_store
+    from controlflow_sdk.store.migrations import migrate
+
+    root = pathlib.Path(test_py_file).parent
+    (root / "data").mkdir(exist_ok=True)
+
+    conn = connect(root)
+    migrate(conn)
+
+    repo.upsert_project(conn, name="Test")
+    repo.upsert_source(
+        conn,
+        id="gl",
+        format="csv",
+        path="gl.csv",
+        key_config={"mode": "single", "columns": ["entry_id"]},
+    )
+    repo.set_columns(conn, "gl", [
+        {"original_name": "entry_id", "display_name": "Entry ID", "is_key": True, "include": True},
+    ])
+    repo.upsert_control(
+        conn, id="cash_cutoff", title="Cash Cutoff", objective="o", narrative="n",
+        framework_refs={"nist": [], "extra": {}}, test_kind="python",
+        test_code="# test",
+    )
+    repo.set_control_sources(conn, "cash_cutoff", ["gl"])
+
+    # Insert OLDER run (5 violations)
+    older_violations = [
+        Violation(item_key=f"K{i}", description="stale", severity="medium")
+        for i in range(5)
+    ]
+    older = RunRecord(
+        control_id="cash_cutoff",
+        executed_at="2026-01-01T00:00:00Z",
+        population_size=100,
+        violations=older_violations,
+        provenance=[],
+    )
+    repo.insert_run(conn, older)
+
+    # Insert NEWER run (0 violations) — store returns this first in DESC order
+    newer = RunRecord(
+        control_id="cash_cutoff",
+        executed_at="2026-06-01T00:00:00Z",
+        population_size=100,
+        violations=[],
+        provenance=[],
+    )
+    repo.insert_run(conn, newer)
+
+    # _to_run_dicts is the unit under test: must return ASC order
+    project = load_project_from_store(conn)
+    runs_by_control = _to_run_dicts(conn, project.controls)
+    conn.close()
+
+    assert "cash_cutoff" in runs_by_control
+    run_list = runs_by_control["cash_cutoff"]
+    assert len(run_list) == 2, f"Expected 2 runs, got {len(run_list)}"
+
+    # With the fix, list is ASC → [older, newer], so runs[-1] is the newer run
+    manifest = assemble_bundle(project, runs_by_control, GENERATED_AT)
+    block = next(c for c in manifest["controls"] if c["id"] == "cash_cutoff")
+
+    assert len(block["runs"]) == 2, "Expected 2 run entries in block['runs']"
+
+    # Workpaper must reflect the NEWER run (failed=0, pass_rate=100)
+    procedures = block["workpaper"]["procedures"]
+    assert procedures, "Expected at least one procedure in workpaper"
+    wp_result = procedures[0]["result"]
+    assert wp_result["failed"] == 0, (
+        f"Workpaper reflects failed={wp_result['failed']} — expected the latest run's 0; "
+        "the oldest run (failed=5) was selected instead (DESC ordering bug in _to_run_dicts)"
+    )
+    assert wp_result["pass_rate"] == 100.0, (
+        f"Workpaper pass_rate={wp_result['pass_rate']} — expected 100.0 from the latest run"
+    )
+    # Also verify chronological order in the runs array: older first, newer last
+    assert run_list[0]["executed_at"] < run_list[1]["executed_at"], (
+        "runs not in ascending chronological order — the first run should be the oldest"
+    )
+
+
+def test_rule_control_bundles_readable_test_code() -> None:
+    from controlflow_sdk.bundle.assemble import assemble_bundle
+    from controlflow_sdk.model.control import ControlDef, FrameworkRefs
+    from controlflow_sdk.project.discovery import Project
+    from controlflow_sdk.project.loader import ProjectConfig
+
+    control = ControlDef(
+        id="sod",
+        title="SoD",
+        objective="o",
+        narrative="n",
+        framework_refs=FrameworkRefs(nist=["AC-5"]),
+        risk=None,
+        sources=[],
+        rule_spec={
+            "logic": "all",
+            "conditions": [{"column": "can_create", "op": "eq", "value": True}],
+            "severity": "high",
+        },
+    )
+    project = Project(
+        config=ProjectConfig(name="Acme", framework="nist"),
+        sources={},
+        controls=[control],
+    )
+    run_dict = {
+        "run_id": "0" * 16,
+        "executed_at": "2026-03-31T00:00:00+00:00",
+        "passed": 1,
+        "failed": 0,
+        "total": 1,
+        "pass_rate": 100.0,
+        "summary": "1/1 passed",
+        "details": {"violations": []},
+        "control_id": "sod",
+        "provenance": [],
+    }
+    manifest = assemble_bundle(project, {"sod": [run_dict]}, "2026-03-31T00:00:00+00:00")
+    block = next(c for c in manifest["controls"] if c["id"] == "sod")
+    assert "Flag a record when ALL" in block["test_code"]

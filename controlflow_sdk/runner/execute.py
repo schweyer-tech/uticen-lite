@@ -181,19 +181,25 @@ def run_control(
     # ── 2. Select the primary population (first bound source) ─────────────────
     primary: Population = populations[0]
 
-    # ── 3. Load and execute the author callable ───────────────────────────────
-    test_fn = load_test_callable(control)
+    # ── 3. Load and execute the author callable OR evaluate the rule spec ────
+    if control.rule_spec is not None:
+        from controlflow_sdk.rules.evaluate import evaluate_rule
+        from controlflow_sdk.rules.spec import parse_rule_spec
 
-    try:
-        if _accepts_sources(test_fn):
-            raw_result: Any = test_fn(primary, sources_by_id)
-        else:
-            raw_result = test_fn(primary)
-    except Exception as exc:
-        tb_summary = _clean_traceback_summary(exc)
-        raise RunnerError(
-            f"Control '{control.id}': test() raised an exception:\n{tb_summary}"
-        ) from exc
+        raw_result: Any = evaluate_rule(parse_rule_spec(control.rule_spec), primary)
+    else:
+        test_fn = load_test_callable(control)
+
+        try:
+            if _accepts_sources(test_fn):
+                raw_result = test_fn(primary, sources_by_id)
+            else:
+                raw_result = test_fn(primary)
+        except Exception as exc:
+            tb_summary = _clean_traceback_summary(exc)
+            raise RunnerError(
+                f"Control '{control.id}': test() raised an exception:\n{tb_summary}"
+            ) from exc
 
     # ── 4. Validate return type ───────────────────────────────────────────────
     if not isinstance(raw_result, list):

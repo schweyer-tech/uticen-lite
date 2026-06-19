@@ -6,10 +6,10 @@ Usage
 
 Steps
 -----
-1. Load the project from *dir*.
-2. Read ``target/run-log.json`` via ``read_runs``.
+1. Load the project from ``controlplane.db`` (via ``build_bundle``).
+2. Read runs from the store (``repo.list_runs_for`` per control).
 3. Exit 1 with a "run before build" message when no runs are found.
-4. Group runs by ``control_id``.
+4. Reconstruct ``RunRecord.to_dict()`` shapes for bundle parity.
 5. Call ``assemble_bundle(project, runs_by_control, generated_at)`` to build a
    validated manifest dict.
 6. Call ``write_bundle(manifest, target_dir, out_path)`` to write the zip.
@@ -24,16 +24,17 @@ Exit codes
 from __future__ import annotations
 
 import sys
-from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import argparse
 
-from controlflow_sdk.bundle import BundleError, assemble_bundle, write_bundle
-from controlflow_sdk.project.discovery import Project
-from controlflow_sdk.runner.runlog import read_runs
+from controlflow_sdk.bundle import BundleError
+from controlflow_sdk.store import repo
+from controlflow_sdk.store.db import connect
+from controlflow_sdk.store.export_service import build_bundle
+from controlflow_sdk.store.loader import load_project_from_store
 
 
 def build_cmd(args: argparse.Namespace) -> int:
@@ -42,48 +43,44 @@ def build_cmd(args: argparse.Namespace) -> int:
     generated_at: str = args.at
     out_path = Path(args.out) if args.out else root / "import-bundle.zip"
 
-    # ── Load project ──────────────────────────────────────────────────────────
+    # ── Load project to get control/run counts for summary ────────────────────
     try:
-        project = Project.load(root)
+        conn = connect(root)
     except Exception as exc:  # noqa: BLE001
+        print(f"ERROR connecting to store at {root}: {exc}", file=sys.stderr)
+        return 1
+    try:
+        project = load_project_from_store(conn)
+    except Exception as exc:  # noqa: BLE001
+        conn.close()
         print(f"ERROR loading project at {root}: {exc}", file=sys.stderr)
         return 1
 
-    # ── Read run log ──────────────────────────────────────────────────────────
-    target_dir = root / "target"
-    runs = read_runs(target_dir)
+    # ── Pre-check: gather run counts for the summary line ─────────────────────
+    runs_by_control = {c.id: repo.list_runs_for(conn, c.id) for c in project.controls}
+    runs_by_control = {cid: runs for cid, runs in runs_by_control.items() if runs}
 
-    if not runs:
+    if not runs_by_control:
         print(
-            "ERROR: No runs found in target/run-log.json — run `cflow run` first, "
+            "ERROR: No runs found in store — run `cflow run` first, "
             "and make sure it completed without errors.",
             file=sys.stderr,
         )
+        conn.close()
         return 1
-
-    # ── Group runs by control_id ───────────────────────────────────────────────
-    runs_by_control: dict[str, list[dict]] = defaultdict(list)
-    for run in runs:
-        control_id = run.get("control_id", "")
-        if control_id:
-            runs_by_control[control_id].append(run)
-        else:
-            print(
-                f"warning: skipping run with no control_id: {run.get('run_id', '?')}",
-                file=sys.stderr,
-            )
 
     total_runs = sum(len(v) for v in runs_by_control.values())
     control_count = len(runs_by_control)
 
     # ── Assemble and write bundle ──────────────────────────────────────────────
     try:
-        manifest = assemble_bundle(project, dict(runs_by_control), generated_at)
-    except BundleError as exc:
+        build_bundle(conn, root, out_path, generated_at)
+    except (BundleError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
+        conn.close()
         return 1
-
-    write_bundle(manifest, target_dir, out_path)
+    finally:
+        conn.close()
 
     # ── Summary ────────────────────────────────────────────────────────────────
     ctrl_word = "control" if control_count == 1 else "controls"

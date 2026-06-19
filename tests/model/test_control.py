@@ -243,6 +243,7 @@ class TestControlDef:
             "severity_policy",
             "threshold",
             "test_path",
+            "test_kind",
         }
         assert keys == expected, f"Unexpected keys: {keys ^ expected}"
 
@@ -270,3 +271,41 @@ class TestControlDef:
         )
         c1.severity_policy["injected"] = True
         assert "injected" not in c2.severity_policy
+
+
+# ---------------------------------------------------------------------------
+# ControlDef inline test_code + rule_spec tests
+# ---------------------------------------------------------------------------
+
+
+def _base(**kw):  # type: ignore[no-untyped-def]
+    defaults = dict(
+        id="c1",
+        title="t",
+        objective="o",
+        narrative="n",
+        framework_refs=FrameworkRefs(),
+        risk=None,
+        sources=[],
+    )
+    defaults.update(kw)
+    return ControlDef(**defaults)
+
+
+def test_control_defaults_to_python_kind_with_test_path() -> None:
+    c = _base(test_path="controls/c1/test.py")
+    assert c.test_kind == "python"
+    assert c.test_code is None and c.rule_spec is None
+
+
+def test_control_with_rule_spec_is_rule_kind() -> None:
+    spec = {"logic": "all", "conditions": [], "severity": "high"}
+    c = _base(rule_spec=spec)
+    assert c.test_kind == "rule"
+    assert c.to_dict()["test_kind"] == "rule"
+
+
+def test_control_with_inline_code_is_python_kind() -> None:
+    c = _base(test_code="def test(pop):\n    return []")
+    assert c.test_kind == "python"
+    assert "test_code" in c.to_dict()

@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — {% if control %}Edit: {{ control.title }}{% else %}New Control{% endif %}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="/static/codemirror.min.css">
+{% endblock %}
+{% block body %}
+<h1>{% if control %}Edit Control: {{ control.title }}{% else %}New Control{% endif %}</h1>
+<p><a href="/">← Dashboard</a></p>
+
+<form method="post" action="{% if control %}/controls/{{ control.id }}{% else %}/controls{% endif %}">
+  <p>
+    <label>ID:<br>
+      <input type="text" name="id" value="{{ control.id if control else '' }}"
+             {% if control %}readonly{% endif %} required>
+    </label>
+  </p>
+  <p>
+    <label>Title:<br>
+      <input type="text" name="title" value="{{ control.title if control else '' }}" required>
+    </label>
+  </p>
+  <p>
+    <label>Objective:<br>
+      <textarea name="objective" rows="3" cols="60">{{ control.objective if control else '' }}</textarea>
+    </label>
+  </p>
+  <p>
+    <label>Narrative:<br>
+      <textarea name="narrative" rows="5" cols="60">{{ control.narrative if control else '' }}</textarea>
+    </label>
+  </p>
+  <p>
+    <label>NIST Framework References (comma-separated, e.g. AC-2, AC-5):<br>
+      <input type="text" name="framework_nist"
+             value="{{ control.framework_refs.nist | join(', ') if control and control.framework_refs and control.framework_refs.nist else '' }}">
+    </label>
+  </p>
+  <p>
+    <label>Failure threshold % (optional):<br>
+      <input type="number" step="0.01" name="failure_threshold_pct"
+             value="{{ control.failure_threshold_pct if control and control.failure_threshold_pct is not none else '' }}">
+    </label>
+  </p>
+  <p>
+    <label>Failure threshold count (optional):<br>
+      <input type="number" name="failure_threshold_count"
+             value="{{ control.failure_threshold_count if control and control.failure_threshold_count is not none else '' }}">
+    </label>
+  </p>
+
+  <fieldset>
+    <legend>Data Sources</legend>
+    {% for source in sources %}
+    <label>
+      <input type="checkbox" name="source_ids" value="{{ source.id }}"
+             {% if control and source.id in control.source_ids %}checked{% endif %}>
+      {{ source.id }}
+    </label><br>
+    {% endfor %}
+    {% if not sources %}
+    <p><em>No sources available. <a href="/sources">Add a source</a> first.</em></p>
+    {% endif %}
+  </fieldset>
+
+  <fieldset>
+    <legend>Test Type</legend>
+    <label>
+      <input type="radio" name="test_kind" value="rule"
+             {% if not control or control.test_kind == 'rule' %}checked{% endif %}>
+      Rule
+    </label>
+    <label>
+      <input type="radio" name="test_kind" value="python"
+             {% if control and control.test_kind == 'python' %}checked{% endif %}>
+      Python
+    </label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Python Test Code</legend>
+    <textarea name="test_code" rows="15" cols="80">{{ control.test_code if control and control.test_code else '' }}</textarea>
+  </fieldset>
+
+  <fieldset>
+    <legend>Rule Builder</legend>
+    {% include "partials/rule_builder.html" %}
+  </fieldset>
+
+  <p><button type="submit">{% if control %}Save Changes{% else %}Create Control{% endif %}</button></p>
+</form>
+
+<script src="/static/codemirror.min.js"></script>
+<script src="/static/codemirror-python.min.js"></script>
+<script>
+  if (typeof window.CodeMirror !== "undefined") {
+    var textarea = document.querySelector('textarea[name="test_code"]');
+    if (textarea) {
+      window.CodeMirror.fromTextArea(textarea, {
+        mode: "python",
+        lineNumbers: true,
+        indentUnit: 4,
+        matchBrackets: true
+      });
+    }
+  }
+</script>
+{% endblock %}

@@ -2,24 +2,19 @@
 
 Subcommands
 -----------
-init <dir>
-    Scaffold a new cflow project.
-
-new control <slug> [dir] [--dir <dir>]
-    Scaffold a new control under the given project directory.
-    The directory may be supplied as a positional argument or via --dir.
-
-validate [dir]
-    Load the project, validate all controls, and report results.
-    Exits 0 if all controls are valid, 1 if any are invalid.
+import <src> [--into <dir>]
+    Import a YAML project into a controlplane.db engagement store.
 
 run [dir] [--control <id>] [--at <iso8601>]
-    Execute all controls (or one) and write workpaper + evidence outputs.
+    Execute all controls (or one) via the store and write workpaper + evidence outputs.
     Exits 0 if all controls completed, 1 if any errored.
 
 build [dir] [--out import-bundle.zip] [--at <iso8601>]
-    Read the run log, assemble a validated manifest, and write a zip bundle.
+    Read runs from the store, assemble a validated manifest, and write a zip bundle.
     Exits 0 on success, 1 if no runs exist or the manifest is invalid.
+
+validate [dir]
+    (Deprecated) YAML-project validator. Returns 0.
 """
 
 from __future__ import annotations
@@ -27,95 +22,24 @@ from __future__ import annotations
 import argparse
 import sys
 from datetime import UTC, datetime
-from pathlib import Path
 
 from controlflow_sdk.cli.build_cmd import build_cmd
+from controlflow_sdk.cli.import_cmd import import_cmd
 from controlflow_sdk.cli.run_cmd import run_cmd
-from controlflow_sdk.cli.scaffold import scaffold_control, scaffold_project
-from controlflow_sdk.project import ProjectError, load_sources
-from controlflow_sdk.schema.validate import validate_control
 
 # ---------------------------------------------------------------------------
 # Subcommand handlers
 # ---------------------------------------------------------------------------
 
 
-def _cmd_init(args: argparse.Namespace) -> int:
-    """Handle ``cflow init <dir>``."""
-    root = Path(args.dir).resolve()
-    scaffold_project(root)
-    print(f"Initialized project at {root}")
-    return 0
-
-
-def _cmd_new(args: argparse.Namespace) -> int:
-    """Handle ``cflow new control <slug> [dir] [--dir <dir>]``."""
-    if args.resource != "control":
-        print(f"Unknown resource type: '{args.resource}'", file=sys.stderr)
-        print("Usage: cflow new control <slug>", file=sys.stderr)
-        return 2
-
-    # Resolve directory: positional arg takes priority, then --dir flag, then cwd.
-    raw_dir = args.dir or args.dir_flag or "."
-    root = Path(raw_dir).resolve()
-    scaffold_control(root, args.slug)
-    print(f"Created control '{args.slug}' in {root / 'controls' / args.slug}")
-    return 0
-
-
 def _cmd_validate(args: argparse.Namespace) -> int:
-    """Handle ``cflow validate [dir]``."""
-    root = Path(args.dir).resolve()
-    all_valid = True
-
-    # Load sources map (needed by discover_controls for reference resolution).
-    # If sources.yaml is missing, report clearly and bail.
-    try:
-        sources = load_sources(root)
-    except FileNotFoundError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 1
-    except ProjectError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 1
-
-    # Walk controls and validate each control.yaml directly (schema layer),
-    # then also attempt full project load to catch reference errors.
-    import yaml  # noqa: PLC0415 — local import to keep startup fast
-
-    controls_root = root / "controls"
-    if not controls_root.is_dir():
-        print("No controls/ directory found — nothing to validate.")
-        return 0
-
-    control_yamls = sorted(controls_root.glob("*/control.yaml"))
-    if not control_yamls:
-        print("No controls found — nothing to validate.")
-        return 0
-
-    for control_yaml in control_yamls:
-        slug = control_yaml.parent.name
-        try:
-            with control_yaml.open(encoding="utf-8") as fh:
-                doc: dict = yaml.safe_load(fh) or {}
-            errors = validate_control(doc)
-            # Also check source references
-            for src_ref in doc.get("sources", []):
-                src_id = src_ref.get("id", "")
-                if src_id and src_id not in sources:
-                    errors.append(f"sources: references unknown source id '{src_id}'")
-        except Exception as exc:  # noqa: BLE001
-            errors = [str(exc)]
-
-        if errors:
-            all_valid = False
-            print(f"  FAIL  {slug}")
-            for err in errors:
-                print(f"        - {err}")
-        else:
-            print(f"  OK    {slug}")
-
-    return 0 if all_valid else 1
+    """Handle ``cflow validate [dir]`` — deprecated stub, returns 0."""
+    print(
+        "NOTE: `cflow validate` is deprecated. "
+        "Use `cflow import` to load a project into the store, then `cflow run`.",
+        file=sys.stderr,
+    )
+    return 0
 
 
 # ---------------------------------------------------------------------------
@@ -130,34 +54,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", metavar="<command>")
 
-    # -- init ----------------------------------------------------------------
-    init_p = sub.add_parser("init", help="Scaffold a new cflow project.")
-    init_p.add_argument("dir", help="Directory to initialise (created if absent).")
-
-    # -- new -----------------------------------------------------------------
-    new_p = sub.add_parser("new", help="Scaffold a new resource.")
-    new_p.add_argument(
-        "resource",
-        choices=["control"],
-        help="Resource type to create.",
-    )
-    new_p.add_argument("slug", help="Slug identifier for the new resource.")
-    new_p.add_argument(
-        "dir",
-        nargs="?",
-        default=None,
-        help="Project root directory (positional, optional).",
-    )
-    new_p.add_argument(
-        "--dir",
-        dest="dir_flag",
-        default=None,
-        metavar="<dir>",
-        help="Project root directory (default: current directory).",
-    )
-
-    # -- validate ------------------------------------------------------------
-    val_p = sub.add_parser("validate", help="Validate all controls in a project.")
+    # -- validate (deprecated stub) ------------------------------------------
+    val_p = sub.add_parser("validate", help="(Deprecated) YAML project validator.")
     val_p.add_argument(
         "dir",
         nargs="?",
@@ -187,6 +85,22 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="<iso8601>",
         help="Execution timestamp in ISO-8601 format (default: current UTC time).",
+    )
+
+    # -- import --------------------------------------------------------------
+    import_p = sub.add_parser(
+        "import",
+        help="Import a YAML project into a controlplane.db engagement store.",
+    )
+    import_p.add_argument(
+        "src",
+        help="Path to the YAML project directory (must contain cflow.yaml).",
+    )
+    import_p.add_argument(
+        "--into",
+        default=None,
+        metavar="<dir>",
+        help="Target engagement directory (default: same as src).",
     )
 
     # -- build ---------------------------------------------------------------
@@ -234,10 +148,6 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
-    if args.command == "init":
-        return _cmd_init(args)
-    if args.command == "new":
-        return _cmd_new(args)
     if args.command == "validate":
         return _cmd_validate(args)
     if args.command == "run":
@@ -245,6 +155,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.at is None:
             args.at = datetime.now(UTC).isoformat()
         return run_cmd(args)
+
+    if args.command == "import":
+        return import_cmd(args)
 
     if args.command == "build":
         # Clock boundary: inject current UTC time only when --at is not supplied.

@@ -205,6 +205,31 @@ class TestLoadTestCallable:
             load_test_callable(controls[0])
 
 
+class TestInlineTestCode:
+    def _control(self, **kw):  # type: ignore[no-untyped-def]
+        from controlflow_sdk.model.control import FrameworkRefs
+
+        base = dict(
+            id="c",
+            title="t",
+            objective="o",
+            narrative="n",
+            framework_refs=FrameworkRefs(),
+            risk=None,
+            sources=[],
+        )
+        base.update(kw)
+        return ControlDef(**base)
+
+    def test_load_test_callable_from_inline_code(self):
+        c = self._control(
+            test_code="def test(pop):\n    return [{'item_key': 'X', 'description': 'd'}]"
+        )
+        fn = load_test_callable(c)
+        assert callable(fn)
+        assert fn(None) == [{"item_key": "X", "description": "d"}]
+
+
 class TestProject:
     def test_load_returns_project(self):
         project = Project.load(SAMPLE)
