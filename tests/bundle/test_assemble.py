@@ -443,3 +443,50 @@ class TestBundleError:
             assert "forced validation failure" in str(exc_info.value)
         finally:
             assemble_mod.validate_bundle = original  # type: ignore[assignment]
+
+
+# ---------------------------------------------------------------------------
+# Tests: rule control bundles readable test_code
+# ---------------------------------------------------------------------------
+
+
+def test_rule_control_bundles_readable_test_code() -> None:
+    from controlflow_sdk.bundle.assemble import assemble_bundle
+    from controlflow_sdk.model.control import ControlDef, FrameworkRefs
+    from controlflow_sdk.project.discovery import Project
+    from controlflow_sdk.project.loader import ProjectConfig
+
+    control = ControlDef(
+        id="sod",
+        title="SoD",
+        objective="o",
+        narrative="n",
+        framework_refs=FrameworkRefs(nist=["AC-5"]),
+        risk=None,
+        sources=[],
+        rule_spec={
+            "logic": "all",
+            "conditions": [{"column": "can_create", "op": "eq", "value": True}],
+            "severity": "high",
+        },
+    )
+    project = Project(
+        config=ProjectConfig(name="Acme", framework="nist"),
+        sources={},
+        controls=[control],
+    )
+    run_dict = {
+        "run_id": "0" * 16,
+        "executed_at": "2026-03-31T00:00:00+00:00",
+        "passed": 1,
+        "failed": 0,
+        "total": 1,
+        "pass_rate": 100.0,
+        "summary": "1/1 passed",
+        "details": {"violations": []},
+        "control_id": "sod",
+        "provenance": [],
+    }
+    manifest = assemble_bundle(project, {"sod": [run_dict]}, "2026-03-31T00:00:00+00:00")
+    block = next(c for c in manifest["controls"] if c["id"] == "sod")
+    assert "Flag a record when ALL" in block["test_code"]
