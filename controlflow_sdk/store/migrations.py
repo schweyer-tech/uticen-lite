@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # Forward-only, idempotent DDL. Index = target user_version.
 _STEPS: list[str] = [
@@ -104,6 +104,16 @@ _STEPS: list[str] = [
         (source_id, stored_path, original_name, as_of_date, uploaded_at, is_current)
     SELECT id, path, replace(path, 'data/', ''), extract_date, created_at, 1
     FROM sources;
+    """,
+    # --- step 4 -> user_version 4 -------------------------------------------
+    # Store-only visual-pipeline graph for test_kind='pipeline' controls (issue
+    # #25). The graph is authoring state in controlplane.db; it COMPILES to the
+    # existing rule_spec/test_code at run/build time, so the bundle contract
+    # (contract/bundle.schema.json) never learns the word "node" (learning 0001).
+    # This bumps the internal STORE schema version only — NOT the bundle
+    # schema_version. The column is NULL for rule/python controls.
+    """
+    ALTER TABLE controls ADD COLUMN pipeline TEXT;
     """,
 ]
 

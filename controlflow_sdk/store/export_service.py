@@ -11,8 +11,38 @@ from pathlib import Path
 
 from controlflow_sdk.bundle.archive import write_bundle
 from controlflow_sdk.bundle.assemble import assemble_bundle
+from controlflow_sdk.pipeline.lint import LintError, lint_pipeline
+from controlflow_sdk.pipeline.model import parse_pipeline
 from controlflow_sdk.store import repo
 from controlflow_sdk.store.loader import load_project_from_store
+
+
+def _enforce_custom_python_gate(conn: sqlite3.Connection) -> None:
+    """HARD export gate (§8 layer 3): refuse the bundle on a tripping custom node.
+
+    Re-run the same allowlist AST deny-scan used at save over every stored
+    ``test_kind='pipeline'`` control's graph. A bundle is the contract surface
+    consumed by the ControlFlow app, so the canvas's provenance claim ("custom
+    nodes never read a source") must hold where it's *consumed*, not only where
+    it's typed — same posture as ``tests/test_contract_export.py``. Decision:
+    hard BLOCK (raise), not a warning. The message names the offending control +
+    node and points at the "Convert to Python test" offramp.
+    """
+    blocking: list[str] = []
+    for c in repo.list_controls(conn):
+        if c.get("test_kind") != "pipeline":
+            continue
+        graph = c.get("pipeline")
+        if not graph:
+            continue
+        try:
+            errors = lint_pipeline(parse_pipeline(graph))
+        except ValueError as exc:  # malformed stored graph → also block the bundle
+            errors = [f"pipeline failed to parse: {exc}"]
+        for err in errors:
+            blocking.append(f"control {c['id']!r}: {err}")
+    if blocking:
+        raise LintError(blocking)
 
 
 def _to_run_dicts(conn: sqlite3.Connection, controls: list) -> dict[str, list[dict]]:
@@ -66,7 +96,12 @@ def build_bundle(
 
     Raises:
         ValueError: When there are no runs to export.
+        LintError: When a ``pipeline`` control has a Custom Python node that
+            trips the §8 allowlist deny-scan (hard export gate).
     """
+    # §8 layer 3: hard export gate — refuse the bundle BEFORE assembling if any
+    # stored pipeline's custom node could read a file / reach outside `rows`.
+    _enforce_custom_python_gate(conn)
     project = load_project_from_store(conn)
     runs_by_control = _to_run_dicts(conn, project.controls)
     if not runs_by_control:

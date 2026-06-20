@@ -97,3 +97,70 @@ def test_export_cross_source_control_bundle_valid(client):
     assert "def test(pop, sources)" in term["test_code"]
     # source B was auto-bound so the runner can load it
     assert {"access", "hr_roster"} <= {s["id"] for s in term["sources"]}
+
+
+def _ran_pipeline_control(client):
+    """A cross-source VISUAL pipeline control (issue #25): Import(access) →
+    Filter → Join(inner against employees filtered to terminated) → Test."""
+    import json as _json
+
+    access = b"account_id,employee_id,is_active\nA1,E1,true\nA2,E2,true\nA3,E3,true\n"
+    emp = b"employee_id,status\nE1,terminated\nE2,active\nE3,terminated\n"
+    client.post("/sources", data={"source_id": "access_accounts", "format": "csv"},
+                files={"file": ("access_accounts.csv", io.BytesIO(access), "text/csv")},
+                follow_redirects=False)
+    client.post("/sources", data={"source_id": "employees", "format": "csv"},
+                files={"file": ("employees.csv", io.BytesIO(emp), "text/csv")},
+                follow_redirects=False)
+    graph = {"nodes": [
+        {"id": "acc", "type": "import", "source_id": "access_accounts",
+         "narrative": "All access accounts"},
+        {"id": "active", "type": "filter", "inputs": ["acc"],
+         "config": {"logic": "all",
+                    "conditions": [{"column": "is_active", "op": "eq", "value": "true"}]}},
+        {"id": "emp", "type": "import", "source_id": "employees"},
+        {"id": "term", "type": "filter", "inputs": ["emp"],
+         "config": {"logic": "all",
+                    "conditions": [{"column": "status", "op": "eq", "value": "terminated"}]}},
+        {"id": "join", "type": "join", "inputs": ["active", "term"],
+         "config": {"left_key": "employee_id", "right_key": "employee_id", "mode": "inner"}},
+        {"id": "tst", "type": "test", "inputs": ["join"],
+         "config": {"logic": "any", "severity": "critical", "item_key_column": "account_id",
+                    "description_template": "Account {account_id} belongs to a terminated employee",
+                    "conditions": [{"column": "account_id", "op": "not_empty"}]}},
+    ]}
+    client.post("/controls", data={
+        "id": "term_pipe", "title": "Terminated access (visual)",
+        "objective": "o", "narrative": "n",
+        "test_kind": "pipeline", "pipeline_json": _json.dumps(graph),
+        "failure_threshold_count": "0",
+    }, follow_redirects=False)
+    client.post("/controls/term_pipe/run", follow_redirects=False)
+
+
+def test_export_pipeline_control_bundle_valid_and_node_free(client):
+    """A VISUAL pipeline control exports a schema-valid bundle whose test_code is
+    the compiled cross-source Python — and the bundle never carries the graph or
+    the word 'node' (cardinal rule 0001; store-only graph per learning 0006)."""
+    from controlflow_sdk.schema.validate import validate_bundle
+
+    _ran_pipeline_control(client)
+    resp = client.post("/export")
+    assert resp.status_code == 200
+    raw = resp.content
+    with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+        manifest_bytes = zf.read("manifest.json")
+        manifest = json.loads(manifest_bytes)
+
+    assert validate_bundle(manifest) == []
+    assert manifest["schema_version"] == "1.0"
+    pipe = next(c for c in manifest["controls"] if c["id"] == "term_pipe")
+    assert "def test(pop, sources)" in pipe["test_code"]
+    assert {"access_accounts", "employees"} <= {s["id"] for s in pipe["sources"]}
+    # The flagged account is the active account of a terminated employee.
+    run = pipe["runs"][0]
+    assert run["failed"] == 2  # A1 (E1) and A3 (E3) are terminated
+    # The store-only graph never enters the bundle: no "pipeline" graph, no "node".
+    assert "pipeline" not in pipe
+    assert b'"node' not in manifest_bytes
+    assert '"nodes"' not in manifest_bytes.decode("utf-8")

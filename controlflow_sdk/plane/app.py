@@ -40,6 +40,7 @@ def create_app(project_root: Path) -> FastAPI:
         controls,
         dashboard,
         export,
+        pipeline,
         runs,
         setup,
         sources,
@@ -48,6 +49,10 @@ def create_app(project_root: Path) -> FastAPI:
     dashboard.register(app, templates, get_conn)
     setup.register(app, templates, get_conn)
     sources.register(app, templates, get_conn)
+    # Register the pipeline sub-routes (/controls/{id}/pipeline*) BEFORE the
+    # /controls/{control_id} catch-all in controls.register() so they cannot be
+    # shadowed (learning 0007).
+    pipeline.register(app, templates, get_conn)
     controls.register(app, templates, get_conn)
     ai.register(app, templates, get_conn)
     runs.register(app, templates, get_conn)

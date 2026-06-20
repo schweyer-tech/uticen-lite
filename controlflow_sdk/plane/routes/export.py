@@ -9,6 +9,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 
+from controlflow_sdk.pipeline.lint import LintError
 from controlflow_sdk.store import repo
 from controlflow_sdk.store.db import connect
 from controlflow_sdk.store.export_service import build_bundle
@@ -35,6 +36,16 @@ def register(
         conn = connect(root)
         try:
             build_bundle(conn, root, out, generated_at)
+        except LintError as exc:
+            # §8 hard export gate: a Custom Python node tripped the deny-scan.
+            # Block the bundle with a friendly 400 naming the offramp, not a 500.
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": "Export blocked: a custom node can't read files.",
+                    "detail": exc.errors,
+                },
+            )
         except ValueError as exc:
             # No runs in the store yet — return a friendly 400 instead of 500.
             return JSONResponse(

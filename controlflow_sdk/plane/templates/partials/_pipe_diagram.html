@@ -1,0 +1,25 @@
+{# Server-rendered top-down SVG flowchart from the graph view-model `diagram`.
+   Boxes are stacked by topological row; edges connect an input row to its
+   consumer. Colors route through design tokens via the .fc-* CSS classes. #}
+{% set box_w = 260 %}
+{% set box_h = 48 %}
+{% set gap_y = 34 %}
+{% set pad = 16 %}
+{% set width = box_w + 2 * pad %}
+{% set height = (diagram.rows * box_h) + ((diagram.rows - 1) * gap_y) + (2 * pad) %}
+<svg viewBox="0 0 {{ width }} {{ height }}" role="img" aria-label="Pipeline flowchart">
+  {% for edge in diagram.edges %}
+    {% set y1 = pad + (edge.from_row * (box_h + gap_y)) + box_h %}
+    {% set y2 = pad + (edge.to_row * (box_h + gap_y)) %}
+    {% set x = pad + (box_w / 2) %}
+    <path class="fc-edge" d="M {{ x }} {{ y1 }} L {{ x }} {{ y2 }}" />
+  {% endfor %}
+  {% for box in diagram.boxes %}
+    {% set y = pad + (box.row * (box_h + gap_y)) %}
+    <g class="fc-box{% if box.terminal %} fc-terminal{% endif %}">
+      <rect x="{{ pad }}" y="{{ y }}" width="{{ box_w }}" height="{{ box_h }}" rx="8" />
+      <text x="{{ pad + 12 }}" y="{{ y + 20 }}">{{ box.label }}</text>
+      <text class="fc-count" x="{{ pad + 12 }}" y="{{ y + 37 }}">{{ box.id }} · rows: {% if box.count is not none %}{{ "{:,}".format(box.count) }}{% else %}—{% endif %}</text>
+    </g>
+  {% endfor %}
+</svg>
