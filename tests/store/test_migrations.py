@@ -59,3 +59,28 @@ def test_v1_store_upgrades_to_title_without_data_loss(tmp_path: Path):
     assert "title" in _source_columns(conn)
     row = conn.execute("SELECT id, title FROM sources WHERE id = 's'").fetchone()
     assert row[0] == "s" and row[1] is None
+
+
+def test_source_files_table_and_backfill(tmp_path: Path):
+    from controlflow_sdk.store.migrations import _STEPS
+
+    conn = connect(tmp_path)
+    conn.executescript(_STEPS[0])      # v1 schema
+    conn.executescript(_STEPS[1])      # v2: title column
+    conn.execute("PRAGMA user_version = 2")
+    conn.execute(
+        "INSERT INTO sources (id, format, path, key_config, extract_date, created_at) "
+        "VALUES ('s', 'csv', 'data/s.csv', '{}', '2026-03-31', '2026-01-01')"
+    )
+    conn.commit()
+
+    migrate(conn)  # forward step 3 adds the table + backfills a current row
+    assert _user_version(conn) == SCHEMA_VERSION == 3
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(source_files)").fetchall()}
+    assert {"source_id", "stored_path", "original_name", "as_of_date",
+            "row_count", "uploaded_at", "is_current"} <= cols
+    row = conn.execute(
+        "SELECT source_id, stored_path, original_name, as_of_date, is_current "
+        "FROM source_files WHERE source_id = 's'"
+    ).fetchone()
+    assert tuple(row) == ("s", "data/s.csv", "s.csv", "2026-03-31", 1)
