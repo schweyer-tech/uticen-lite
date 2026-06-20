@@ -133,6 +133,44 @@ def _rule_spec_from_form(form: Any) -> dict[str, Any]:
     }
 
 
+def _conditions_view_from_form(form: Any) -> list[dict[str, Any]]:
+    """Rebuild condition view-models from the RAW posted fields (no type coercion).
+
+    Used by the source-checkbox refresh (``GET /controls/_conditions``) to
+    re-render every row against the newly-checked source's columns while keeping
+    the author's uncommitted state. Unlike ``_rule_spec_from_form`` this preserves
+    the verbatim string the user typed (so a ``cond_value`` like ``a|b`` round-
+    trips into the same input) and resolves the ``__other__`` free-text column to
+    a plain ``column`` so the partial can match it against the new dropdown. An
+    empty list yields one blank row (the template's fallback).
+    """
+    columns = form.getlist("cond_column")
+    n = len(columns)
+    ops = _padded(form.getlist("cond_op"), n)
+    values = _padded(form.getlist("cond_value"), n)
+    freetexts = _padded(form.getlist("cond_column_freetext"), n)
+    other_sources = _padded(form.getlist("cond_other_source"), n)
+    this_keys = _padded(form.getlist("cond_this_key"), n)
+    other_keys = _padded(form.getlist("cond_other_key"), n)
+    rows: list[dict[str, Any]] = []
+    for i, (col, op) in enumerate(zip(columns, ops)):
+        if op in ("exists_in", "not_exists_in"):
+            rows.append({
+                "op": op,
+                "column": _resolve_column(col, freetexts[i]) or this_keys[i].strip(),
+                "other_source": other_sources[i].strip(),
+                "this_key": this_keys[i].strip(),
+                "other_key": other_keys[i].strip(),
+            })
+            continue
+        rows.append({
+            "op": op or "eq",
+            "column": _resolve_column(col, freetexts[i]),
+            "value": values[i],
+        })
+    return rows
+
+
 def _cross_source_ids(rule_spec: dict[str, Any] | None) -> list[str]:
     """The set of source ids referenced by cross-source conditions (source B)."""
     if not rule_spec:
@@ -277,6 +315,32 @@ def register(
         return templates.TemplateResponse(
             request, "partials/rule_condition.html",
             {"columns": cols, "all_sources": repo.list_sources(conn)},
+        )
+
+    @app.get("/controls/_conditions", response_class=HTMLResponse)
+    def conditions_refresh(
+        request: Request,
+        conn: sqlite3.Connection = Depends(get_conn),
+    ) -> Any:
+        """Re-render the condition rows for the currently-checked sources (U1).
+
+        Fired by ``hx-trigger`` when a data-source checkbox toggles. The request
+        carries the uncommitted condition fields + the checked ``source_ids`` as
+        query params (HTMX ``hx-include``); we derive the new primary-source
+        columns and re-render every row with that source's column dropdown,
+        preserving what the author already typed. Read-only — nothing is written
+        to the store for this preview (sync GET → ``Depends`` per learning 0002).
+        """
+        params = request.query_params
+        source_ids = [s for s in params.getlist("source_ids") if s]
+        return templates.TemplateResponse(
+            request,
+            "partials/rule_conditions.html",
+            {
+                "conditions": _conditions_view_from_form(params),
+                "columns": _primary_columns(conn, source_ids),
+                "all_sources": repo.list_sources(conn),
+            },
         )
 
     @app.get("/controls/new", response_class=HTMLResponse)
