@@ -117,17 +117,22 @@ def _input_columns_for(
 
 
 def _diagram(pipeline: Pipeline, counts: dict[str, int]) -> dict[str, Any]:
-    """A view-model for the server-rendered SVG flowchart (top-down).
+    """A view-model for the multi-lane server-rendered SVG flowchart (top-down).
 
-    One box per node in topological order with its type, a short label, the
-    surviving row-count (or ``None`` when unknown), and the edges (input→node)
-    so the template can draw connectors. Join's fan-in shows as two edges.
+    One box per node with a ``row`` (vertical position, top→bottom) and a ``lane``
+    (horizontal column). Parallel branches that feed a Join sit in SEPARATE lanes
+    that visibly converge at the Join box, so a join / multi-root pipeline no
+    longer reads as a single linear chain. Each box also carries its type, a short
+    label, and the surviving row-count (``None`` when unknown). Edges connect
+    ``(from_row, from_lane) → (to_row, to_lane)`` so the template can draw a
+    straight in-lane spine and a converging connector across lanes.
+
+    Layout is **presentation-only** — it never reorders execution. Compile/run
+    still use :meth:`Pipeline.topological`; this view-model only positions boxes.
     """
-    # Branch-grouped layout order (DFS post-order from the terminal): a node's
-    # inputs sit contiguously above it, so each input branch stays together
-    # instead of all roots being emitted first. This keeps a fan-in a single
-    # clean convergence rather than interleaved, crossing edges. Compile still
-    # uses .topological() — this ordering is presentation-only.
+    # Vertical order: DFS post-order from the terminal so a node's inputs sit
+    # contiguously above it (each branch stays together). Then any node not
+    # reachable from the terminal, in topological order, for determinism.
     order: list[Any] = []
     seen: set[str] = set()
 
@@ -146,6 +151,10 @@ def _diagram(pipeline: Pipeline, counts: dict[str, int]) -> dict[str, Any]:
             seen.add(n.id)
             order.append(n)
     index = {n.id: i for i, n in enumerate(order)}
+
+    lanes = _assign_lanes(pipeline, order)
+    lane_count = (max(lanes.values()) + 1) if lanes else 1
+
     boxes = [
         {
             "id": n.id,
@@ -153,16 +162,57 @@ def _diagram(pipeline: Pipeline, counts: dict[str, int]) -> dict[str, Any]:
             "label": _node_label(n),
             "count": counts.get(n.id),
             "row": i,
+            "lane": lanes[n.id],
             "terminal": n.id == pipeline.terminal.id,
         }
         for i, n in enumerate(order)
     ]
     edges = [
-        {"from_row": index[src], "to_row": index[n.id]}
+        {
+            "from_row": index[src], "to_row": index[n.id],
+            "from_lane": lanes[src], "to_lane": lanes[n.id],
+        }
         for n in order
         for src in n.inputs
     ]
-    return {"boxes": boxes, "edges": edges, "rows": len(order)}
+    return {"boxes": boxes, "edges": edges, "rows": len(order), "lanes": lane_count}
+
+
+def _assign_lanes(pipeline: Pipeline, order: list[Any]) -> dict[str, int]:
+    """Assign each node a horizontal lane so fan-in branches sit side by side.
+
+    Walks down from the terminal: a node keeps its own lane for its FIRST input
+    (the spine stays vertical) and pushes each additional input onto a fresh lane
+    to the right, recursively. Any node not reached from the terminal (a detached
+    root) is parked in its own new lane. The result places a Join's two feeder
+    branches in distinct columns that converge at the Join — pure presentation,
+    independent of the topological execution order.
+    """
+    lane: dict[str, int] = {}
+    next_lane = [0]
+
+    def _walk(node_id: str, my_lane: int) -> None:
+        if node_id in lane:
+            return
+        lane[node_id] = my_lane
+        if my_lane >= next_lane[0]:
+            next_lane[0] = my_lane + 1
+        node = pipeline.node(node_id)
+        for i, src in enumerate(node.inputs):
+            if i == 0:
+                _walk(src, my_lane)  # first input continues this lane (spine)
+            else:
+                branch_lane = next_lane[0]
+                next_lane[0] += 1
+                _walk(src, branch_lane)  # extra inputs fan out to the right
+
+    _walk(pipeline.terminal.id, 0)
+    for n in order:  # detached nodes (not reachable from terminal) get their own lane
+        if n.id not in lane:
+            branch_lane = next_lane[0]
+            next_lane[0] += 1
+            _walk(n.id, branch_lane)
+    return lane
 
 
 def _node_label(node: Any) -> str:

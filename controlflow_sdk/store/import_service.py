@@ -12,8 +12,13 @@ import shutil
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
+
+import yaml
 
 from controlflow_sdk.model.control import SourceBinding
+from controlflow_sdk.pipeline.compile import compile_pipeline
+from controlflow_sdk.pipeline.model import parse_pipeline
 from controlflow_sdk.project.discovery import Project
 from controlflow_sdk.store import repo
 
@@ -101,7 +106,7 @@ def import_project(conn: sqlite3.Connection, src: Path) -> tuple[int, int]:
         )
 
     for control in project.controls:
-        code = Path(control.test_path).read_text(encoding="utf-8") if control.test_path else ""
+        authoring = _resolve_authoring(control)
         repo.upsert_control(
             conn,
             id=control.id,
@@ -112,14 +117,59 @@ def import_project(conn: sqlite3.Connection, src: Path) -> tuple[int, int]:
                 "nist": control.framework_refs.nist,
                 **control.framework_refs.extra,
             },
-            test_kind="python",
-            test_code=code,
+            test_kind=authoring["test_kind"],
+            rule_spec=authoring["rule_spec"],
+            test_code=authoring["test_code"],
+            pipeline=authoring["pipeline"],
             failure_threshold_pct=control.threshold.failure_threshold_pct,
             failure_threshold_count=control.threshold.failure_threshold_count,
         )
         repo.set_control_sources(conn, control.id, [s.id for s in control.sources])
 
     return len(project.controls), len(project.sources)
+
+
+def _resolve_authoring(control: object) -> dict[str, Any]:
+    """Pick a control's authoring mode from optional sidecars next to ``control.yaml``.
+
+    Each control directory holds the ``test.py`` Python escape hatch by default. To
+    let the bundled demo showcase the no-code and visual authoring surfaces (not only
+    the escape hatch), a control may *also* ship one of two store-only sidecars; the
+    importer prefers the sidecar and stores the richer ``test_kind`` so the loaded
+    engagement shows a MIX of authoring modes:
+
+    * ``rule.yaml``     — a no-code ``rule_spec`` (``test_kind == "rule"``).
+    * ``pipeline.yaml`` — a visual pipeline graph; it is parsed/validated, kept in the
+      store-only ``pipeline`` column, and COMPILED to the existing bundle artifact
+      (a ``rule_spec`` for the pure single-source case, else generated ``test_code``)
+      so ``test_kind == "pipeline"`` (learning 0010 — the bundle never sees the graph).
+
+    Falls back to the file-based ``test.py`` (``test_kind == "python"``) when no
+    sidecar is present. Sidecars are an *authoring representation* only — they do not
+    touch ``bundle.schema.json`` — and ``cflow``/the web runner reuse the unchanged
+    rule/python execution paths against whatever lands in ``rule_spec``/``test_code``.
+    """
+    test_path = getattr(control, "test_path", "") or ""
+    control_dir = Path(test_path).parent if test_path else None
+
+    if control_dir is not None:
+        rule_file = control_dir / "rule.yaml"
+        if rule_file.is_file():
+            rule_spec = yaml.safe_load(rule_file.read_text(encoding="utf-8")) or {}
+            return {"test_kind": "rule", "rule_spec": rule_spec,
+                    "test_code": None, "pipeline": None}
+
+        pipeline_file = control_dir / "pipeline.yaml"
+        if pipeline_file.is_file():
+            graph = yaml.safe_load(pipeline_file.read_text(encoding="utf-8")) or {}
+            pipeline = parse_pipeline(graph)  # validate the graph eagerly
+            compiled = compile_pipeline(pipeline)
+            return {"test_kind": "pipeline", "rule_spec": compiled.rule_spec,
+                    "test_code": compiled.test_code, "pipeline": graph}
+
+    code = Path(test_path).read_text(encoding="utf-8") if test_path else ""
+    return {"test_kind": "python", "rule_spec": None,
+            "test_code": code, "pipeline": None}
 
 
 def demo_source_dir() -> Path:
