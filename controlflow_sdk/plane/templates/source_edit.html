@@ -6,27 +6,7 @@
   <h1>{{ source.title or "Edit source" }}</h1>
   <p class="muted mono">{{ source.id }}</p>
 </div>
-
-<div class="card">
-  <h2>Data file</h2>
-  <p class="muted">Current file: <span class="mono">{{ source.path }}</span></p>
-  <form method="post" action="/sources/{{ source.id }}/refresh" enctype="multipart/form-data">
-    <div class="field">
-      <label for="s-refresh">Refresh data</label>
-      <span class="hint">Upload a newer extract. You'll review any column changes before it replaces the current file — and the previous file is always kept.</span>
-      <input id="s-refresh" type="file" name="file" accept=".csv" required>
-    </div>
-    <button class="btn" type="submit">Upload new file…</button>
-  </form>
-  {% if versions %}
-  <h3 style="margin-top:16px;">Previous versions</h3>
-  <ul class="version-list">
-    {% for v in versions %}
-    <li><span class="mono">{{ v.name }}</span> <span class="muted">— {{ v.label }}</span></li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-</div>
+{% include "_source_tabs.html" %}
 
 <form method="post" action="/sources/{{ source.id }}">
   <div class="card">
@@ -41,11 +21,6 @@
       <label for="s-desc">Description</label>
       <span class="hint">One line on what this extract is.</span>
       <textarea id="s-desc" name="description" rows="2">{{ source.description or '' }}</textarea>
-    </div>
-    <div class="field">
-      <label for="s-asof">Data as-of date</label>
-      <span class="hint">The date this extract is current as of.</span>
-      <input id="s-asof" type="date" name="extract_date" value="{{ source.extract_date or '' }}">
     </div>
   </div>
 

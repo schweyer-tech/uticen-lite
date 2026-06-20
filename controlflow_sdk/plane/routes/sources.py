@@ -134,7 +134,8 @@ def register(
             request,
             "source_edit.html",
             {"project": repo.get_project(conn) or {"name": ""},
-             "source": repo.get_source(conn, source_id)},
+             "source": repo.get_source(conn, source_id),
+             "active": "definition"},
         )
 
     @app.post("/sources/{source_id}")

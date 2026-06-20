@@ -209,6 +209,15 @@ def test_refresh_confirm_records_new_version_with_asof(client):
     conn.close()
 
 
+def test_definition_tab_has_nav_and_no_datafile_card(client):
+    _upload(client, "d", b"a\n1\n")
+    page = client.get("/sources/d").text
+    assert 'href="/sources/d/data"' in page and 'href="/sources/d/history"' in page
+    assert 'class="tabs"' in page
+    # the upload/refresh UI no longer lives on the Definition tab
+    assert "/sources/d/refresh" not in page
+
+
 def test_blank_title_clears_to_none(client):
     csv = b"a\n1\n"
     client.post("/sources", data={"source_id": "s", "format": "csv"},
