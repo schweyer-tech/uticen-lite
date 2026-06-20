@@ -161,6 +161,31 @@ def test_settings_get_lists_providers(client):
     assert "Ollama" in resp.text
 
 
+def test_settings_names_exact_env_vars_per_provider(client, monkeypatch):
+    # U6: each cloud provider's hint names its real env var; Ollama says no key.
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    text = client.get("/settings/ai").text
+    assert "ANTHROPIC_API_KEY" in text
+    assert "OPENAI_API_KEY" in text
+    # Ollama needs no key — the page must say so rather than naming a key var.
+    assert "no API key needed" in text
+    # The generic, env-var-less wording is gone.
+    assert "set the provider's environment variable" not in text
+
+
+def test_settings_shows_enable_state_for_all_three(client, monkeypatch):
+    # U6: enable/disable state is shown consistently for every provider, not just
+    # Anthropic. With one cloud key present and one absent, we see both states,
+    # plus Ollama always-enabled.
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    text = client.get("/settings/ai").text
+    # Two "enabled" badges (Anthropic + Ollama) and one "disabled" (OpenAI).
+    assert text.count(">enabled<") == 2
+    assert text.count(">disabled<") == 1
+
+
 def test_settings_post_persists_selection(client):
     _configure_ai(client, provider="openai", model="gpt-4o")
     conn = connect(client.app.state.project_root)

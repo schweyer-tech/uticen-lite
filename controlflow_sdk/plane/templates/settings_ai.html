@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ project.name }} — AI settings{% endblock %}
 {% block body %}
-<a class="crumb" href="/">← Controls</a>
+<a class="crumb" href="/settings">← Settings</a>
 <div class="page-head">
   <h1>AI-assisted authoring</h1>
 </div>
@@ -22,12 +22,24 @@
                {% if not p.enabled %}disabled{% endif %}
                {% if p.id == selected_provider %}checked{% endif %}>
         <span class="src-name">{{ p.label }}</span>
-        {% if not p.enabled %}
-          <span class="hint" style="margin:0;">
-            disabled — set the provider's environment variable to enable
-          </span>
+        {% if p.enabled %}
+          <span class="badge ok">enabled</span>
+        {% else %}
+          <span class="badge bad">disabled</span>
         {% endif %}
       </label>
+      <span class="hint">
+        {% if p.needs_key %}
+          {% if p.enabled %}
+            Enabled — <code class="mono">{{ p.env }}</code> is set in this environment.
+          {% else %}
+            Disabled — set <code class="mono">{{ p.env }}</code> in this environment to enable.
+          {% endif %}
+        {% else %}
+          Always available — runs locally, no API key needed
+          (set <code class="mono">{{ p.env }}</code> only to point at a non-default host).
+        {% endif %}
+      </span>
       <select name="model__{{ p.id }}" {% if not p.enabled %}disabled{% endif %}>
         {% for m in p.models %}
         <option value="{{ m }}"
