@@ -24,6 +24,24 @@ def test_first_run_shows_setup_screen(fresh_client: TestClient):
     assert "New control" not in resp.text
 
 
+def test_setup_layout_balances_the_two_cards(fresh_client: TestClient):
+    """U7: the onboarding cards are equal-height with bottom-aligned CTAs, and the
+    page is centered so it doesn't strand empty space below the fold.
+
+    The polish is structural (wrapper + per-card body + pinned action row), so assert
+    the scaffolding is present rather than pixel-measuring.
+    """
+    page = fresh_client.get("/").text
+    # centering wrapper + balanced grid
+    assert "setup-page" in page
+    assert "setup-grid" in page
+    # each card uses the equal-height body + a pinned actions row for its CTA
+    assert page.count("setup-card-body") == 2
+    assert page.count("setup-actions") == 2
+    # the demo card now earns its height with concrete value points (no dead space)
+    assert "setup-points" in page
+
+
 def test_header_shows_no_engagement_chip_before_naming(fresh_client: TestClient):
     # The header renders the engagement name in a .chip once set; on first run there is
     # no name, so no empty chip (and no nav-to-nowhere) should appear.

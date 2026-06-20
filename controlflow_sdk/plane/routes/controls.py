@@ -22,6 +22,14 @@ def _fmt_executed(iso: str) -> str:
         return iso or "—"
 
 
+def _fmt_axis(iso: str) -> str:
+    """Render a compact ``executed_at`` for a trend chart's x-axis endpoint."""
+    try:
+        return datetime.fromisoformat(iso).strftime("%b %d")
+    except (ValueError, TypeError):
+        return ""
+
+
 def _history_view(runs: list[dict]) -> dict[str, Any]:
     """Build the trend view-model from newest-first run dicts (learning 0004).
 
@@ -37,6 +45,7 @@ def _history_view(runs: list[dict]) -> dict[str, Any]:
             "failed": r["failed"],
             "total": r["total"],
             "executed_at": r["executed_at"],
+            "x_label": _fmt_axis(r.get("executed_at", "")),
             "label": (
                 f"{_fmt_executed(r.get('executed_at', ''))} — "
                 f"{r['pass_rate']}% pass, {r['failed']} failed"

@@ -64,8 +64,40 @@ def test_history_trend_renders_svg(client):
     page = client.get("/controls/sod/history")
     assert "<svg" in page.text
     assert "<polyline" in page.text
-    # tokenized color, not a hard-coded hex (learning 0005)
-    assert "var(--accent-primary)" in page.text
+    # legibility scaffolding (U3): a 0/50/100% Y scale, gridlines, and a legend so a
+    # reviewer can read pass-rate over runs without guessing.
+    assert "trend-legend" in page.text
+    assert "Pass rate" in page.text
+    assert "Exceptions" in page.text
+    assert "trend-grid" in page.text
+    assert ">100%<" in page.text and ">50%<" in page.text and ">0%<" in page.text
+
+
+def test_trend_svg_has_no_invalid_height_attr(client):
+    """B1: an SVG `height="auto"` is invalid and errors in the browser console.
+
+    The svg must be sized via CSS, never carry a literal `height="auto"` attribute.
+    """
+    _rule_control(client)
+    _run_id_of(client)
+    _run_id_of(client)
+    page = client.get("/controls/sod/history")
+    assert 'height="auto"' not in page.text
+    # the svg element itself declares no width/height presentation attribute
+    svg_open = page.text[page.text.index("<svg"):page.text.index("<svg") + 400]
+    assert "height=" not in svg_open
+    assert "width=" not in svg_open
+
+
+def test_trend_colors_route_through_tokens(client):
+    """Learning 0005: every trend color is a var(--token) in the stylesheet."""
+    css = client.get("/static/app.css").text
+    # the trend block exists and drives its colors through tokens, no raw hex
+    block = css[css.index(".trend-figure"):css.index(".trend-figure") + 1400]
+    assert "var(--accent-primary)" in block
+    assert "var(--status-warning)" in block
+    assert "var(--status-critical)" in block
+    assert "#" not in block  # no hard-coded hex colors in the trend rules
 
 
 def test_control_page_has_history_tab(client):

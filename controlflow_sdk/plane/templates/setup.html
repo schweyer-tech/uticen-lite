@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Set up your engagement — Control Plane{% endblock %}
 {% block body %}
-<div class="page-head">
+<div class="setup-page">
+<div class="page-head setup-head">
   <h1>Welcome to the Control Plane</h1>
   <p class="lead">
     An engagement is a single control-testing workspace. Name yours to get started, or
@@ -10,42 +11,54 @@
 </div>
 
 <div class="setup-grid">
-  <section class="card">
-    <h2>Name your engagement</h2>
-    <form method="post" action="/setup">
-      <div class="field">
-        <label for="name">Engagement name</label>
-        <input type="text" id="name" name="name" placeholder="e.g. Acme Corp — FY26 SOX"
-               required autofocus>
-      </div>
-      <div class="field">
-        <label for="framework">Framework</label>
-        <span class="hint">Optional — the compliance framework this engagement maps to.</span>
-        <input type="text" id="framework" name="framework" list="framework-options"
-               placeholder="e.g. NIST SP 800-53">
-        <datalist id="framework-options">
-          <option value="NIST SP 800-53">
-          <option value="NIST CSF 2.0">
-          <option value="SOC 2">
-          <option value="ISO 27001">
-          <option value="PCI DSS">
-          <option value="COBIT 2019">
-        </datalist>
-      </div>
-      <button type="submit">Create engagement</button>
-    </form>
+  <section class="card setup-card">
+    <div class="setup-card-body">
+      <h2>Name your engagement</h2>
+      <p class="setup-sub">Start a clean workspace and author your own controls and sources.</p>
+      <form class="setup-form" method="post" action="/setup">
+        <div class="field">
+          <label for="name">Engagement name</label>
+          <input type="text" id="name" name="name" placeholder="e.g. Acme Corp — FY26 SOX"
+                 required autofocus>
+        </div>
+        <div class="field">
+          <label for="framework">Framework</label>
+          <span class="hint">Optional — the compliance framework this engagement maps to.</span>
+          <input type="text" id="framework" name="framework" list="framework-options"
+                 placeholder="e.g. NIST SP 800-53">
+          <datalist id="framework-options">
+            <option value="NIST SP 800-53">
+            <option value="NIST CSF 2.0">
+            <option value="SOC 2">
+            <option value="ISO 27001">
+            <option value="PCI DSS">
+            <option value="COBIT 2019">
+          </datalist>
+        </div>
+        <div class="setup-actions">
+          <button type="submit">Create engagement</button>
+        </div>
+      </form>
+    </div>
   </section>
 
-  <section class="card">
-    <h2>Just exploring?</h2>
-    <p>
-      Load <strong>Northwind Trading</strong> — a fictional wholesale distributor with
-      8 real audit controls (financial close, IT access, procurement) over 8 seeded
-      data extracts. Everything is populated and runnable in seconds.
-    </p>
-    <form method="post" action="/setup/demo">
-      <button type="submit">Load the Northwind demo</button>
-    </form>
+  <section class="card setup-card">
+    <div class="setup-card-body">
+      <h2>Just exploring?</h2>
+      <p class="setup-sub">
+        Load <strong>Northwind Trading</strong> — a fully populated example you can run
+        in seconds, no setup required.
+      </p>
+      <ul class="setup-points">
+        <li>8 real audit controls — financial close, IT access, procurement</li>
+        <li>8 seeded data extracts, ready to test against</li>
+        <li>Run full-population and view an audit-grade workpaper right away</li>
+      </ul>
+      <form class="setup-actions" method="post" action="/setup/demo">
+        <button type="submit">Load the Northwind demo</button>
+      </form>
+    </div>
   </section>
+</div>
 </div>
 {% endblock %}
