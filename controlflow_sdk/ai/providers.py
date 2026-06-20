@@ -76,9 +76,13 @@ def provider_key_present(provider: str) -> bool:
 
 
 def available_providers() -> list[dict[str, Any]]:
-    """Picker rows: ``[{id, label, models, default_model, enabled}]``.
+    """Picker rows: ``[{id, label, models, default_model, env, needs_key, enabled}]``.
 
-    ``enabled`` is :func:`provider_key_present`. **Never imports the [ai] SDKs.**
+    ``enabled`` is :func:`provider_key_present`. ``env`` is the exact environment
+    variable that gates the provider (so the UI can name it) and ``needs_key`` is
+    ``True`` for the cloud providers (the var holds an API key) and ``False`` for
+    local Ollama (always eligible; ``OLLAMA_HOST`` only *overrides* the localhost
+    default). **Never imports the [ai] SDKs.**
     """
     return [
         {
@@ -86,6 +90,8 @@ def available_providers() -> list[dict[str, Any]]:
             "label": spec["label"],
             "models": list(spec["models"]),
             "default_model": spec["default_model"],
+            "env": spec["env"],
+            "needs_key": pid != "ollama",
             "enabled": provider_key_present(pid),
         }
         for pid, spec in PROVIDERS.items()

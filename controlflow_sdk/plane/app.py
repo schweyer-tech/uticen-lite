@@ -57,12 +57,17 @@ def create_app(project_root: Path) -> FastAPI:
         export,
         pipeline,
         runs,
+        settings,
         setup,
         sources,
     )
 
     dashboard.register(app, templates, get_conn)
     setup.register(app, templates, get_conn)
+    # Register the general Settings landing (/settings, /settings/rename) BEFORE
+    # ai.register() so the AI sub-routes (/settings/ai) sit alongside it; both
+    # share the /settings prefix and neither shadows the other (learning 0007).
+    settings.register(app, templates, get_conn)
     sources.register(app, templates, get_conn)
     # Register the pipeline sub-routes (/controls/{id}/pipeline*) BEFORE the
     # /controls/{control_id} catch-all in controls.register() so they cannot be
