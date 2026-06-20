@@ -1,0 +1,69 @@
+# Visual-pipeline (graph) authoring of this control — a Custom Python pipeline.
+#
+# Reshapes the demo so the one-click demo showcases a pipeline that drops to a
+# Custom Python node for logic the no-code grammar can't express (a row-local
+# comparison of reviewed_by vs prepared_by). The importer stores this graph in the
+# store-only `pipeline` column and COMPILES it to the existing bundle artifact
+# (learning 0010): the DAG has a Custom Python node, so it compiles to a generated
+# test(pop, sources) with the node emitted as a starved module-level function. The
+# bundle never learns the word "node". The companion test.py stays as documentation
+# but is not the executed artifact once this sidecar is present.
+#
+# Shape: Import journal entries -> Filter to MANUAL entries -> Custom Python test
+# node that applies the $50k materiality threshold and flags entries that are
+# self-reviewed or have no reviewer.
+#
+# The Custom Python node is intentionally starved: it only sees `rows` (the
+# filtered frame), never `sources` — cross-source work would go through Import/Join
+# nodes. It uses only the allowlisted constructs (no file I/O, no imports beyond the
+# pure set). Expected: 3 violations on the demo data (same as the Python test it
+# replaces).
+nodes:
+  - id: je
+    type: import
+    source_id: journal_entries
+    narrative: Journal entry register (primary population).
+  - id: manual
+    type: filter
+    inputs: [je]
+    narrative: Keep only manually prepared entries.
+    config:
+      logic: all
+      conditions:
+        - column: entry_type
+          op: eq
+          value: manual
+  - id: flag
+    type: custom_python
+    inputs: [manual]
+    narrative: >-
+      Flag manual entries >= $50,000 that are self-reviewed or have no reviewer.
+    config:
+      flavor: test
+      code: |
+        out = []
+        for _idx, _row in rows.iterrows():
+            r = _row.to_dict()
+            try:
+                amount = float(r.get("amount"))
+            except (ValueError, TypeError):
+                continue
+            if abs(amount) < 50000:
+                continue
+            prepared_by = str(r.get("prepared_by") or "").strip()
+            reviewed_by = str(r.get("reviewed_by") or "").strip()
+            reviewer_missing = reviewed_by == ""
+            self_reviewed = (not reviewer_missing) and reviewed_by == prepared_by
+            if reviewer_missing or self_reviewed:
+                reason = (
+                    "No independent reviewer assigned"
+                    if reviewer_missing
+                    else "Entry reviewed by preparer (self-authorization)"
+                )
+                out.append({
+                    "item_key": str(r.get("entry_id")),
+                    "description": reason,
+                    "severity": "high",
+                    "details": {"amount": amount, "prepared_by": prepared_by},
+                })
+        return out

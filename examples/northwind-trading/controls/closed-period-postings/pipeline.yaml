@@ -1,0 +1,55 @@
+# Visual-pipeline (graph) authoring of this control.
+#
+# Reshapes the demo so the one-click demo showcases the visual pipeline builder
+# (#25). The importer stores this graph in the store-only `pipeline` column and
+# COMPILES it to the existing bundle artifact (learning 0010): the DAG has a Join,
+# so it compiles to a generated test(pop, sources) and the bundle never learns the
+# word "node". The companion test.py stays as documentation but is not the executed
+# artifact once this sidecar is present.
+#
+# Shape: the right branch narrows the period calendar to the CLOSED periods; the
+# Join keeps journal entries whose period exists among the closed periods; the
+# terminal Test flags every survivor.
+#
+# dtype note (learning 0011): `period` and `status` both load as text, so the
+# filter and join compare against strings. Expected: 2 violations on the demo data
+# (same as the Python test it replaces).
+nodes:
+  - id: je
+    type: import
+    source_id: journal_entries
+    narrative: Journal entry register (primary population).
+  - id: periods
+    type: import
+    source_id: closed_periods
+    narrative: Accounting period calendar.
+  - id: closed
+    type: filter
+    inputs: [periods]
+    narrative: Keep only periods marked closed.
+    config:
+      logic: all
+      conditions:
+        - column: status
+          op: eq
+          value: closed
+  - id: posted_to_closed
+    type: join
+    inputs: [je, closed]
+    narrative: Journal entries posted to a closed period.
+    config:
+      mode: exists
+      left_key: period
+      right_key: period
+  - id: flag
+    type: test
+    inputs: [posted_to_closed]
+    narrative: Flag every entry posted to a closed period.
+    config:
+      logic: all
+      severity: high
+      item_key_column: entry_id
+      description_template: "Journal entry posted to closed period '{period}'"
+      conditions:
+        - column: entry_id
+          op: not_empty
