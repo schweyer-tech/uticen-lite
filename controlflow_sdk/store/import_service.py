@@ -10,10 +10,36 @@ from __future__ import annotations
 
 import shutil
 import sqlite3
+from datetime import UTC, datetime
 from pathlib import Path
 
+from controlflow_sdk.model.control import SourceBinding
 from controlflow_sdk.project.discovery import Project
 from controlflow_sdk.store import repo
+
+
+def _import_stamp() -> str:
+    """Upload/as-of stamp for imported files (same wire format the UI renders)."""
+    return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+
+
+def _row_count_of(binding: SourceBinding, root: Path) -> int | None:
+    """Count a source file's data rows for the store-only file history.
+
+    Reuses the format-aware adapter machinery (``source_for(...).provenance()``)
+    so csv/parquet/xlsx all report an accurate count. Returns ``None`` if the file
+    can't be read (missing extract, unsupported format, optional dep absent) so an
+    import never fails just because a count couldn't be derived — the History tab
+    falls back to "—" in that case.
+    """
+    from controlflow_sdk.adapters.files import source_for
+
+    try:
+        prov = source_for(binding, root).provenance()
+        count = prov.get("row_count")
+        return int(count) if count is not None else None
+    except Exception:
+        return None
 
 
 def import_project(conn: sqlite3.Connection, src: Path) -> tuple[int, int]:
@@ -71,7 +97,7 @@ def import_project(conn: sqlite3.Connection, src: Path) -> tuple[int, int]:
         repo.set_initial_file(
             conn, source_id=sid, stored_path=_path,
             original_name=Path(_path).name, as_of_date=binding.extract_date,
-            row_count=None, uploaded_at="",
+            row_count=_row_count_of(binding, src), uploaded_at=_import_stamp(),
         )
 
     for control in project.controls:

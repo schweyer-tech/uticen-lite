@@ -33,6 +33,10 @@ def test_import_project_returns_counts_and_rows(tmp_path: Path):
     cur = repo.get_current_file(conn, "invoices")
     assert cur is not None and cur["is_current"] == 1
     assert cur["as_of_date"] == "2026-03-31"
+    # ...and the file-history metadata the History tab renders: a real record
+    # count (not NULL → no "—") and an upload stamp.
+    assert cur["row_count"] is not None and cur["row_count"] > 0
+    assert cur["uploaded_at"]
 
 
 def test_demo_source_dir_has_definition_and_data():
@@ -59,6 +63,15 @@ def test_load_demo_copies_data_and_is_runnable(tmp_path: Path):
     control_id = repo.list_controls(conn)[0]["id"]
     run = run_control_in_store(conn, tmp_path, control_id, "2026-03-31T00:00:00Z")
     assert run.population_size > 0
+
+    # Every demo-seeded source's file-history row carries a real record count and
+    # an upload stamp so the History tab renders them (no "—"). Regression for the
+    # demo seed creating the source_files row with NULL row_count/uploaded_at.
+    for src in repo.list_sources(conn):
+        cur = repo.get_current_file(conn, src["id"])
+        assert cur is not None, src["id"]
+        assert cur["row_count"] is not None and cur["row_count"] > 0, src["id"]
+        assert cur["uploaded_at"], src["id"]
 
 
 def test_demo_source_dir_missing_raises(monkeypatch, tmp_path: Path):
