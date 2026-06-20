@@ -243,6 +243,9 @@ legend {
 .tabs .tab:hover { color: var(--text-primary); }
 .tabs .tab.active { color: var(--accent-primary); border-bottom-color: var(--accent-primary); }
 
+/* ── run trend (history) ──────────────────────────────────────────────────── */
+.trend-svg { display: block; width: 100%; max-width: 480px; height: 72px; margin: 4px 0 2px; }
+
 /* ── badges / pills / chips ───────────────────────────────────────────────── */
 .chip {
   display: inline-block; background: var(--bg-surface-2); color: var(--text-primary);

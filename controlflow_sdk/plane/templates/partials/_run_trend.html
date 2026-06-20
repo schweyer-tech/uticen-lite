@@ -1,0 +1,46 @@
+{#- Inline-SVG run trend (no JS, no chart dep). `trend.points` is chronological
+    (oldest->newest, left-to-right). All colors route through var(--token) so the
+    light theme works automatically (learning 0005). -#}
+{%- set pts = trend.points -%}
+{%- set n = pts | length -%}
+{%- set W = 320 -%}
+{%- set SP_H = 38 -%}      {#- sparkline band height -#}
+{%- set BAR_TOP = 46 -%}   {#- exception bars baseline top -#}
+{%- set BAR_H = 12 -%}     {#- max bar height -#}
+{%- set max_failed = trend.max_failed -%}
+<svg viewBox="0 0 {{ W }} 60" width="100%" height="auto"
+     preserveAspectRatio="none" role="img" aria-label="Run trend"
+     class="trend-svg">
+  {#- baseline axis for the exception bars -#}
+  <line x1="0" y1="{{ BAR_TOP + BAR_H }}" x2="{{ W }}" y2="{{ BAR_TOP + BAR_H }}"
+        stroke="var(--border-default)" stroke-width="1"
+        vector-effect="non-scaling-stroke"/>
+
+  {#- pass-rate sparkline -#}
+  {%- if n > 1 -%}
+  <polyline fill="none" stroke="var(--accent-primary)" stroke-width="2"
+            vector-effect="non-scaling-stroke" stroke-linejoin="round"
+            stroke-linecap="round"
+            points="{% for p in pts %}{{ (loop.index0 / (n - 1) * W) | round(2) }},{{ (SP_H - (p.pass_rate / 100 * SP_H)) | round(2) }} {% endfor %}"/>
+  {%- endif -%}
+
+  {#- per-run dots + exception bars -#}
+  {%- for p in pts -%}
+    {%- set x = (loop.index0 / (n - 1) * W) if n > 1 else (W / 2) -%}
+    {%- set y = SP_H - (p.pass_rate / 100 * SP_H) -%}
+    {%- set bar_h = (p.failed / max_failed * BAR_H) if max_failed > 0 else 0 -%}
+    {%- set bar_w = (W / n * 0.5) -%}
+    {%- if bar_h > 0 -%}
+    <rect x="{{ (x - bar_w / 2) | round(2) }}" y="{{ (BAR_TOP + BAR_H - bar_h) | round(2) }}"
+          width="{{ bar_w | round(2) }}" height="{{ bar_h | round(2) }}"
+          fill="{% if p.failed >= max_failed %}var(--status-critical){% else %}var(--status-warning){% endif %}">
+      <title>{{ p.label }}</title>
+    </rect>
+    {%- endif -%}
+    <circle cx="{{ x | round(2) }}" cy="{{ y | round(2) }}" r="2.5"
+            fill="{% if loop.last %}{% if p.failed == 0 %}var(--status-success){% else %}var(--status-critical){% endif %}{% else %}var(--accent-primary){% endif %}"
+            vector-effect="non-scaling-stroke">
+      <title>{{ p.label }}</title>
+    </circle>
+  {%- endfor -%}
+</svg>

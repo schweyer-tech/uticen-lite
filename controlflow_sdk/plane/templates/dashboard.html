@@ -31,6 +31,7 @@
         <td>
           {% if row.latest %}
             <span class="badge {{ 'pass' if row.latest.failed == 0 else 'fail' }}">{{ row.latest.pass_rate }}% pass</span>
+            <a class="btn btn-sm btn-ghost" href="/controls/{{ row.control.id }}/history">History</a>
             <span class="muted mono">{{ row.latest.failed }} / {{ row.latest.total }} failed</span>
           {% else %}
             <span class="muted">Not yet run</span>
