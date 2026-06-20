@@ -24,15 +24,60 @@ def _typed(value: str) -> Any:
         return v
 
 
+def _primary_columns(conn: sqlite3.Connection, source_ids: list[str]) -> list[dict]:
+    """Columns of the rule's primary population (the first bound source).
+
+    The first bound source is the primary population (mirrors
+    ``runner/execute.py`` which uses ``populations[0]``). Returns ``[]`` when no
+    source is bound or the source is missing, so the template falls back to a
+    free-text column input.
+    """
+    if not source_ids:
+        return []
+    src = repo.get_source(conn, source_ids[0])
+    return src["columns"] if src else []
+
+
+def _padded(items: list, n: int) -> list:
+    """Right-pad a getlist to length ``n`` with empty strings (parallel fields)."""
+    return list(items) + [""] * (n - len(items))
+
+
+def _resolve_column(selected: str, freetext: str) -> str:
+    """Resolve the posted column: the dropdown value, or the free-text sibling
+    when the user picked the ``__other__`` (type-a-name) escape hatch."""
+    if selected == "__other__" and freetext.strip():
+        return freetext.strip()
+    return selected.strip()
+
+
 def _rule_spec_from_form(form: Any) -> dict[str, Any]:
     columns = form.getlist("cond_column")
-    ops = form.getlist("cond_op")
-    values = form.getlist("cond_value")
+    n = len(columns)
+    ops = _padded(form.getlist("cond_op"), n)
+    values = _padded(form.getlist("cond_value"), n)
+    freetexts = _padded(form.getlist("cond_column_freetext"), n)
+    other_sources = _padded(form.getlist("cond_other_source"), n)
+    this_keys = _padded(form.getlist("cond_this_key"), n)
+    other_keys = _padded(form.getlist("cond_other_key"), n)
     conditions: list[dict[str, Any]] = []
-    for col, op, raw in zip(columns, ops, values):
-        if not col.strip():
+    for i, (col, op, raw) in enumerate(zip(columns, ops, values)):
+        if op in ("exists_in", "not_exists_in"):
+            this_key = this_keys[i].strip()
+            if not this_key:
+                continue
+            conditions.append({
+                "op": op,
+                "column": this_key,
+                "other_source": other_sources[i].strip(),
+                "this_key": this_key,
+                "other_key": other_keys[i].strip(),
+            })
             continue
-        cond: dict[str, Any] = {"column": col.strip(), "op": op}
+        resolved = _resolve_column(col, freetexts[i])
+        if not resolved:
+            continue
+        cond: dict[str, Any] = {"column": resolved, "op": op}
         if op in ("is_empty", "not_empty", "is_duplicate"):
             pass
         elif op in ("in", "not_in"):
@@ -47,6 +92,18 @@ def _rule_spec_from_form(form: Any) -> dict[str, Any]:
         "description_template": form.get("rule_description", ""),
         "item_key_column": form.get("rule_item_key") or None,
     }
+
+
+def _cross_source_ids(rule_spec: dict[str, Any] | None) -> list[str]:
+    """The set of source ids referenced by cross-source conditions (source B)."""
+    if not rule_spec:
+        return []
+    out: list[str] = []
+    for c in rule_spec.get("conditions", []):
+        other = c.get("other_source")
+        if other and other not in out:
+            out.append(other)
+    return out
 
 
 def _save_from_form(conn: sqlite3.Connection, form: Any) -> str:
@@ -70,7 +127,13 @@ def _save_from_form(conn: sqlite3.Connection, form: Any) -> str:
         failure_threshold_pct=float(pct) if pct else None,
         failure_threshold_count=int(cnt) if cnt else None,
     )
-    repo.set_control_sources(conn, cid, form.getlist("source_ids"))
+    # Auto-bind every source B referenced by a cross-source condition so the
+    # runner can load it — the analyst need not also tick B's checkbox.
+    source_ids = list(form.getlist("source_ids"))
+    for sid in _cross_source_ids(rule_spec):
+        if sid not in source_ids:
+            source_ids.append(sid)
+    repo.set_control_sources(conn, cid, source_ids)
     return cid
 
 
@@ -80,9 +143,15 @@ def register(
     get_conn: Callable[..., Generator[sqlite3.Connection, None, None]],
 ) -> None:
     @app.get("/controls/_condition_row", response_class=HTMLResponse)
-    def condition_row(request: Request) -> Any:
+    def condition_row(
+        request: Request,
+        source_id: str = "",
+        conn: sqlite3.Connection = Depends(get_conn),
+    ) -> Any:
+        cols = _primary_columns(conn, [source_id]) if source_id else []
         return templates.TemplateResponse(
-            request, "partials/rule_condition.html", {}
+            request, "partials/rule_condition.html",
+            {"columns": cols, "all_sources": repo.list_sources(conn)},
         )
 
     @app.get("/controls/new", response_class=HTMLResponse)
@@ -97,6 +166,8 @@ def register(
                 "project": repo.get_project(conn) or {"name": ""},
                 "control": None,
                 "sources": repo.list_sources(conn),
+                "columns": [],  # no bound source yet → free-text fallback
+                "all_sources": repo.list_sources(conn),
             },
         )
 
@@ -106,13 +177,16 @@ def register(
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
     ) -> Any:
+        control = repo.get_control(conn, control_id)
         return templates.TemplateResponse(
             request,
             "control_edit.html",
             {
                 "project": repo.get_project(conn) or {"name": ""},
-                "control": repo.get_control(conn, control_id),
+                "control": control,
                 "sources": repo.list_sources(conn),
+                "columns": _primary_columns(conn, control["source_ids"]) if control else [],
+                "all_sources": repo.list_sources(conn),
             },
         )
 

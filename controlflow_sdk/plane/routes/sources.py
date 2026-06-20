@@ -12,6 +12,7 @@ from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from controlflow_sdk.plane.coercion_check import coercion_report
 from controlflow_sdk.store import repo
 from controlflow_sdk.store.db import connect
 
@@ -152,9 +153,11 @@ def register(
         conn: sqlite3.Connection = Depends(get_conn),
     ) -> Any:
         root = request.app.state.project_root
+        source = repo.get_source(conn, source_id)
         current = repo.get_current_file(conn, source_id)
         header: list[str] = []
         rows: list[list[str]] = []
+        data_rows: list[list[str]] = []
         total = 0
         if current:
             fpath = root / current["stored_path"]
@@ -169,13 +172,18 @@ def register(
                     start = (page - 1) * PAGE_SIZE
                     rows = data_rows[start:start + PAGE_SIZE]
         page_count = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        # Coercion-health verdict computed over the FULL file (not the paginated
+        # slice) so it stays honest even when page 1 happens to be clean (0004).
+        coercion: list[dict] = []
+        if header and source:
+            coercion = coercion_report(header, data_rows, source["columns"])
         return templates.TemplateResponse(
             request, "source_data.html",
             {"project": repo.get_project(conn) or {"name": ""},
-             "source": repo.get_source(conn, source_id), "current": current,
+             "source": source, "current": current,
              "header": header, "rows": rows, "total": total,
              "page": min(page, page_count), "page_count": page_count,
-             "page_size": PAGE_SIZE, "active": "data"},
+             "page_size": PAGE_SIZE, "coercion": coercion, "active": "data"},
         )
 
     @app.get("/sources/{source_id}/history", response_class=HTMLResponse)

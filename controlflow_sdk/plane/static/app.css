@@ -23,6 +23,10 @@
   --bg-header:rgba(11,13,23,0.85);
   --row-hover:rgba(255,255,255,0.018);
   --shadow-card:none;
+  /* warning callout (mapping-check) — distinct from severity styling */
+  --callout-warn-bg:rgba(245,158,11,0.10);
+  --callout-warn-border:rgba(245,158,11,0.45);
+  --callout-warn-fg:#fbbf24;
   /* CodeMirror syntax (overridden in light) */
   --cm-keyword:#c084fc; --cm-string:#34d399; --cm-number:#fbbf24; --cm-builtin:#60a5fa;
   --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -45,6 +49,9 @@
   --row-hover:rgba(15,23,42,0.025);
   --shadow-card:0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.06);
   --cm-keyword:#7c3aed; --cm-string:#047857; --cm-number:#b45309; --cm-builtin:#2563eb;
+  --callout-warn-bg:rgba(217,119,6,0.08);
+  --callout-warn-border:rgba(217,119,6,0.40);
+  --callout-warn-fg:#b45309;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -321,3 +328,13 @@ legend {
 .inline-asof { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .inline-asof input { margin-top: 0; }
 .pager { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+
+/* ── mapping-check callout (Data tab coercion warning) ────────────────────── */
+.callout-warn {
+  background: var(--callout-warn-bg);
+  border: 1px solid var(--callout-warn-border);
+}
+.callout-warn h2 { color: var(--callout-warn-fg); }
+
+/* ── cross-source condition fields (no-code rule builder) ─────────────────── */
+.condition-row .xsrc { display: inline-flex; gap: 8px; flex-wrap: wrap; }

@@ -19,9 +19,20 @@ def _safe_format(template: str, row: dict) -> str:
     return template.format_map(_SafeDict(row))
 
 
-def _condition_mask(df: pd.DataFrame, cond: Condition) -> pd.Series:
+def _condition_mask(
+    df: pd.DataFrame, cond: Condition,
+    sources: dict[str, Population] | None = None,
+) -> pd.Series:
+    op = cond.op
+    if op in ("exists_in", "not_exists_in"):
+        other = (sources or {}).get(cond.other_source or "")
+        if other is None:
+            raise ValueError(f"exists_in references unknown source {cond.other_source!r}")
+        other_values = set(other.df[cond.other_key].dropna().astype(str))
+        present = df[cond.this_key].astype(str).isin(other_values)
+        return present if op == "exists_in" else ~present
     col = df[cond.column]
-    op, value = cond.op, cond.value
+    value = cond.value
     if op == "eq":
         return col == value
     if op == "ne":
@@ -49,11 +60,14 @@ def _condition_mask(df: pd.DataFrame, cond: Condition) -> pd.Series:
     raise ValueError(f"unhandled operator {op!r}")  # pragma: no cover (validated upstream)
 
 
-def evaluate_rule(spec: RuleSpec, pop: Population) -> list[dict]:
+def evaluate_rule(
+    spec: RuleSpec, pop: Population,
+    sources: dict[str, Population] | None = None,
+) -> list[dict]:
     df = pop.df
     if not spec.conditions:
         return []
-    masks = [_condition_mask(df, c) for c in spec.conditions]
+    masks = [_condition_mask(df, c, sources) for c in spec.conditions]
     combined = masks[0]
     for m in masks[1:]:
         combined = (combined & m) if spec.logic == "all" else (combined | m)

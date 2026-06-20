@@ -1,6 +1,18 @@
-<div class="condition-row">
+<div class="condition-row" data-condition>
+  {% if columns %}
+  <select name="cond_column" data-col-select>
+    <option value="">— column —</option>
+    {% for c in columns %}
+    <option value="{{ c.original_name }}">{{ c.display_name }}{% if c.display_name != c.original_name %} ({{ c.original_name }}){% endif %}</option>
+    {% endfor %}
+    <option value="__other__">Other (type a name)…</option>
+  </select>
+  <input type="text" name="cond_column_freetext" placeholder="Custom column" data-col-freetext style="display:none;">
+  {% else %}
   <input type="text" name="cond_column" placeholder="Column name">
-  <select name="cond_op">
+  <input type="hidden" name="cond_column_freetext" value="" data-col-freetext>
+  {% endif %}
+  <select name="cond_op" data-op-select>
     <option value="eq">eq (=)</option>
     <option value="ne">ne (≠)</option>
     <option value="gt">gt (&gt;)</option>
@@ -13,6 +25,27 @@
     <option value="not_in">not_in (pipe-separated)</option>
     <option value="regex">regex</option>
     <option value="is_duplicate">is_duplicate</option>
+    <option value="exists_in">exists in another source</option>
+    <option value="not_exists_in">not in another source</option>
   </select>
-  <input type="text" name="cond_value" placeholder="Value">
+  <input type="text" name="cond_value" placeholder="Value" data-val>
+  <span class="xsrc" data-xsrc style="display:none;">
+    <select name="cond_other_source" data-xsrc-source>
+      <option value="">— other source —</option>
+      {% for s in all_sources %}
+      <option value="{{ s.id }}">{{ s.title or s.id }}</option>
+      {% endfor %}
+    </select>
+    {% if columns %}
+    <select name="cond_this_key" data-xsrc-this>
+      <option value="">— this key —</option>
+      {% for c in columns %}
+      <option value="{{ c.original_name }}">{{ c.display_name }}{% if c.display_name != c.original_name %} ({{ c.original_name }}){% endif %}</option>
+      {% endfor %}
+    </select>
+    {% else %}
+    <input type="text" name="cond_this_key" placeholder="This key column" data-xsrc-this>
+    {% endif %}
+    <input type="text" name="cond_other_key" placeholder="Other key column" data-xsrc-other>
+  </span>
 </div>

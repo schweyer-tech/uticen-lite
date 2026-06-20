@@ -57,6 +57,100 @@ def test_add_condition_row_partial(client):
 
 
 # ---------------------------------------------------------------------------
+# Part A — column dropdown (issue #9)
+# ---------------------------------------------------------------------------
+
+def test_condition_row_with_source_renders_column_select(client):
+    _src(client)
+    resp = client.get("/controls/_condition_row?source_id=users")
+    assert resp.status_code == 200
+    assert '<select name="cond_column"' in resp.text
+    # the source's columns appear as options
+    assert "can_create" in resp.text and "can_approve" in resp.text
+    # an "Other" escape hatch is offered for power users
+    assert "__other__" in resp.text
+
+
+def test_condition_row_without_source_falls_back_to_freetext(client):
+    resp = client.get("/controls/_condition_row")
+    assert resp.status_code == 200
+    # fallback: a free-text cond_column input, no <select>
+    assert 'name="cond_column"' in resp.text
+    assert '<select name="cond_column"' not in resp.text
+
+
+def test_rule_spec_resolves_other_freetext_column(client):
+    form = FakeForm({
+        "cond_column": ["__other__"],
+        "cond_column_freetext": ["custom_col"],
+        "cond_op": ["eq"],
+        "cond_value": ["x"],
+        "rule_logic": "all", "rule_severity": "medium",
+        "rule_description": "", "rule_item_key": "",
+    })
+    spec = _rule_spec_from_form(form)
+    assert spec["conditions"] == [{"column": "custom_col", "op": "eq", "value": "x"}]
+
+
+def test_rule_spec_dropdown_column_used_directly(client):
+    form = FakeForm({
+        "cond_column": ["can_create"],
+        "cond_column_freetext": [""],
+        "cond_op": ["eq"],
+        "cond_value": ["true"],
+        "rule_logic": "all", "rule_severity": "medium",
+        "rule_description": "", "rule_item_key": "",
+    })
+    spec = _rule_spec_from_form(form)
+    assert spec["conditions"] == [{"column": "can_create", "op": "eq", "value": True}]
+
+
+# ---------------------------------------------------------------------------
+# Part C — cross-source primitive (issue #9)
+# ---------------------------------------------------------------------------
+
+def test_rule_spec_builds_cross_source_condition():
+    form = FakeForm({
+        "cond_column": ["user_id"],
+        "cond_op": ["not_exists_in"],
+        "cond_value": [""],
+        "cond_other_source": ["hr_roster"],
+        "cond_this_key": ["user_id"],
+        "cond_other_key": ["employee_id"],
+        "rule_logic": "all", "rule_severity": "high",
+        "rule_description": "", "rule_item_key": "user_id",
+    })
+    spec = _rule_spec_from_form(form)
+    assert spec["conditions"] == [{
+        "op": "not_exists_in", "column": "user_id", "other_source": "hr_roster",
+        "this_key": "user_id", "other_key": "employee_id",
+    }]
+
+
+def test_save_auto_binds_cross_source_b(client):
+    # two sources so source B (hr_roster) exists
+    client.post("/sources", data={"source_id": "access", "format": "csv"},
+                files={"file": ("access.csv", io.BytesIO(b"user_id\nU1\n"), "text/csv")},
+                follow_redirects=False)
+    client.post("/sources", data={"source_id": "hr_roster", "format": "csv"},
+                files={"file": ("hr_roster.csv",
+                                io.BytesIO(b"employee_id\nU1\n"), "text/csv")},
+                follow_redirects=False)
+    client.post("/controls", data={
+        "id": "term", "title": "T", "objective": "o", "narrative": "n",
+        "test_kind": "rule", "rule_logic": "all", "rule_severity": "high",
+        "rule_description": "", "rule_item_key": "user_id",
+        "cond_column": ["user_id"], "cond_op": ["not_exists_in"], "cond_value": [""],
+        "cond_other_source": ["hr_roster"], "cond_this_key": ["user_id"],
+        "cond_other_key": ["employee_id"],
+        "source_ids": ["access"],  # only A ticked; B must be auto-bound
+    }, follow_redirects=False)
+    c = repo.get_control(connect(client.app.state.project_root), "term")
+    # B was unioned into the control's sources so the runner can load it
+    assert "access" in c["source_ids"] and "hr_roster" in c["source_ids"]
+
+
+# ---------------------------------------------------------------------------
 # Unit tests for _typed
 # ---------------------------------------------------------------------------
 

@@ -41,6 +41,21 @@
   </form>
 </div>
 
+{% set flagged = coercion | selectattr('all_bad') | list %}
+{% if flagged %}
+<div class="card callout-warn">
+  <h2>Mapping check</h2>
+  <p class="hint">These columns are declared as a non-text type but no value parsed. Fix the data type on the
+     <a href="/sources/{{ source.id }}">Definition</a> tab, or correct the data.</p>
+  <ul>
+    {% for col in flagged %}
+    <li><span class="mono">{{ col.display_name }}</span> — declared <strong>{{ col.data_type }}</strong>,
+        but all {{ col.total }} non-empty value(s) failed to parse.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
 {% if header %}
 <h2>Preview <span class="muted">— records {{ (page - 1) * page_size + 1 }}–{{ (page - 1) * page_size + rows|length }} of {{ total }}</span></h2>
 <div class="table-wrap">

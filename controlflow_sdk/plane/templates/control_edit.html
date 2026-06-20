@@ -147,6 +147,43 @@
       el.addEventListener('change', syncPanes);
     });
     syncPanes();
+
+    // Pass the rule's primary source (first checked source) to the add-condition
+    // partial so new rows get the right column dropdown. This is a one-field
+    // request rewrite, not client-side tabs (learning 0007 unaffected).
+    document.body.addEventListener('htmx:configRequest', function (e) {
+      if (e.detail.elt.matches('[hx-get*="_condition_row"]')) {
+        var first = document.querySelector('input[name="source_ids"]:checked');
+        if (first) { e.detail.parameters['source_id'] = first.value; }
+      }
+    });
+
+    // Within a condition row: reveal the cross-source fields when the op is a
+    // cross-source op, and reveal the free-text column box when "Other" is picked.
+    function syncRow(row) {
+      var op = row.querySelector('[data-op-select]');
+      var xsrc = row.querySelector('[data-xsrc]');
+      var val = row.querySelector('[data-val]');
+      var isXsrc = op && (op.value === 'exists_in' || op.value === 'not_exists_in');
+      if (xsrc) { xsrc.style.display = isXsrc ? '' : 'none'; }
+      if (val) { val.style.display = isXsrc ? 'none' : ''; }
+      var sel = row.querySelector('[data-col-select]');
+      var free = row.querySelector('[data-col-freetext]');
+      if (sel && free && free.type !== 'hidden') {
+        free.style.display = (sel.value === '__other__') ? '' : 'none';
+      }
+    }
+    function wireRow(row) {
+      row.querySelectorAll('[data-op-select], [data-col-select]').forEach(function (el) {
+        el.addEventListener('change', function () { syncRow(row); });
+      });
+      syncRow(row);
+    }
+    document.querySelectorAll('[data-condition]').forEach(wireRow);
+    // Newly added rows (HTMX swap) get wired too.
+    document.body.addEventListener('htmx:afterSwap', function (e) {
+      e.target.querySelectorAll('[data-condition]').forEach(wireRow);
+    });
   })();
 </script>
 {% endblock %}

@@ -264,6 +264,54 @@ def test_add_source_page_has_required_asof(client):
     assert 'name="as_of_date"' in page and "required" in page
 
 
+def test_data_tab_flags_failed_coercion(client):
+    """A column declared 'number' whose every value is non-numeric is flagged."""
+    csv = b"id,amount\nR1,n/a\nR2,bad\n"
+    client.post("/sources", data={"source_id": "bad", "format": "csv",
+                                   "as_of_date": "2026-01-01"},
+                files={"file": ("bad.csv", io.BytesIO(csv), "text/csv")},
+                follow_redirects=False)
+    client.post("/sources/bad", data={
+        "display_name__id": "ID", "data_type__id": "text", "include__id": "on",
+        "display_name__amount": "Amount", "data_type__amount": "number",
+        "include__amount": "on",
+    }, follow_redirects=False)
+    page = client.get("/sources/bad/data").text
+    assert "Mapping check" in page
+    assert "Amount" in page
+
+
+def test_data_tab_no_card_for_clean_numeric(client):
+    csv = b"id,amount\nR1,5\nR2,9\n"
+    client.post("/sources", data={"source_id": "ok", "format": "csv",
+                                   "as_of_date": "2026-01-01"},
+                files={"file": ("ok.csv", io.BytesIO(csv), "text/csv")},
+                follow_redirects=False)
+    client.post("/sources/ok", data={
+        "display_name__id": "ID", "data_type__id": "text", "include__id": "on",
+        "display_name__amount": "Amount", "data_type__amount": "number",
+        "include__amount": "on",
+    }, follow_redirects=False)
+    page = client.get("/sources/ok/data").text
+    assert "Mapping check" not in page
+
+
+def test_data_tab_empty_numeric_column_not_flagged(client):
+    """An all-empty column declared 'number' is not a coercion failure."""
+    csv = b"id,amount\nR1,\nR2,\n"
+    client.post("/sources", data={"source_id": "empt", "format": "csv",
+                                   "as_of_date": "2026-01-01"},
+                files={"file": ("empt.csv", io.BytesIO(csv), "text/csv")},
+                follow_redirects=False)
+    client.post("/sources/empt", data={
+        "display_name__id": "ID", "data_type__id": "text", "include__id": "on",
+        "display_name__amount": "Amount", "data_type__amount": "number",
+        "include__amount": "on",
+    }, follow_redirects=False)
+    page = client.get("/sources/empt/data").text
+    assert "Mapping check" not in page
+
+
 def test_blank_title_clears_to_none(client):
     csv = b"a\n1\n"
     client.post("/sources", data={"source_id": "s", "format": "csv"},

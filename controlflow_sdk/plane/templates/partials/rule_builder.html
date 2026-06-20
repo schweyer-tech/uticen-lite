@@ -29,12 +29,29 @@
 
   <fieldset>
     <legend>Conditions</legend>
+    <span class="hint">"Exists in / not in another source" joins this control's primary source to a
+       second source on a single key — that source is bound automatically.</span>
     <div id="conditions">
       {% if control and control.rule_spec and control.rule_spec.conditions %}
         {% for cond in control.rule_spec.conditions %}
-        <div class="condition-row">
+        {% set known = columns and (cond.column in columns | map(attribute='original_name') | list) %}
+        <div class="condition-row" data-condition>
+          {% if columns %}
+          <select name="cond_column" data-col-select>
+            <option value="">— column —</option>
+            {% for c in columns %}
+            <option value="{{ c.original_name }}" {% if c.original_name == cond.column %}selected{% endif %}>{{ c.display_name }}{% if c.display_name != c.original_name %} ({{ c.original_name }}){% endif %}</option>
+            {% endfor %}
+            <option value="__other__" {% if not known %}selected{% endif %}>Other (type a name)…</option>
+          </select>
+          <input type="text" name="cond_column_freetext" placeholder="Custom column" data-col-freetext
+                 value="{{ cond.column if not known else '' }}"
+                 style="{% if known %}display:none;{% endif %}">
+          {% else %}
           <input type="text" name="cond_column" value="{{ cond.column }}" placeholder="Column name">
-          <select name="cond_op">
+          <input type="hidden" name="cond_column_freetext" value="" data-col-freetext>
+          {% endif %}
+          <select name="cond_op" data-op-select>
             <option value="eq" {% if cond.op == 'eq' %}selected{% endif %}>eq (=)</option>
             <option value="ne" {% if cond.op == 'ne' %}selected{% endif %}>ne (≠)</option>
             <option value="gt" {% if cond.op == 'gt' %}selected{% endif %}>gt (&gt;)</option>
@@ -47,10 +64,34 @@
             <option value="not_in" {% if cond.op == 'not_in' %}selected{% endif %}>not_in (pipe-separated)</option>
             <option value="regex" {% if cond.op == 'regex' %}selected{% endif %}>regex</option>
             <option value="is_duplicate" {% if cond.op == 'is_duplicate' %}selected{% endif %}>is_duplicate</option>
+            <option value="exists_in" {% if cond.op == 'exists_in' %}selected{% endif %}>exists in another source</option>
+            <option value="not_exists_in" {% if cond.op == 'not_exists_in' %}selected{% endif %}>not in another source</option>
           </select>
           <input type="text" name="cond_value"
                  value="{{ cond.value if cond.value is not none and cond.value is defined else '' }}"
-                 placeholder="Value">
+                 placeholder="Value" data-val>
+          {% set is_xsrc = cond.op in ('exists_in', 'not_exists_in') %}
+          <span class="xsrc" data-xsrc style="{% if not is_xsrc %}display:none;{% endif %}">
+            <select name="cond_other_source" data-xsrc-source>
+              <option value="">— other source —</option>
+              {% for s in all_sources %}
+              <option value="{{ s.id }}" {% if s.id == cond.other_source %}selected{% endif %}>{{ s.title or s.id }}</option>
+              {% endfor %}
+            </select>
+            {% if columns %}
+            <select name="cond_this_key" data-xsrc-this>
+              <option value="">— this key —</option>
+              {% for c in columns %}
+              <option value="{{ c.original_name }}" {% if c.original_name == cond.this_key %}selected{% endif %}>{{ c.display_name }}{% if c.display_name != c.original_name %} ({{ c.original_name }}){% endif %}</option>
+              {% endfor %}
+            </select>
+            {% else %}
+            <input type="text" name="cond_this_key" placeholder="This key column"
+                   value="{{ cond.this_key or '' }}" data-xsrc-this>
+            {% endif %}
+            <input type="text" name="cond_other_key" placeholder="Other key column"
+                   value="{{ cond.other_key or '' }}" data-xsrc-other>
+          </span>
         </div>
         {% endfor %}
       {% else %}
