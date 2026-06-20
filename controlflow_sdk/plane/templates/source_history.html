@@ -21,7 +21,7 @@
           <td class="mono">{{ f.original_name }}</td>
           <td>{{ f.as_of_date or '—' }}</td>
           <td>{{ f.row_count if f.row_count is not none else '—' }}</td>
-          <td class="muted">{{ f.uploaded_at or '—' }}</td>
+          <td class="muted">{{ f.uploaded or '—' }}</td>
           <td class="shrink">{% if f.is_current %}<span class="badge">current</span>{% endif %}</td>
         </tr>
         {% endfor %}

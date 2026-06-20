@@ -255,6 +255,8 @@ def test_history_tab_lists_versions(client):
     page = client.get("/sources/h/history").text
     assert "h.csv" in page and "2026-02-02" in page
     assert 'class="tabs"' in page
+    # the upload stamp is shown human-friendly, not as the raw 20260620T...Z form
+    assert "UTC" in page and "Z<" not in page
 
 
 def test_add_source_page_has_required_asof(client):

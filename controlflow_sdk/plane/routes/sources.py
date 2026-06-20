@@ -35,6 +35,14 @@ def _stamp() -> str:
     return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
+def _fmt_stamp(stamp: str) -> str:
+    """Render an internal upload stamp (20260620T101913Z) for humans."""
+    try:
+        return datetime.strptime(stamp, "%Y%m%dT%H%M%SZ").strftime("%Y-%m-%d %H:%M UTC")
+    except ValueError:
+        return stamp
+
+
 def _row_count(raw: bytes) -> int:
     n = sum(1 for _ in csvmod.reader(io.StringIO(raw.decode("utf-8-sig"))))
     return max(0, n - 1)  # exclude header
@@ -176,11 +184,14 @@ def register(
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
     ) -> Any:
+        files = repo.list_source_files(conn, source_id)
+        for f in files:
+            f["uploaded"] = _fmt_stamp(f["uploaded_at"]) if f["uploaded_at"] else ""
         return templates.TemplateResponse(
             request, "source_history.html",
             {"project": repo.get_project(conn) or {"name": ""},
              "source": repo.get_source(conn, source_id),
-             "files": repo.list_source_files(conn, source_id), "active": "history"},
+             "files": files, "active": "history"},
         )
 
     @app.post("/sources/{source_id}/data/asof")
