@@ -41,3 +41,55 @@ jobs:
 
       - name: Run tests
         run: pytest -q
+
+  # Detect whether this change touches the control-plane web surface (or the
+  # contract / bundle / schema it depends on). The browser e2e job below is
+  # gated on this so it runs — and blocks — only on plane-relevant PRs.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      plane: ${{ steps.filter.outputs.plane }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            plane:
+              - 'controlflow_sdk/plane/**'
+              - 'contract/**'
+              - 'controlflow_sdk/bundle/**'
+              - 'controlflow_sdk/schema/**'
+              - 'tests/e2e/**'
+              - 'pyproject.toml'
+              - '.github/workflows/ci.yml'
+
+  # Playwright browser smoke test (issue #13). Separate from the fast `test`
+  # lane: installs the e2e extra + Chromium and drives a live controlplane. Runs
+  # only when `changes` reports a plane-relevant diff, so it is present-and-
+  # blocking exactly on the PRs the locked decision requires (and skipped — not
+  # failing — on unrelated PRs). Branch protection should require this check via
+  # the present-when-relevant pattern, not as a hard-required check that would
+  # block on "skipped".
+  e2e:
+    needs: changes
+    if: needs.changes.outputs.plane == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: "pyproject.toml"
+
+      - name: Install dependencies
+        run: pip install -e ".[plane,e2e]"
+
+      - name: Install Playwright browser
+        run: python -m playwright install --with-deps chromium
+
+      - name: Run browser smoke test
+        run: pytest tests/e2e -m browser

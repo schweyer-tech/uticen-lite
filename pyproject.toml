@@ -19,6 +19,11 @@ dependencies = [
 [project.optional-dependencies]
 adapters = ["openpyxl>=3.1", "pyarrow>=14.0"]
 plane = ["fastapi>=0.110", "uvicorn>=0.27", "jinja2>=3.1", "python-multipart>=0.0.9"]
+# End-to-end browser smoke test (issue #13). pytest-playwright pulls in
+# playwright; the Chromium binary is installed separately via
+# `python -m playwright install chromium` in CI — it is not a pip dependency.
+# This extra is NEVER needed by the fast unit lane (tests/e2e is ignored there).
+e2e = ["pytest-playwright>=0.5"]
 # Optional AI-assisted authoring backends. The SDKs are imported lazily inside
 # controlflow_sdk/ai/ (never at import time), so the package runs without this
 # extra; Ollama uses the stdlib only. (Learning 0003: keep the core dep-free.)
@@ -47,6 +52,14 @@ packages = ["controlflow_sdk"]
 
 
 [tool.pytest.ini_options]
+# Keep the fast unit lane offline and pristine: never collect the browser
+# smoke test (so the fast lane never needs pytest-playwright or a browser), and
+# register the `browser` marker so it does not emit PytestUnknownMarkWarning.
+# The CI e2e job overrides the ignore by targeting the dir: `pytest tests/e2e`.
+addopts = "--ignore=tests/e2e"
+markers = [
+  "browser: end-to-end Playwright browser test (opt-in; excluded from the fast unit lane)",
+]
 filterwarnings = [
   "ignore:Using .httpx. with .starlette.testclient.:starlette.exceptions.StarletteDeprecationWarning",
 ]
