@@ -75,7 +75,7 @@ def test_source_files_table_and_backfill(tmp_path: Path):
     conn.commit()
 
     migrate(conn)  # forward step 3 adds the table + backfills a current row
-    assert _user_version(conn) == SCHEMA_VERSION == 3
+    assert _user_version(conn) == SCHEMA_VERSION
     cols = {r[1] for r in conn.execute("PRAGMA table_info(source_files)").fetchall()}
     assert {"source_id", "stored_path", "original_name", "as_of_date",
             "row_count", "uploaded_at", "is_current"} <= cols

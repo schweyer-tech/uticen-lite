@@ -341,3 +341,16 @@ legend {
 
 /* ── cross-source condition fields (no-code rule builder) ─────────────────── */
 .condition-row .xsrc { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+
+/* ── save-error banner (pipeline lint / parse refusal, issue #25 §8) ──────── */
+.banner-error {
+  background: var(--status-critical-muted);
+  border: 1px solid var(--status-critical);
+  border-radius: var(--radius-card);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+.banner-error strong { color: var(--status-critical); }
+.banner-error ul { margin: 6px 0 0; padding-left: 20px; }
+.banner-error li { margin: 4px 0; color: var(--text-secondary); }

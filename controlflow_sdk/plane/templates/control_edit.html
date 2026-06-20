@@ -31,6 +31,15 @@
 </div>
 {% if control %}{% set active = 'definition' %}{% include "_control_tabs.html" %}{% endif %}
 
+{% if save_errors %}
+<div class="banner banner-error" role="alert">
+  <strong>This control wasn't saved.</strong>
+  <ul>
+    {% for err in save_errors %}<li>{{ err }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+
 <form method="post" action="{% if control %}/controls/{{ control.id }}{% else %}/controls{% endif %}">
   <div class="card">
     <h2>Details</h2>

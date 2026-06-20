@@ -199,26 +199,36 @@ def set_current_file_asof(
 def upsert_control(
     conn: sqlite3.Connection, *, id: str, title: str, objective: str, narrative: str,
     framework_refs: dict, test_kind: str, rule_spec: dict | None = None,
-    test_code: str | None = None, failure_threshold_pct: float | None = None,
+    test_code: str | None = None, pipeline: dict | None = None,
+    failure_threshold_pct: float | None = None,
     failure_threshold_count: int | None = None, created_at: str = "", updated_at: str = "",
 ) -> None:
+    """Upsert a control.
+
+    ``test_kind`` is ``rule`` | ``python`` | ``pipeline``. For a ``pipeline``
+    control the *store-only* visual graph lands in the ``pipeline`` column while
+    its COMPILED artifact still lands in ``rule_spec``/``test_code`` (so the
+    runner/bundle reuse the existing paths and the bundle never sees the graph).
+    """
     conn.execute(
         """INSERT INTO controls
              (id, title, objective, narrative, framework_refs,
               failure_threshold_pct, failure_threshold_count,
-              test_kind, rule_spec, test_code, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              test_kind, rule_spec, test_code, pipeline, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              title=excluded.title, objective=excluded.objective,
              narrative=excluded.narrative, framework_refs=excluded.framework_refs,
              failure_threshold_pct=excluded.failure_threshold_pct,
              failure_threshold_count=excluded.failure_threshold_count,
              test_kind=excluded.test_kind, rule_spec=excluded.rule_spec,
-             test_code=excluded.test_code, updated_at=excluded.updated_at""",
+             test_code=excluded.test_code, pipeline=excluded.pipeline,
+             updated_at=excluded.updated_at""",
         (id, title, objective, narrative, json.dumps(framework_refs),
          failure_threshold_pct, failure_threshold_count, test_kind,
          json.dumps(rule_spec) if rule_spec is not None else None,
-         test_code, created_at, updated_at),
+         test_code, json.dumps(pipeline) if pipeline is not None else None,
+         created_at, updated_at),
     )
     conn.commit()
 
@@ -247,6 +257,7 @@ def get_control(conn: sqlite3.Connection, control_id: str) -> dict | None:
     d = dict(row)
     d["framework_refs"] = _loads(d.get("framework_refs"), {})
     d["rule_spec"] = _loads(d.get("rule_spec"), None)
+    d["pipeline"] = _loads(d.get("pipeline"), None)
     d["source_ids"] = _source_ids_for(conn, control_id)
     return d
 

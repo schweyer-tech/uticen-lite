@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from collections.abc import Callable, Generator
 from datetime import datetime
@@ -144,14 +145,100 @@ def _cross_source_ids(rule_spec: dict[str, Any] | None) -> list[str]:
     return out
 
 
+def _pipeline_from_form(form: Any) -> dict[str, Any] | None:
+    """Parse the posted ``pipeline_json`` into a graph dict (None when absent)."""
+    raw = form.get("pipeline_json")
+    if not raw:
+        return None
+    try:
+        graph = json.loads(raw)
+    except (ValueError, TypeError):
+        return None
+    return graph if isinstance(graph, dict) else None
+
+
+def _save_pipeline_graph(
+    conn: sqlite3.Connection, control_id: str, graph: dict[str, Any]
+) -> list[str]:
+    """Validate, lint, compile and persist a pipeline graph onto an EXISTING control.
+
+    Used by the dedicated pipeline-editor route (the control's metadata already
+    exists; only the graph + its compiled artifact + the derived source binding
+    change). Returns a list of errors (id-prefixed for lint failures so the
+    editor can pin them per-node) — ``[]`` on success. Nothing is persisted when
+    there are errors, mirroring the create/update guardrail (§8 layer 1).
+    """
+    from controlflow_sdk.pipeline.compile import compile_pipeline
+    from controlflow_sdk.pipeline.lint import lint_pipeline
+    from controlflow_sdk.pipeline.model import PipelineError, parse_pipeline
+
+    control = repo.get_control(conn, control_id)
+    if control is None:
+        return [f"control {control_id!r} does not exist"]
+    try:
+        parsed = parse_pipeline(graph)
+        parsed.validate_sources({s["id"] for s in repo.list_sources(conn)})
+    except PipelineError as exc:
+        return [str(exc)]
+    lint_errors = lint_pipeline(parsed)
+    if lint_errors:
+        return lint_errors
+
+    compiled = compile_pipeline(parsed)
+    repo.upsert_control(
+        conn,
+        id=control["id"],
+        title=control["title"],
+        objective=control["objective"],
+        narrative=control["narrative"],
+        framework_refs=control["framework_refs"],
+        test_kind="pipeline",
+        rule_spec=compiled.rule_spec,
+        test_code=compiled.test_code,
+        pipeline=graph,
+        failure_threshold_pct=control["failure_threshold_pct"],
+        failure_threshold_count=control["failure_threshold_count"],
+    )
+    repo.set_control_sources(conn, control["id"], parsed.import_source_ids())
+    return []
+
+
 def _save_from_form(conn: sqlite3.Connection, form: Any) -> str:
     cid = str(form.get("id")).strip()
     nist = [s.strip() for s in str(form.get("framework_nist", "")).split(",") if s.strip()]
     test_kind = form.get("test_kind", "rule")
     rule_spec = _rule_spec_from_form(form) if test_kind == "rule" else None
     test_code = form.get("test_code") if test_kind == "python" else None
+    pipeline = _pipeline_from_form(form) if test_kind == "pipeline" else None
     pct = form.get("failure_threshold_pct")
     cnt = form.get("failure_threshold_count")
+
+    # Source binding: explicit checkboxes for rule/python; DERIVED from the
+    # Import nodes for a pipeline (the analyst binds sources by adding Imports).
+    source_ids = list(form.getlist("source_ids"))
+
+    if test_kind == "pipeline" and pipeline is not None:
+        # Compile the graph to the existing artifact the runner/bundle understand
+        # (a rule_spec for the pure single-source case, else a test() string), and
+        # derive the source binding from the Import nodes. The graph itself is
+        # store-only (the `pipeline` column) — never threaded into the bundle.
+        from controlflow_sdk.pipeline.compile import compile_pipeline
+        from controlflow_sdk.pipeline.lint import LintError, lint_pipeline
+        from controlflow_sdk.pipeline.model import parse_pipeline
+
+        parsed = parse_pipeline(pipeline)
+        parsed.validate_sources({s["id"] for s in repo.list_sources(conn)})
+        # Layer 1 of the §8 enforcement stack: allowlist AST deny-scan at SAVE.
+        # Refuse to persist a Custom Python node that could read a file / reach
+        # outside `rows` — the message names the "Convert to Python test" door.
+        lint_errors = lint_pipeline(parsed)
+        if lint_errors:
+            raise LintError(lint_errors)
+        compiled = compile_pipeline(parsed)
+        rule_spec = compiled.rule_spec
+        test_code = compiled.test_code
+        source_ids = parsed.import_source_ids()
+
     repo.upsert_control(
         conn,
         id=cid,
@@ -162,12 +249,12 @@ def _save_from_form(conn: sqlite3.Connection, form: Any) -> str:
         test_kind=test_kind,
         rule_spec=rule_spec,
         test_code=test_code,
+        pipeline=pipeline,
         failure_threshold_pct=float(pct) if pct else None,
         failure_threshold_count=int(cnt) if cnt else None,
     )
     # Auto-bind every source B referenced by a cross-source condition so the
     # runner can load it — the analyst need not also tick B's checkbox.
-    source_ids = list(form.getlist("source_ids"))
     for sid in _cross_source_ids(rule_spec):
         if sid not in source_ids:
             source_ids.append(sid)
@@ -259,24 +346,68 @@ def register(
             },
         )
 
+    def _rerender_with_error(
+        request: Request, conn: sqlite3.Connection, control_id: str | None,
+        errors: list[str],
+    ) -> Any:
+        """Re-render the edit form with an inline error banner (HTTP 422).
+
+        Used when a pipeline save is REFUSED by the §8 allowlist deny-scan: the
+        offending Custom Python node's offramp message reaches the author rather
+        than persisting an unsafe node or returning a bare 500.
+        """
+        from controlflow_sdk.plane.routes.ai import _ai_configured
+
+        control = repo.get_control(conn, control_id) if control_id else None
+        return templates.TemplateResponse(
+            request,
+            "control_edit.html",
+            {
+                "project": repo.get_project(conn) or {"name": ""},
+                "control": control,
+                "sources": repo.list_sources(conn),
+                "columns": _primary_columns(conn, control["source_ids"]) if control else [],
+                "all_sources": repo.list_sources(conn),
+                "ai_enabled": _ai_configured(conn),
+                "save_errors": errors,
+            },
+            status_code=422,
+        )
+
     @app.post("/controls")
     async def create_control(request: Request) -> Any:
+        from controlflow_sdk.pipeline.lint import LintError
+        from controlflow_sdk.pipeline.model import PipelineError
+
         root = request.app.state.project_root
         conn = connect(root)
         try:
             form = await request.form()
-            cid = _save_from_form(conn, form)
+            try:
+                cid = _save_from_form(conn, form)
+            except LintError as exc:
+                return _rerender_with_error(request, conn, None, exc.errors)
+            except PipelineError as exc:
+                return _rerender_with_error(request, conn, None, [str(exc)])
             return RedirectResponse(f"/controls/{cid}", status_code=303)
         finally:
             conn.close()
 
     @app.post("/controls/{control_id}")
     async def update_control(control_id: str, request: Request) -> Any:
+        from controlflow_sdk.pipeline.lint import LintError
+        from controlflow_sdk.pipeline.model import PipelineError
+
         root = request.app.state.project_root
         conn = connect(root)
         try:
             form = await request.form()
-            _save_from_form(conn, form)
+            try:
+                _save_from_form(conn, form)
+            except LintError as exc:
+                return _rerender_with_error(request, conn, control_id, exc.errors)
+            except PipelineError as exc:
+                return _rerender_with_error(request, conn, control_id, [str(exc)])
             return RedirectResponse(f"/controls/{control_id}", status_code=303)
         finally:
             conn.close()

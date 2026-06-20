@@ -46,21 +46,24 @@ def rule_to_text(spec: RuleSpec) -> str:
 # Cross-source specs → self-contained plain-Python test(pop, sources)
 # ---------------------------------------------------------------------------
 
-def _mask_expr(cond: Condition) -> str:
-    """A Python source expression (over ``df``/``sources``) for one condition.
+def _mask_expr(cond: Condition, frame: str = "df") -> str:
+    """A Python source expression (over *frame*/``sources``) for one condition.
 
     Mirrors :func:`controlflow_sdk.rules.evaluate._condition_mask` exactly so the
     generated code is behaviorally identical to the live no-code evaluation. All
     column/source names and values are injected via ``repr()`` (never bare
-    interpolation) so names with quotes can't break the emitted source.
+    interpolation) so names with quotes can't break the emitted source. *frame*
+    is the name of the DataFrame variable the expression reads from (``"df"`` for
+    the single-source rule renderer; the pipeline compiler passes a per-node
+    frame name so the same machinery emits Filter/Test masks over named frames).
     """
     op = cond.op
     if op in _CROSS_SOURCE_OPS:
         other = (f"set(sources[{cond.other_source!r}].df[{cond.other_key!r}]"
                  f".dropna().astype(str))")
-        present = f"df[{cond.this_key!r}].astype(str).isin({other})"
+        present = f"{frame}[{cond.this_key!r}].astype(str).isin({other})"
         return present if op == "exists_in" else f"(~{present})"
-    col = f"df[{cond.column!r}]"
+    col = f"{frame}[{cond.column!r}]"
     val = cond.value
     if op == "eq":
         return f"({col} == {val!r})"

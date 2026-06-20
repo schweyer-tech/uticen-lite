@@ -1,0 +1,40 @@
+{# Server-rendered top-down SVG flowchart from the graph view-model `diagram`.
+   Boxes are stacked by topological row. Adjacent edges (consumer directly below
+   its input) draw as a straight spine; a fan-in or a skip edge (input more than
+   one row above its consumer) is routed through a left gutter as a curved path,
+   offset by its source row so converging edges stay individually legible — a
+   Join's two inputs read as two distinct curves meeting at the Join box rather
+   than overlapping on the center line. Colors route through design tokens via
+   the .fc-* classes. #}
+{% set box_w = 260 %}
+{% set box_h = 48 %}
+{% set gap_y = 34 %}
+{% set pad = 16 %}
+{% set lane = 64 %}
+{% set box_x = pad + lane %}
+{% set cx = box_x + (box_w / 2) %}
+{% set width = box_x + box_w + pad %}
+{% set height = (diagram.rows * box_h) + ((diagram.rows - 1) * gap_y) + (2 * pad) %}
+<svg viewBox="0 0 {{ width }} {{ height }}" role="img" aria-label="Pipeline flowchart">
+  {% for edge in diagram.edges %}
+    {% set y1 = pad + (edge.from_row * (box_h + gap_y)) + box_h %}
+    {% set y2 = pad + (edge.to_row * (box_h + gap_y)) %}
+    {% if edge.to_row - edge.from_row == 1 %}
+      <path class="fc-edge" d="M {{ cx }} {{ y1 }} L {{ cx }} {{ y2 }}" />
+    {% else %}
+      {# route through the left gutter; deeper rail per source row separates
+         overlapping spanning edges (cap so the curve stays left of the boxes). #}
+      {% set rail = 12 + (6 * (edge.from_row if edge.from_row < 4 else 4)) %}
+      <path class="fc-edge"
+            d="M {{ cx }} {{ y1 }} C {{ rail }} {{ y1 + 8 }} {{ rail }} {{ y2 - 8 }} {{ cx }} {{ y2 }}" />
+    {% endif %}
+  {% endfor %}
+  {% for box in diagram.boxes %}
+    {% set y = pad + (box.row * (box_h + gap_y)) %}
+    <g class="fc-box{% if box.terminal %} fc-terminal{% endif %}">
+      <rect x="{{ box_x }}" y="{{ y }}" width="{{ box_w }}" height="{{ box_h }}" rx="8" />
+      <text x="{{ box_x + 12 }}" y="{{ y + 20 }}">{{ box.label }}</text>
+      <text class="fc-count" x="{{ box_x + 12 }}" y="{{ y + 37 }}">{{ box.id }} · rows: {% if box.count is not none %}{{ "{:,}".format(box.count) }}{% else %}—{% endif %}</text>
+    </g>
+  {% endfor %}
+</svg>
