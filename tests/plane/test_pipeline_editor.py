@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 
 from controlflow_sdk.pipeline.lint import OFFRAMP_MESSAGE
 
@@ -113,6 +114,10 @@ def test_pipeline_tab_renders_cards_and_diagram(client):
     assert "Left input" in body and "Right input" in body
     # The generated SVG flowchart is server-rendered.
     assert "Pipeline flowchart" in body and "<svg" in body
+    # The fan-in (Join's two inputs can't both sit directly above it) is routed
+    # through the left gutter as a curved path, not stacked on the center spine,
+    # so converging edges stay legible. Guards the diagram-routing regression.
+    assert re.search(r'class="fc-edge"[^>]*d="M[^"]* C ', body)
     # The read-only generated-Python glass-box + the convert offramp.
     assert "Generated Python" in body
     assert "Convert to Python test" in body

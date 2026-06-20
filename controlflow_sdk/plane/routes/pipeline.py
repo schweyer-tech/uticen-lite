@@ -123,7 +123,28 @@ def _diagram(pipeline: Pipeline, counts: dict[str, int]) -> dict[str, Any]:
     surviving row-count (or ``None`` when unknown), and the edges (input→node)
     so the template can draw connectors. Join's fan-in shows as two edges.
     """
-    order = pipeline.topological()
+    # Branch-grouped layout order (DFS post-order from the terminal): a node's
+    # inputs sit contiguously above it, so each input branch stays together
+    # instead of all roots being emitted first. This keeps a fan-in a single
+    # clean convergence rather than interleaved, crossing edges. Compile still
+    # uses .topological() — this ordering is presentation-only.
+    order: list[Any] = []
+    seen: set[str] = set()
+
+    def _visit(node_id: str) -> None:
+        if node_id in seen:
+            return
+        seen.add(node_id)
+        node = pipeline.node(node_id)
+        for src in node.inputs:
+            _visit(src)
+        order.append(node)
+
+    _visit(pipeline.terminal.id)
+    for n in pipeline.topological():  # include any node not reachable from terminal
+        if n.id not in seen:
+            seen.add(n.id)
+            order.append(n)
     index = {n.id: i for i, n in enumerate(order)}
     boxes = [
         {
