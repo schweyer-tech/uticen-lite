@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — AI settings{% endblock %}
+{% block body %}
+<a class="crumb" href="/">← Controls</a>
+<div class="page-head">
+  <h1>AI-assisted authoring</h1>
+</div>
+
+<form method="post" action="/settings/ai">
+  <div class="card">
+    <h2>Provider</h2>
+    <p class="lead">
+      Drafting is opt-in and offline by default. No data leaves your machine unless
+      you select a provider and its API key is present in this environment. The AI
+      only proposes a no-code rule — you review and edit it before saving.
+    </p>
+
+    {% for p in providers %}
+    <div class="field">
+      <label style="display:flex; align-items:center; gap:8px;">
+        <input type="radio" name="provider" value="{{ p.id }}"
+               {% if not p.enabled %}disabled{% endif %}
+               {% if p.id == selected_provider %}checked{% endif %}>
+        <span class="src-name">{{ p.label }}</span>
+        {% if not p.enabled %}
+          <span class="hint" style="margin:0;">
+            disabled — set the provider's environment variable to enable
+          </span>
+        {% endif %}
+      </label>
+      <select name="model__{{ p.id }}" {% if not p.enabled %}disabled{% endif %}>
+        {% for m in p.models %}
+        <option value="{{ m }}"
+          {% if p.id == selected_provider and m == selected_model %}selected{% elif p.id != selected_provider and m == p.default_model %}selected{% endif %}>{{ m }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="page-actions">
+    <button class="btn btn-primary" type="submit">Save provider</button>
+    <a class="btn btn-ghost" href="/">Cancel</a>
+  </div>
+</form>
+
+<script>
+  /* The form posts one "model" value matching the chosen provider's per-provider
+     select. Mirror the selected provider's model into a hidden "model" field on
+     submit so the server reads a single provider+model pair. */
+  (function () {
+    var form = document.querySelector('form[action="/settings/ai"]');
+    if (!form) return;
+    var hidden = document.createElement("input");
+    hidden.type = "hidden";
+    hidden.name = "model";
+    form.appendChild(hidden);
+    form.addEventListener("submit", function () {
+      var picked = form.querySelector('input[name="provider"]:checked');
+      if (picked) {
+        var sel = form.querySelector('select[name="model__' + picked.value + '"]');
+        hidden.value = sel ? sel.value : "";
+      } else {
+        hidden.value = "";
+      }
+    });
+  })();
+</script>
+{% endblock %}

@@ -108,7 +108,22 @@
     </div>
 
     <div data-pane="rule">
-      {% include "partials/rule_builder.html" %}
+      <div class="ai-draft-bar" style="margin-bottom:12px;">
+        {% if ai_enabled %}
+        <button class="btn btn-sm btn-ghost" type="button"
+                hx-post="/controls/ai/draft"
+                hx-include="#f-obj, input[name=source_ids]"
+                hx-target="#rule-builder-pane" hx-swap="innerHTML">
+          Draft with AI
+        </button>
+        <span class="hint" style="margin:0;">Proposes a rule from the objective + the primary source — review before saving.</span>
+        {% else %}
+        <a class="btn btn-sm btn-ghost" href="/settings/ai">Enable AI drafting…</a>
+        {% endif %}
+      </div>
+      <div id="rule-builder-pane">
+        {% include "partials/rule_builder.html" %}
+      </div>
     </div>
 
     <div data-pane="python">

@@ -159,6 +159,8 @@ def register(
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
     ) -> Any:
+        from controlflow_sdk.plane.routes.ai import _ai_configured
+
         return templates.TemplateResponse(
             request,
             "control_edit.html",
@@ -168,6 +170,7 @@ def register(
                 "sources": repo.list_sources(conn),
                 "columns": [],  # no bound source yet → free-text fallback
                 "all_sources": repo.list_sources(conn),
+                "ai_enabled": _ai_configured(conn),
             },
         )
 
@@ -177,6 +180,8 @@ def register(
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
     ) -> Any:
+        from controlflow_sdk.plane.routes.ai import _ai_configured
+
         control = repo.get_control(conn, control_id)
         return templates.TemplateResponse(
             request,
@@ -187,6 +192,7 @@ def register(
                 "sources": repo.list_sources(conn),
                 "columns": _primary_columns(conn, control["source_ids"]) if control else [],
                 "all_sources": repo.list_sources(conn),
+                "ai_enabled": _ai_configured(conn),
             },
         )
 

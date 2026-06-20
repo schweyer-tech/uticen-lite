@@ -35,12 +35,21 @@ def create_app(project_root: Path) -> FastAPI:
     app.state.project_root = project_root
     app.mount("/static", StaticFiles(directory=str(_HERE / "static")), name="static")
 
-    from controlflow_sdk.plane.routes import controls, dashboard, export, runs, setup, sources
+    from controlflow_sdk.plane.routes import (
+        ai,
+        controls,
+        dashboard,
+        export,
+        runs,
+        setup,
+        sources,
+    )
 
     dashboard.register(app, templates, get_conn)
     setup.register(app, templates, get_conn)
     sources.register(app, templates, get_conn)
     controls.register(app, templates, get_conn)
+    ai.register(app, templates, get_conn)
     runs.register(app, templates, get_conn)
     export.register(app, templates, get_conn)
     return app
