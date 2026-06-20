@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — {% if control %}{{ control.title }}{% else %}Control{% endif %} · History{% endblock %}
+{% block body %}
+<a class="crumb" href="/">← Controls</a>
+<div class="page-head">
+  <h1>{% if control %}{{ control.title }}{% else %}Control history{% endif %}</h1>
+  <p class="muted mono">{{ control.id if control else control_id }}</p>
+</div>
+{% if control %}{% include "_control_tabs.html" %}{% endif %}
+
+{% if trend.points %}
+<div class="card">
+  <div class="card-head"><h2>Trend</h2></div>
+  {% include "partials/_run_trend.html" %}
+  <p class="hint">{{ trend.points | length }} run{{ 's' if trend.points | length != 1 else '' }} · latest {{ trend.latest_pass_rate }}% pass</p>
+</div>
+{% endif %}
+
+{% if runs %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Run</th>
+        <th>Result</th>
+        <th>Failed</th>
+        <th>Run ID</th>
+        <th class="shrink"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for run in runs %}
+      <tr>
+        <td><a href="/controls/{{ control_id }}/runs/{{ run.run_id }}">{{ run.executed_display }}</a></td>
+        <td><span class="badge {{ 'pass' if run.failed == 0 else 'fail' }}">{{ run.pass_rate }}% pass</span></td>
+        <td class="muted mono">{{ run.failed }} / {{ run.total }}</td>
+        <td class="mono muted">{{ run.run_id }}</td>
+        <td class="shrink"><a class="btn btn-sm btn-ghost" href="/controls/{{ control_id }}/runs/{{ run.run_id }}">View →</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <h3>Not yet run</h3>
+  <p>Run this control to start building history.</p>
+  <form class="inline-form" method="post" action="/controls/{{ control_id }}/run" style="margin-top:14px;">
+    <button class="btn btn-primary" type="submit">Run now</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

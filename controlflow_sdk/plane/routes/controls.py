@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 from collections.abc import Callable, Generator
+from datetime import datetime
 from typing import Any
 
 from fastapi import Depends, FastAPI, Request
@@ -10,6 +11,43 @@ from fastapi.templating import Jinja2Templates
 
 from controlflow_sdk.store import repo
 from controlflow_sdk.store.db import connect
+
+
+def _fmt_executed(iso: str) -> str:
+    """Render a run's ISO-8601 ``executed_at`` for humans (UTC)."""
+    try:
+        return datetime.fromisoformat(iso).strftime("%Y-%m-%d %H:%M UTC")
+    except (ValueError, TypeError):
+        return iso or "—"
+
+
+def _history_view(runs: list[dict]) -> dict[str, Any]:
+    """Build the trend view-model from newest-first run dicts (learning 0004).
+
+    ``repo.list_runs_for`` returns newest-first, but a trend must read
+    oldest->newest left-to-right, so chart a reversed copy. ``runs`` itself is
+    left untouched (the table renders it newest-first). "latest" reads index 0
+    (the newest input) — never the last chronological point.
+    """
+    chrono = list(reversed(runs))  # oldest->newest for left-to-right charting
+    points = [
+        {
+            "pass_rate": r["pass_rate"],
+            "failed": r["failed"],
+            "total": r["total"],
+            "executed_at": r["executed_at"],
+            "label": (
+                f"{_fmt_executed(r.get('executed_at', ''))} — "
+                f"{r['pass_rate']}% pass, {r['failed']} failed"
+            ),
+        }
+        for r in chrono
+    ]
+    return {
+        "points": points,
+        "max_failed": max((p["failed"] for p in points), default=0),
+        "latest_pass_rate": runs[0]["pass_rate"] if runs else None,
+    }
 
 
 def _typed(value: str) -> Any:
@@ -171,6 +209,31 @@ def register(
                 "columns": [],  # no bound source yet → free-text fallback
                 "all_sources": repo.list_sources(conn),
                 "ai_enabled": _ai_configured(conn),
+            },
+        )
+
+    # Register the specific sub-route BEFORE the /{control_id} catch-all so it
+    # cannot be shadowed (learning 0007). Read-only sync GET → Depends (0002).
+    @app.get("/controls/{control_id}/history", response_class=HTMLResponse)
+    def control_history(
+        control_id: str,
+        request: Request,
+        conn: sqlite3.Connection = Depends(get_conn),
+    ) -> Any:
+        control = repo.get_control(conn, control_id)
+        runs = repo.list_runs_for(conn, control_id)  # newest-first (0004)
+        for r in runs:
+            r["executed_display"] = _fmt_executed(r.get("executed_at", ""))
+        return templates.TemplateResponse(
+            request,
+            "control_history.html",
+            {
+                "project": repo.get_project(conn) or {"name": ""},
+                "control": control,
+                "control_id": control_id,
+                "runs": runs,
+                "trend": _history_view(runs),
+                "active": "history",
             },
         )
 
