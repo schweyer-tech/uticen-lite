@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import argparse
 
+from controlflow_sdk.cli._store_guard import check_store
 from controlflow_sdk.store.db import connect
 from controlflow_sdk.store.loader import load_project_from_store
 from controlflow_sdk.store.run_service import run_control_in_store
@@ -39,6 +40,9 @@ def run_cmd(args: argparse.Namespace) -> int:
     # ── Load project from store ────────────────────────────────────────────────
     try:
         conn = connect(root)
+        # Detect a missing/empty store before a read raises "no such table".
+        if not check_store(conn, root):
+            return 1
         project = load_project_from_store(conn)
     except Exception as exc:  # noqa: BLE001
         print(f"ERROR loading project at {root}: {exc}", file=sys.stderr)

@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     import argparse
 
 from controlflow_sdk.bundle import BundleError
+from controlflow_sdk.cli._store_guard import check_store
 from controlflow_sdk.store import repo
 from controlflow_sdk.store.db import connect
 from controlflow_sdk.store.export_service import build_bundle
@@ -49,6 +50,12 @@ def build_cmd(args: argparse.Namespace) -> int:
     except Exception as exc:  # noqa: BLE001
         print(f"ERROR connecting to store at {root}: {exc}", file=sys.stderr)
         return 1
+
+    # Detect a missing/empty store before a read raises "no such table".
+    if not check_store(conn, root):
+        conn.close()
+        return 1
+
     try:
         project = load_project_from_store(conn)
     except Exception as exc:  # noqa: BLE001
