@@ -84,10 +84,12 @@ def test_author_run_export_smoke(page: Page, live_server: str, tmp_path: Path) -
     # Condition 2 (dropdown row, injected by htmx): can_create not_empty.
     page.click("button:has-text('+ Add condition')")
     expect(cond_columns).to_have_count(2)
-    # The second row's cond_column is a <select> (the #9 dropdown for the bound
-    # source). select_option keys off the option value, confirming the dropdown
-    # is the one in play.
-    page.locator("select[name='cond_column']").select_option("can_create")
+    # Binding the source (U1, #9) upgrades EVERY condition row's column field to
+    # the server-rendered <select> in place — so both rows are now dropdowns
+    # (row 1's free-text "user_id" was carried over and re-rendered as a selected
+    # option). Target the second row's <select> explicitly; select_option keys off
+    # the option value, confirming the dropdown is the one in play.
+    page.locator("select[name='cond_column']").nth(1).select_option("can_create")
     page.locator("select[name='cond_op']").nth(1).select_option("not_empty")
 
     page.click("button[type=submit]")  # POST /controls -> 303 /controls/sod
