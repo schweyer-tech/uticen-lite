@@ -35,6 +35,10 @@ pip install 'controlflow-sdk[plane,adapters]'
 [pipx](https://pipx.pypa.io/) works too if you want the commands isolated on your PATH:
 `pipx install 'controlflow-sdk[plane]'`.
 
+**Corporate / offline install.** Behind a firewall, air-gapped, or on an internal package index?
+See **[docs/INSTALL.md](docs/INSTALL.md)** for pipx, internal-index (`--index-url`/`--extra-index-url`),
+and pinned-wheel flows.
+
 ## Quick start — launch and first run
 
 After installing, start the control plane in any directory (it's created if missing):

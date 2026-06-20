@@ -6,6 +6,7 @@
 
 | Surface | Type | What it does |
 | --- | --- | --- |
+| Distribution / install | docs + release CI | Corporate-ready install paths — pipx, internal index (`--index-url`/`--extra-index-url`), and pinned-wheel/air-gapped — documented in `docs/INSTALL.md`. Wheel is pure-Python `py3-none-any`, ships the web assets + bundled Northwind demo (verified by `tests/plane/test_wheel_build.py`). A manual, token-gated `release.yml` (`workflow_dispatch`, `PYPI_API_TOKEN`) builds + `twine check`s the dist; **not yet published to PyPI**. |
 | `controlplane` | command / web app | Launches the local SQLite-backed FastAPI + HTMX control plane (localhost only, default `:8765`); the primary authoring surface. `pip install 'controlflow-sdk[plane]'` → `controlplane --project <dir>` (or the equivalent `python -m controlflow_sdk.plane`). |
 | Control plane — First-run setup | view | Shown when an engagement has no name yet: name the engagement + pick a framework, or one-click **Load the Northwind demo** (bundled in the wheel, copied into the engagement so it runs immediately). |
 | Control plane — Dashboard | view | Lists controls + last-run status; entry point to author, run, and export. Engagement name renders in the header. |
