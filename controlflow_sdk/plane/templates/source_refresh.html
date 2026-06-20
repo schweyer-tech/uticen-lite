@@ -33,10 +33,12 @@
   <div class="page-actions">
     <form method="post" action="/sources/{{ source.id }}/refresh/confirm" style="display:inline;">
       <input type="hidden" name="pending" value="{{ pending }}">
+      <input type="hidden" name="as_of_date" value="{{ as_of_date or '' }}">
       <button class="btn btn-primary" type="submit">Confirm refresh</button>
     </form>
     <form method="post" action="/sources/{{ source.id }}/refresh/cancel" style="display:inline;">
       <input type="hidden" name="pending" value="{{ pending }}">
+      <input type="hidden" name="as_of_date" value="{{ as_of_date or '' }}">
       <button class="btn btn-ghost" type="submit">Cancel</button>
     </form>
   </div>

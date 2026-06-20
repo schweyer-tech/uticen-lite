@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — {{ source.title or source.id }} · History{% endblock %}
+{% block body %}
+<a class="crumb" href="/sources">← Sources</a>
+<div class="page-head">
+  <h1>{{ source.title or "Edit source" }}</h1>
+  <p class="muted mono">{{ source.id }}</p>
+</div>
+{% include "_source_tabs.html" %}
+
+<div class="card">
+  <h2>File history</h2>
+  <p class="hint">Every uploaded version is kept. The current file is what controls test against.</p>
+  {% if files %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>File</th><th>As-of date</th><th>Records</th><th>Uploaded</th><th class="shrink"></th></tr></thead>
+      <tbody>
+        {% for f in files %}
+        <tr>
+          <td class="mono">{{ f.original_name }}</td>
+          <td>{{ f.as_of_date or '—' }}</td>
+          <td>{{ f.row_count if f.row_count is not none else '—' }}</td>
+          <td class="muted">{{ f.uploaded_at or '—' }}</td>
+          <td class="shrink">{% if f.is_current %}<span class="badge">current</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state"><h3>No files yet</h3></div>
+  {% endif %}
+</div>
+{% endblock %}

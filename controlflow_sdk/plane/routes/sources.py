@@ -173,6 +173,19 @@ def register(
              "page": min(page, page_count), "page_count": page_count, "active": "data"},
         )
 
+    @app.get("/sources/{source_id}/history", response_class=HTMLResponse)
+    def source_history(
+        source_id: str,
+        request: Request,
+        conn: sqlite3.Connection = Depends(get_conn),
+    ) -> Any:
+        return templates.TemplateResponse(
+            request, "source_history.html",
+            {"project": repo.get_project(conn) or {"name": ""},
+             "source": repo.get_source(conn, source_id),
+             "files": repo.list_source_files(conn, source_id), "active": "history"},
+        )
+
     @app.post("/sources/{source_id}/data/asof")
     async def update_asof(
         source_id: str,

@@ -247,6 +247,21 @@ def test_data_tab_asof_edit_syncs(client):
     conn.close()
 
 
+def test_history_tab_lists_versions(client):
+    client.post("/sources", data={"source_id": "h", "format": "csv",
+                                   "as_of_date": "2026-02-02"},
+                files={"file": ("h.csv", io.BytesIO(b"a\n1\n"), "text/csv")},
+                follow_redirects=False)
+    page = client.get("/sources/h/history").text
+    assert "h.csv" in page and "2026-02-02" in page
+    assert 'class="tabs"' in page
+
+
+def test_add_source_page_has_required_asof(client):
+    page = client.get("/sources/new").text
+    assert 'name="as_of_date"' in page and "required" in page
+
+
 def test_blank_title_clears_to_none(client):
     csv = b"a\n1\n"
     client.post("/sources", data={"source_id": "s", "format": "csv"},
