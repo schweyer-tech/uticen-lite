@@ -1,40 +1,44 @@
-{# Server-rendered top-down SVG flowchart from the graph view-model `diagram`.
-   Boxes are stacked by topological row. Adjacent edges (consumer directly below
-   its input) draw as a straight spine; a fan-in or a skip edge (input more than
-   one row above its consumer) is routed through a left gutter as a curved path,
-   offset by its source row so converging edges stay individually legible — a
-   Join's two inputs read as two distinct curves meeting at the Join box rather
-   than overlapping on the center line. Colors route through design tokens via
-   the .fc-* classes. #}
-{% set box_w = 260 %}
+{# Server-rendered multi-lane top-down SVG flowchart from the graph view-model
+   `diagram`. Boxes are stacked by topological `row` (top→bottom) and placed in a
+   `lane` (horizontal column). Parallel branches that feed a Join sit in SEPARATE
+   lanes that visibly converge at the Join: an in-lane edge (same lane, consumer
+   directly below) draws as a straight vertical spine; a cross-lane edge drops down
+   its source lane and curves into the consumer's lane, so a Join's two feeder
+   branches read as two columns meeting at the Join box rather than a single chain.
+   Colors route through design tokens via the .fc-* classes (light/dark parity). #}
+{% set box_w = 240 %}
 {% set box_h = 48 %}
 {% set gap_y = 34 %}
 {% set pad = 16 %}
-{% set lane = 64 %}
-{% set box_x = pad + lane %}
-{% set cx = box_x + (box_w / 2) %}
-{% set width = box_x + box_w + pad %}
+{% set lane_gap = 56 %}
+{% set lane_pitch = box_w + lane_gap %}
+{% set lanes = diagram.lanes if diagram.lanes else 1 %}
+{% set width = (2 * pad) + (lanes * box_w) + ((lanes - 1) * lane_gap) %}
 {% set height = (diagram.rows * box_h) + ((diagram.rows - 1) * gap_y) + (2 * pad) %}
 <svg viewBox="0 0 {{ width }} {{ height }}" role="img" aria-label="Pipeline flowchart">
   {% for edge in diagram.edges %}
+    {% set fx = pad + (edge.from_lane * lane_pitch) + (box_w / 2) %}
+    {% set tx = pad + (edge.to_lane * lane_pitch) + (box_w / 2) %}
     {% set y1 = pad + (edge.from_row * (box_h + gap_y)) + box_h %}
     {% set y2 = pad + (edge.to_row * (box_h + gap_y)) %}
-    {% if edge.to_row - edge.from_row == 1 %}
-      <path class="fc-edge" d="M {{ cx }} {{ y1 }} L {{ cx }} {{ y2 }}" />
+    {% if edge.from_lane == edge.to_lane %}
+      {# same lane: straight vertical spine. #}
+      <path class="fc-edge" d="M {{ fx }} {{ y1 }} L {{ tx }} {{ y2 }}" />
     {% else %}
-      {# route through the left gutter; deeper rail per source row separates
-         overlapping spanning edges (cap so the curve stays left of the boxes). #}
-      {% set rail = 12 + (6 * (edge.from_row if edge.from_row < 4 else 4)) %}
+      {# cross-lane: drop down the source lane, then S-curve into the target lane
+         so converging branches stay individually legible at the join. #}
+      {% set my = (y1 + y2) / 2 %}
       <path class="fc-edge"
-            d="M {{ cx }} {{ y1 }} C {{ rail }} {{ y1 + 8 }} {{ rail }} {{ y2 - 8 }} {{ cx }} {{ y2 }}" />
+            d="M {{ fx }} {{ y1 }} C {{ fx }} {{ my }} {{ tx }} {{ my }} {{ tx }} {{ y2 }}" />
     {% endif %}
   {% endfor %}
   {% for box in diagram.boxes %}
+    {% set x = pad + (box.lane * lane_pitch) %}
     {% set y = pad + (box.row * (box_h + gap_y)) %}
     <g class="fc-box{% if box.terminal %} fc-terminal{% endif %}">
-      <rect x="{{ box_x }}" y="{{ y }}" width="{{ box_w }}" height="{{ box_h }}" rx="8" />
-      <text x="{{ box_x + 12 }}" y="{{ y + 20 }}">{{ box.label }}</text>
-      <text class="fc-count" x="{{ box_x + 12 }}" y="{{ y + 37 }}">{{ box.id }} · rows: {% if box.count is not none %}{{ "{:,}".format(box.count) }}{% else %}—{% endif %}</text>
+      <rect x="{{ x }}" y="{{ y }}" width="{{ box_w }}" height="{{ box_h }}" rx="8" />
+      <text x="{{ x + 12 }}" y="{{ y + 20 }}">{{ box.label }}</text>
+      <text class="fc-count" x="{{ x + 12 }}" y="{{ y + 37 }}">{{ box.id }} · rows: {% if box.count is not none %}{{ "{:,}".format(box.count) }}{% else %}—{% endif %}</text>
     </g>
   {% endfor %}
 </svg>

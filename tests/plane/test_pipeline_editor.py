@@ -114,9 +114,15 @@ def test_pipeline_tab_renders_cards_and_diagram(client):
     assert "Left input" in body and "Right input" in body
     # The generated SVG flowchart is server-rendered.
     assert "Pipeline flowchart" in body and "<svg" in body
-    # The fan-in (Join's two inputs can't both sit directly above it) is routed
-    # through the left gutter as a curved path, not stacked on the center spine,
-    # so converging edges stay legible. Guards the diagram-routing regression.
+    # Multi-lane layout: the Join's two feeder branches sit in SEPARATE columns
+    # that converge at the Join. The flowchart positions the two import roots at
+    # DIFFERENT x coordinates (distinct lanes), so the join no longer reads as a
+    # single linear chain. Guards the multi-lane layout regression.
+    rect_xs = [int(m) for m in re.findall(r'<rect x="(\d+)"', body)]
+    assert len(set(rect_xs)) >= 2, f"expected >=2 distinct lanes, got xs={rect_xs}"
+    # At least one fan-in edge crosses lanes: it converges from a branch column
+    # into the spine, drawn as an S-curve (presentation-only — execution order is
+    # unchanged and still topological).
     assert re.search(r'class="fc-edge"[^>]*d="M[^"]* C ', body)
     # The read-only generated-Python glass-box + the convert offramp.
     assert "Generated Python" in body
@@ -132,6 +138,50 @@ def test_pipeline_editor_shows_live_row_counts(client):
     assert "rows: <strong>4</strong>" in body      # acc import
     assert "rows: <strong>3</strong>" in body      # active filter
     assert "rows: <strong>2</strong>" in body      # join / test
+
+
+def test_diagram_lays_join_branches_in_separate_converging_lanes():
+    """The multi-lane view-model puts a Join's two feeder branches in distinct
+    lanes that converge at the Join, while keeping every edge a real input→node
+    relationship (presentation-only — never reorders execution)."""
+    from controlflow_sdk.pipeline.model import parse_pipeline
+    from controlflow_sdk.plane.routes.pipeline import _diagram
+
+    pipeline = parse_pipeline(_terminated_access_graph())
+    diagram = _diagram(pipeline, counts={})
+
+    lane = {b["id"]: b["lane"] for b in diagram["boxes"]}
+    row = {b["id"]: b["row"] for b in diagram["boxes"]}
+
+    # Two lanes: the spine (acc→active→join→tst) and the employee branch.
+    assert diagram["lanes"] == 2
+    assert lane["acc"] == lane["active"] == lane["join"] == lane["tst"] == 0
+    assert lane["emp"] == lane["term"] == 1
+    # The terminal sits on the spine lane.
+    assert next(b for b in diagram["boxes"] if b["terminal"])["lane"] == 0
+
+    # Edges exactly mirror the graph's input→node relationships (no spurious or
+    # missing edges), and each carries the right (lane, row) for both endpoints.
+    by_id = {n.id: n for n in pipeline.nodes}
+    expected = {
+        (row[src], row[nid])
+        for nid, n in by_id.items()
+        for src in n.inputs
+    }
+    actual = {(e["from_row"], e["to_row"]) for e in diagram["edges"]}
+    assert actual == expected
+    # The Join fan-in converges across lanes: term (lane 1) → join (lane 0).
+    term_to_join = next(
+        e for e in diagram["edges"]
+        if e["from_row"] == row["term"] and e["to_row"] == row["join"]
+    )
+    assert term_to_join["from_lane"] == 1 and term_to_join["to_lane"] == 0
+    # The spine edges stay in-lane (straight vertical), e.g. active → join.
+    active_to_join = next(
+        e for e in diagram["edges"]
+        if e["from_row"] == row["active"] and e["to_row"] == row["join"]
+    )
+    assert active_to_join["from_lane"] == active_to_join["to_lane"] == 0
 
 
 def test_authoring_terminated_access_pipeline_runs_with_right_exceptions(client):
