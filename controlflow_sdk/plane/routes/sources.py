@@ -23,10 +23,6 @@ PAGE_SIZE = 50
 # the user's explicit confirmation are staged under data/.pending/<id>/. Both live
 # under nested dirs so the top-level data/*.csv glob (import/load_demo) ignores them.
 
-def _archive_dir(root: Path, sid: str) -> Path:
-    return root / "data" / ".versions" / sid
-
-
 def _pending_dir(root: Path, sid: str) -> Path:
     return root / "data" / ".pending" / sid
 
@@ -170,7 +166,8 @@ def register(
             {"project": repo.get_project(conn) or {"name": ""},
              "source": repo.get_source(conn, source_id), "current": current,
              "header": header, "rows": rows, "total": total,
-             "page": min(page, page_count), "page_count": page_count, "active": "data"},
+             "page": min(page, page_count), "page_count": page_count,
+             "page_size": PAGE_SIZE, "active": "data"},
         )
 
     @app.get("/sources/{source_id}/history", response_class=HTMLResponse)
@@ -310,6 +307,7 @@ def register(
                 adir = root / "data" / ".versions" / source_id
                 adir.mkdir(parents=True, exist_ok=True)
                 (root / archive_rel).write_bytes(current_path.read_bytes())
+                repo.archive_current_file(conn, source_id, str(archive_rel))
             current_path.parent.mkdir(parents=True, exist_ok=True)
             current_path.write_bytes(new_bytes)  # path stays stable across refreshes
             pending_path.unlink()
@@ -329,8 +327,7 @@ def register(
             else:
                 key_config = {"mode": "auto"}
 
-            # Record the new current file version (old one archived above).
-            repo.archive_current_file(conn, source_id, str(archive_rel))
+            # Record the new current file version (old one archived above if it existed).
             repo.record_current_file(
                 conn, source_id=source_id, stored_path=existing["path"],
                 original_name=Path(pending).name,
