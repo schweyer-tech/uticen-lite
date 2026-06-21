@@ -284,6 +284,29 @@ def _save_pipeline_graph(
     return []
 
 
+def _required_source_ids(existing: dict) -> list[str]:
+    """Source ids that the control's logic requires, beyond what the author posted.
+
+    For a PIPELINE control: Import-node sources + any ``other_source`` values
+    from cross-source conditions (exists_in/not_exists_in).
+    For a RULE-SPEC control: the ``other_source`` values in its conditions.
+    Returns ``[]`` on any parse failure so a malformed graph never breaks the
+    metadata save.
+    """
+    try:
+        if existing.get("pipeline"):
+            from controlflow_sdk.pipeline.model import parse_pipeline
+            parsed = parse_pipeline(existing["pipeline"])
+            import_ids = parsed.import_source_ids()
+            extra = [sid for sid in _other_source_ids(parsed) if sid not in import_ids]
+            return import_ids + extra
+        if existing.get("rule_spec"):
+            return _cross_source_ids(existing["rule_spec"])
+    except Exception:  # noqa: BLE001 — malformed graph must not break the metadata save
+        pass
+    return []
+
+
 def _save_from_form(conn: sqlite3.Connection, form: Any) -> str:
     """Save the Definition form: metadata + sources only.
 
@@ -294,6 +317,11 @@ def _save_from_form(conn: sqlite3.Connection, form: Any) -> str:
     For a NEW control (no existing store record) the control is created with
     empty logic (test_kind="pipeline", no rule_spec/test_code/pipeline); the
     Logic ▸ Builder derives an Import→Test scaffold on first view.
+
+    Source-desync guard: when saving an existing control, UNION any sources
+    required by the control's logic into the posted source_ids so a needed
+    source is never accidentally dropped (posted first, then any extra logic-
+    required sources not already present — deterministic order).
     """
     cid = str(form.get("id")).strip()
     nist = [s.strip() for s in str(form.get("framework_nist", "")).split(",") if s.strip()]
@@ -308,6 +336,10 @@ def _save_from_form(conn: sqlite3.Connection, form: Any) -> str:
         rule_spec = existing["rule_spec"]
         test_code = existing["test_code"]
         pipeline = existing["pipeline"]
+        # Union logic-required sources so a needed source is never dropped.
+        for sid in _required_source_ids(existing):
+            if sid not in source_ids:
+                source_ids.append(sid)
     else:
         test_kind = "pipeline"
         rule_spec = None

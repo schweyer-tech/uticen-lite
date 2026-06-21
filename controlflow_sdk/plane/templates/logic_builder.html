@@ -124,22 +124,20 @@
     <h2>Draft with AI</h2>
   </div>
   <p class="lead">Let AI draft the Test node's conditions from this control's objective
-    and a sample of the bound source data. Review the suggestion, then copy the
-    conditions into the Test node above.</p>
+    and a sample of the bound source data. The drafted conditions are applied directly
+    into the Test node above — review and edit them, then click "Save pipeline".</p>
   {% if ai_enabled %}
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-    <form hx-post="/controls/ai/draft"
-          hx-target="#ai-draft-panel"
-          hx-swap="innerHTML"
-          hx-indicator="#ai-draft-card"
-          style="display:contents;">
-      <input type="hidden" name="objective"
-             value="{{ control.objective if control else '' }}">
-      {% for src in (control.source_ids if control and control.source_ids else []) %}
-      <input type="hidden" name="source_ids" value="{{ src }}">
-      {% endfor %}
-      <button class="btn btn-sm" type="submit">Draft with AI</button>
-    </form>
+    <button class="btn btn-sm" type="button" id="ai-draft-btn"
+            hx-post="/controls/{{ control_id }}/logic/ai-apply"
+            hx-include="#pipeline-json"
+            hx-target="#pipe-cards"
+            hx-swap="innerHTML"
+            hx-indicator="#ai-draft-card"
+            hx-on::before-request="serializeForAI()"
+            hx-on::after-request="clearAiPanel()">
+      Draft with AI
+    </button>
   </div>
   {% else %}
   <p class="muted">
@@ -261,31 +259,17 @@
       });
     });
 
-    document.querySelectorAll('[data-remove]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        serialize();
-        var id = btn.getAttribute('data-remove');
-        graph.nodes = graph.nodes.filter(function (n) { return n.id !== id; });
-        graph.nodes.forEach(function (n) {
-          n.inputs = (n.inputs || []).filter(function (i) { return i !== id; });
-        });
-        jsonField.value = JSON.stringify(graph);
-        document.getElementById('pipeline-form').submit();
-      });
-    });
-
     document.getElementById('pipeline-form').addEventListener('submit', function () {
       serialize();
       jsonField.value = JSON.stringify(graph);
     });
 
-    // Reveal the free-text column box when "Other" is picked (mirrors the rule builder).
+    // ── bind interactive widgets on a set of condition rows / cards ──────────
     function syncCond(row) {
       var sel = row.querySelector('[data-cond-col]');
       var free = row.querySelector('[data-cond-col-free]');
       if (sel && free) { free.style.display = (sel.value === '__other__') ? '' : 'none'; }
     }
-    // Show/hide cross-source widgets vs. the plain value input when op changes.
     function syncCondOp(row) {
       var opSel = row.querySelector('[data-cond-op]');
       if (!opSel) { return; }
@@ -295,27 +279,76 @@
       if (valInput) { valInput.style.display = xsrc ? 'none' : ''; }
       if (xsrcSpan) { xsrcSpan.style.display = xsrc ? '' : 'none'; }
     }
-    document.querySelectorAll('[data-cond]').forEach(function (row) {
-      var sel = row.querySelector('[data-cond-col]');
-      if (sel) { sel.addEventListener('change', function () { syncCond(row); }); }
-      syncCond(row);
-      var opSel = row.querySelector('[data-cond-op]');
-      if (opSel) { opSel.addEventListener('change', function () { syncCondOp(row); }); }
-      syncCondOp(row);
-    });
-    // Add-condition within a Filter/Test card.
-    document.querySelectorAll('[data-add-cond]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        serialize();
-        var card = btn.closest('[data-node]');
-        var node = graph.nodes.filter(function (n) { return n.id === card.getAttribute('data-node'); })[0];
-        if (node) {
-          node.config.conditions = node.config.conditions || [];
-          node.config.conditions.push({ column: '', op: 'eq', value: '' });
-          jsonField.value = JSON.stringify(graph);
-          document.getElementById('pipeline-form').submit();
+
+    function bindCards(root) {
+      var scope = root || document;
+      scope.querySelectorAll('[data-cond]').forEach(function (row) {
+        var sel = row.querySelector('[data-cond-col]');
+        if (sel) { sel.addEventListener('change', function () { syncCond(row); }); }
+        syncCond(row);
+        var opSel = row.querySelector('[data-cond-op]');
+        if (opSel) { opSel.addEventListener('change', function () { syncCondOp(row); }); }
+        syncCondOp(row);
+      });
+      scope.querySelectorAll('[data-add-cond]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          serialize();
+          var card = btn.closest('[data-node]');
+          var node = graph.nodes.filter(function (n) { return n.id === card.getAttribute('data-node'); })[0];
+          if (node) {
+            node.config.conditions = node.config.conditions || [];
+            node.config.conditions.push({ column: '', op: 'eq', value: '' });
+            jsonField.value = JSON.stringify(graph);
+            document.getElementById('pipeline-form').submit();
+          }
+        });
+      });
+      scope.querySelectorAll('[data-remove]').forEach(function (btn) {
+        if (!btn._removeBound) {
+          btn._removeBound = true;
+          btn.addEventListener('click', function () {
+            serialize();
+            var id = btn.getAttribute('data-remove');
+            graph.nodes = graph.nodes.filter(function (n) { return n.id !== id; });
+            graph.nodes.forEach(function (n) {
+              n.inputs = (n.inputs || []).filter(function (i) { return i !== id; });
+            });
+            jsonField.value = JSON.stringify(graph);
+            document.getElementById('pipeline-form').submit();
+          });
         }
       });
+    }
+
+    // Initial bind on page load.
+    bindCards(document);
+
+    // Re-bind after HTMX swaps the cards (ai-apply success path).
+    document.getElementById('pipe-cards').addEventListener('htmx:afterSwap', function () {
+      bindCards(document.getElementById('pipe-cards'));
+    });
+
+    // serializeForAI: called via hx-on::before-request — sync DOM → hidden
+    // field so the current graph is posted to the ai-apply endpoint.
+    window.serializeForAI = function () {
+      serialize();
+      jsonField.value = JSON.stringify(graph);
+    };
+
+    // clearAiPanel: dismiss any previous AI error after a successful apply.
+    window.clearAiPanel = function () {
+      var panel = document.getElementById('ai-draft-panel');
+      if (panel) { panel.innerHTML = ''; }
+    };
+
+    // aiDraftApplied: sync the in-memory graph from the applied draft so that
+    // subsequent add/remove/save operations use the correct node list.
+    document.body.addEventListener('aiDraftApplied', function (evt) {
+      try {
+        var payload = evt.detail && (evt.detail.value !== undefined ? evt.detail.value : evt.detail);
+        var updated = JSON.parse(typeof payload === 'string' ? payload : JSON.stringify(payload));
+        if (updated && updated.nodes) { graph = updated; }
+      } catch (_) {}
     });
   })();
 </script>

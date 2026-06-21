@@ -316,6 +316,92 @@ def _generated_python(pipeline: Pipeline) -> str:
 
 
 # ---------------------------------------------------------------------------
+# AI-apply helpers (F3: auto-apply drafted rule_spec into the Test node)
+# ---------------------------------------------------------------------------
+
+def _merge_draft_into_graph(
+    graph: dict[str, Any],
+    draft: dict[str, Any],
+    source_ids: list[str],
+) -> dict[str, Any]:
+    """Merge *draft* rule_spec fields into the terminal Test node of *graph*.
+
+    If the graph has no Test node, fall back to the canonical scaffold
+    (Import → Test) derived from the bound sources, then merge.  Returns a
+    *new* graph dict; the input is not mutated.
+    """
+    import copy
+
+    from controlflow_sdk.plane.logic_view import derive_builder_graph
+
+    nodes: list[dict[str, Any]] = list(copy.deepcopy(graph.get("nodes") or []))
+
+    # Find the terminal Test node (last test-type node, or append one).
+    test_idx: int | None = None
+    for i, n in enumerate(nodes):
+        if n.get("type") == "test":
+            test_idx = i  # keep the last one
+
+    if test_idx is None:
+        # No Test node yet — derive the scaffold from the control's sources and
+        # merge into that scaffold's Test node.
+        scaffold = derive_builder_graph({"source_ids": source_ids}, source_ids) or {
+            "nodes": [
+                {"id": "src", "type": "import", "source_id": source_ids[0] if source_ids else None,
+                 "narrative": "", "config": {}, "inputs": []},
+                {"id": "tst", "type": "test", "inputs": ["src"], "narrative": "",
+                 "config": {"logic": "all", "conditions": []}},
+            ]
+        }
+        nodes = list(copy.deepcopy(scaffold.get("nodes") or []))
+        for i, n in enumerate(nodes):
+            if n.get("type") == "test":
+                test_idx = i
+                break
+
+    if test_idx is None:
+        # Pathological: still no test node — append one.
+        nodes.append({
+            "id": "tst", "type": "test", "inputs": [], "narrative": "",
+            "config": {"logic": "all", "conditions": []},
+        })
+        test_idx = len(nodes) - 1
+
+    cfg = dict(nodes[test_idx].get("config") or {})
+    cfg["conditions"] = list(draft.get("conditions") or [])
+    cfg["logic"] = draft.get("logic", cfg.get("logic", "all"))
+    if draft.get("severity"):
+        cfg["severity"] = draft["severity"]
+    if draft.get("item_key_column") is not None:
+        cfg["item_key_column"] = draft["item_key_column"]
+    if draft.get("description_template") is not None:
+        cfg["description_template"] = draft["description_template"]
+    nodes[test_idx] = dict(nodes[test_idx])
+    nodes[test_idx]["config"] = cfg
+
+    return {"nodes": nodes}
+
+
+def _ai_apply_error(
+    templates: Jinja2Templates, request: Request, message: str
+) -> Any:
+    """Return an OOB error fragment that HTMX swaps into ``#ai-draft-panel``.
+
+    The swap is out-of-band so the ``#pipe-cards`` target is left intact.
+    """
+    from fastapi.responses import HTMLResponse
+
+    html = (
+        f'<div id="ai-draft-panel" hx-swap-oob="innerHTML">'
+        f'<div class="ai-notice" role="alert" style="padding:10px 14px;margin-top:10px;'
+        f'font-size:13px;color:var(--status-critical);background:var(--status-critical-muted);'
+        f'border:1px solid var(--status-critical);border-radius:var(--radius-input);">'
+        f'{message}</div></div>'
+    )
+    return HTMLResponse(html, status_code=200)
+
+
+# ---------------------------------------------------------------------------
 # Render the editor
 # ---------------------------------------------------------------------------
 
@@ -539,12 +625,22 @@ def register(
 
     @app.post("/controls/{control_id}/logic/python")
     async def save_python(control_id: str, request: Request) -> Any:
-        """Save hand-written test_code for a raw-Python control."""
+        """Save hand-written test_code for a raw-Python control.
+
+        Guard: if the control already has a pipeline or rule_spec it is NOT a
+        raw-python control.  A stray/curl POST must not wipe the stored logic —
+        redirect back without writing so the round-trip is a no-op for the user.
+        """
         root = request.app.state.project_root
         conn = connect(root)
         try:
             control = repo.get_control(conn, control_id)
             if control is None:
+                return RedirectResponse(f"/controls/{control_id}/logic/python", status_code=303)
+            # Guard: only honour the write when the control has no pipeline or
+            # rule_spec.  A stray POST to a GRAPH control (one whose logic was
+            # authored in the Builder) must not silently wipe that logic.
+            if control.get("pipeline") or control.get("rule_spec"):
                 return RedirectResponse(f"/controls/{control_id}/logic/python", status_code=303)
             form = await request.form()
             code = str(form.get("test_code", ""))
@@ -640,6 +736,136 @@ def register(
                 failure_threshold_count=control["failure_threshold_count"],
             )
             return RedirectResponse(f"/controls/{control_id}/logic/python", status_code=303)
+        finally:
+            conn.close()
+
+    # --- Logic POST (AI draft → auto-apply into terminal Test node) ----------
+
+    @app.post("/controls/{control_id}/logic/ai-apply", response_class=HTMLResponse)
+    async def ai_apply(control_id: str, request: Request) -> Any:
+        """Draft a rule_spec via the AI backend and merge it into the terminal
+        Test node of the builder graph.  Returns the re-rendered ``#pipe-cards``
+        inner HTML so HTMX can swap the cards in place — the author reviews and
+        edits before clicking "Save pipeline".  No DB write is performed.
+
+        On error the response body is an OOB fragment that drops the error
+        banner into ``#ai-draft-panel`` while leaving ``#pipe-cards`` unchanged
+        (HTMX ``hx-swap-oob`` in the response swaps the error target).
+        """
+        from controlflow_sdk.plane.routes.ai import _ai_config, _build_sample
+
+        root = request.app.state.project_root
+        conn = connect(root)
+        try:
+            form = await request.form()
+
+            # ── current graph from the serialised hidden field ──────────────
+            raw_json = form.get("pipeline_json")
+            try:
+                graph: dict[str, Any] = (
+                    json.loads(str(raw_json)) if raw_json else dict(_EMPTY_GRAPH)
+                )
+            except (ValueError, TypeError):
+                graph = dict(_EMPTY_GRAPH)
+
+            # ── AI config guards ─────────────────────────────────────────────
+            cfg = _ai_config(conn)
+            if cfg is None:
+                return _ai_apply_error(
+                    templates, request,
+                    "AI is not configured. Pick a provider in Settings.",
+                )
+
+            from controlflow_sdk.ai.providers import provider_key_present
+
+            if not provider_key_present(cfg["provider"]):
+                return _ai_apply_error(
+                    templates, request,
+                    "AI is not enabled — the selected provider's API key is not "
+                    "set in this environment.",
+                )
+
+            control = repo.get_control(conn, control_id)
+            source_ids = list((control or {}).get("source_ids") or [])
+            if not source_ids:
+                return _ai_apply_error(
+                    templates, request,
+                    "Bind a data source to this control first.",
+                )
+
+            sample = _build_sample(conn, root, source_ids[0])
+            if sample is None:
+                return _ai_apply_error(
+                    templates, request, "Bind a data file to the source first.",
+                )
+
+            objective = str((control or {}).get("objective") or "")
+
+            # ── draft ────────────────────────────────────────────────────────
+            from controlflow_sdk.ai.draft import DraftError, draft_and_validate
+            from controlflow_sdk.rules.spec import RuleSpecError
+
+            try:
+                draft = draft_and_validate(
+                    objective=objective,
+                    source_schema={"columns": sample["schema"]},
+                    data_sample=sample,
+                    provider=cfg["provider"],
+                    model=cfg["model"],
+                )
+            except RuleSpecError as exc:
+                return _ai_apply_error(
+                    templates, request,
+                    f"The drafted rule was malformed: {exc}",
+                )
+            except Exception as exc:  # noqa: BLE001
+                msg = (
+                    str(exc) if isinstance(exc, DraftError)
+                    else "The AI provider could not produce a usable rule. "
+                         "Try again or build the rule by hand."
+                )
+                return _ai_apply_error(templates, request, msg)
+
+            # ── merge draft into the terminal Test node ──────────────────────
+            merged_graph = _merge_draft_into_graph(
+                graph, draft, source_ids
+            )
+
+            # ── render the pipe-cards partial ────────────────────────────────
+            source_columns = _source_columns(conn)
+            sources = repo.list_sources(conn)
+            try:
+                builder_parsed = parse_pipeline(merged_graph)
+            except PipelineError:
+                builder_parsed = None
+
+            builder_stream_cols: dict[str, list[dict]] = {}
+            builder_counts: dict[str, int] = {}
+            if builder_parsed is not None:
+                builder_counts = _row_counts(conn, root, builder_parsed)
+                builder_stream_cols = _stream_columns(builder_parsed, source_columns)
+
+            ordered_nodes = (
+                [_card_vm(n, builder_parsed, builder_stream_cols, builder_counts, {})
+                 for n in builder_parsed.topological()]
+                if builder_parsed is not None
+                else [_raw_card_vm(n, {}) for n in merged_graph.get("nodes", [])]
+            )
+
+            return templates.TemplateResponse(
+                request,
+                "partials/_pipe_cards.html",
+                {
+                    "nodes": ordered_nodes,
+                    "sources": sources,
+                    "op_choices": OP_CHOICES,
+                    "join_mode_choices": JOIN_MODE_CHOICES,
+                },
+                # The JS picks up the merged graph from this HX-Trigger event.
+                headers={"HX-Trigger": json.dumps(
+                    {"aiDraftApplied": json.dumps(merged_graph)}
+                )},
+            )
         finally:
             conn.close()
 

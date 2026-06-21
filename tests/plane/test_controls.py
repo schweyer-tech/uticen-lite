@@ -136,3 +136,83 @@ def test_new_control_has_empty_logic(client):
     assert c["rule_spec"] is None
     assert c["test_code"] is None
     assert c["pipeline"] is None
+
+
+# ---------------------------------------------------------------------------
+# F2: source-desync guard — Definition save must not drop logic-required sources
+# ---------------------------------------------------------------------------
+
+def _make_cross_source_control(client) -> str:
+    """Create a control whose pipeline requires two sources (A and B).
+
+    Uses an Import+Test graph with a not_exists_in cross-source condition so
+    source B is required by the Test node condition (not the Import node).
+    Returns the control id.
+    """
+    import json
+    # Source A: primary population.
+    _make_source(client, "f2_accounts")
+    # Source B: the reference set (needed by the cross-source condition).
+    csv_b = b"employee_id,status\nE1,active\n"
+    client.post("/sources", data={"source_id": "f2_employees", "format": "csv"},
+                files={"file": ("f2_employees.csv", __import__("io").BytesIO(csv_b), "text/csv")},
+                follow_redirects=False)
+
+    cid = "F2C1"
+    client.post("/controls", data={
+        "id": cid, "title": "F2 Cross-Source", "objective": "o", "narrative": "n",
+        "source_ids": ["f2_accounts", "f2_employees"],
+    }, follow_redirects=False)
+
+    # Save a pipeline that references f2_employees via a not_exists_in condition.
+    graph = {
+        "nodes": [
+            {"id": "imp", "type": "import", "source_id": "f2_accounts", "narrative": ""},
+            {"id": "tst", "type": "test", "inputs": ["imp"], "narrative": "",
+             "config": {
+                 "logic": "all", "severity": "high",
+                 "item_key_column": "user_id",
+                 "description_template": "User {user_id} missing from employees",
+                 "conditions": [{
+                     "column": "user_id",
+                     "op": "not_exists_in",
+                     "other_source": "f2_employees",
+                     "this_key": "user_id",
+                     "other_key": "employee_id",
+                 }],
+             }},
+        ]
+    }
+    client.post(f"/controls/{cid}/logic/builder",
+                data={"pipeline_json": json.dumps(graph)},
+                follow_redirects=False)
+    return cid
+
+
+def test_definition_save_preserves_logic_required_sources(client):
+    """Posting the Definition form with source B unchecked must NOT drop B if
+    the control's logic (pipeline) still needs it.
+
+    Scenario: the pipeline has a not_exists_in condition that references
+    f2_employees (source B).  The author accidentally unchecks B on the Definition
+    tab and saves.  The guard must UNION B back in so the next run doesn't fail
+    with 'unknown source'.
+    """
+    cid = _make_cross_source_control(client)
+
+    before = _get_control(client, cid)
+    assert "f2_employees" in before["source_ids"], (
+        "setup: f2_employees must be bound before the test"
+    )
+
+    # POST the Definition form with ONLY source A checked (B unchecked).
+    client.post(f"/controls/{cid}", data={
+        "id": cid, "title": "F2 Cross-Source",
+        "objective": "o", "narrative": "n", "framework_nist": "",
+        "source_ids": ["f2_accounts"],  # B intentionally omitted
+    }, follow_redirects=False)
+
+    after = _get_control(client, cid)
+    assert "f2_employees" in after["source_ids"], (
+        "source f2_employees was dropped even though the pipeline still needs it"
+    )

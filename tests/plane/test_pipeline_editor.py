@@ -15,6 +15,8 @@ import io
 import json
 import re
 
+import pytest
+
 from controlflow_sdk.pipeline.lint import OFFRAMP_MESSAGE
 
 _OFFRAMP_STABLE = "pull data in with an Import node, or convert this control"
@@ -332,8 +334,6 @@ def test_pipeline_subroute_not_shadowed_by_catch_all(client):
 # ---------------------------------------------------------------------------
 # Task 3: Logic sub-routes + tab nav
 # ---------------------------------------------------------------------------
-
-import pytest  # noqa: E402 — added below existing imports for minimal diff
 
 
 @pytest.fixture()
@@ -694,3 +694,61 @@ def test_builder_degrades_gracefully_on_incomplete_test_condition(client):
     )
     # The node cards must still render (import + test nodes visible).
     assert "data-node=" in r.text, "node cards missing from builder response"
+
+
+# ---------------------------------------------------------------------------
+# F1: guard POST /controls/{id}/logic/python — must not clobber a GRAPH control
+# ---------------------------------------------------------------------------
+
+def test_python_save_does_not_clobber_graph_control(client):
+    """A stray POST to /logic/python on a GRAPH control must be a no-op.
+
+    If the control already has a pipeline or rule_spec (it is NOT raw-python),
+    the save handler must redirect back without writing — preserving the existing
+    pipeline and rule_spec.
+    """
+    _seed_terminated_access(client)
+    _make_control(client, "G1")
+    _save_pipeline(client, "G1", _terminated_access_graph())
+
+    from controlflow_sdk.store import repo
+    conn = _conn(client)
+    before = repo.get_control(conn, "G1")
+    conn.close()
+    assert before["pipeline"] is not None, "setup: control must have a pipeline"
+    assert before["rule_spec"] is None or before["test_code"] is not None or before["pipeline"]
+
+    # Stray POST to /logic/python — should be a no-op for a graph control.
+    resp = client.post("/controls/G1/logic/python",
+                       data={"test_code": "def test(pop, sources):\n    return []\n"},
+                       follow_redirects=False)
+    assert resp.status_code in (302, 303), f"expected redirect, got {resp.status_code}"
+
+    conn = _conn(client)
+    after = repo.get_control(conn, "G1")
+    conn.close()
+    # The pipeline must be unchanged.
+    assert after["pipeline"] == before["pipeline"], "pipeline was clobbered by /logic/python POST"
+    # test_code must NOT have been set to the posted value.
+    assert after["test_code"] != "def test(pop, sources):\n    return []\n", (
+        "test_code was overwritten on a graph control by /logic/python POST"
+    )
+
+
+def test_python_save_works_for_raw_python_control(client):
+    """Regression: POST /logic/python must still save for a genuinely raw-python control."""
+    cid = _make_raw_python_control(client)
+
+    new_code = "def test(pop, sources):\n    return list(pop.df.itertuples())\n"
+    resp = client.post(f"/controls/{cid}/logic/python",
+                       data={"test_code": new_code},
+                       follow_redirects=False)
+    assert resp.status_code in (302, 303), f"expected redirect, got {resp.status_code}"
+
+    from controlflow_sdk.store import repo
+    conn = _conn(client)
+    c = repo.get_control(conn, cid)
+    conn.close()
+    assert c["test_code"] == new_code, "test_code was not saved for a raw-python control"
+    assert c["pipeline"] is None
+    assert c["rule_spec"] is None
