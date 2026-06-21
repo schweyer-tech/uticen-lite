@@ -45,6 +45,8 @@ OP_CHOICES: list[tuple[str, str]] = [
     ("not_empty", "not_empty"), ("in", "in (pipe-separated)"),
     ("not_in", "not_in (pipe-separated)"), ("regex", "regex"),
     ("is_duplicate", "is_duplicate"),
+    ("exists_in", "exists in another source"),
+    ("not_exists_in", "not in another source"),
 ]
 JOIN_MODE_CHOICES: list[tuple[str, str]] = [
     ("inner", "inner — keep left rows with a match"),

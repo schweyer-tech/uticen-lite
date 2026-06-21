@@ -155,9 +155,18 @@
             if (col === '__other__' && free) { col = free; }
             var op = (row.querySelector('[data-cond-op]') || {}).value || 'eq';
             var raw = (row.querySelector('[data-cond-val]') || {}).value;
-            if (!col) { return; }
+            var isXsrc = op === 'exists_in' || op === 'not_exists_in';
+            if (!col && !isXsrc) { return; }
             var cond = { column: col, op: op };
-            if (['is_empty', 'not_empty', 'is_duplicate'].indexOf(op) === -1) {
+            if (isXsrc) {
+              var otherSrc = (row.querySelector('[data-xsrc-source]') || {}).value || '';
+              var thisKey = (row.querySelector('[data-xsrc-this]') || {}).value || '';
+              var otherKey = (row.querySelector('[data-xsrc-other]') || {}).value || '';
+              cond.other_source = otherSrc;
+              cond.this_key = thisKey;
+              cond.other_key = otherKey;
+              if (thisKey) { cond.column = thisKey; }
+            } else if (['is_empty', 'not_empty', 'is_duplicate'].indexOf(op) === -1) {
               if (op === 'in' || op === 'not_in') {
                 cond.value = raw.split('|').map(function (p) { return typed(p.trim()); })
                                 .filter(function (p) { return p !== ''; });
@@ -242,10 +251,23 @@
       var free = row.querySelector('[data-cond-col-free]');
       if (sel && free) { free.style.display = (sel.value === '__other__') ? '' : 'none'; }
     }
+    // Show/hide cross-source widgets vs. the plain value input when op changes.
+    function syncCondOp(row) {
+      var opSel = row.querySelector('[data-cond-op]');
+      if (!opSel) { return; }
+      var xsrc = opSel.value === 'exists_in' || opSel.value === 'not_exists_in';
+      var valInput = row.querySelector('[data-cond-val]');
+      var xsrcSpan = row.querySelector('[data-xsrc]');
+      if (valInput) { valInput.style.display = xsrc ? 'none' : ''; }
+      if (xsrcSpan) { xsrcSpan.style.display = xsrc ? '' : 'none'; }
+    }
     document.querySelectorAll('[data-cond]').forEach(function (row) {
       var sel = row.querySelector('[data-cond-col]');
       if (sel) { sel.addEventListener('change', function () { syncCond(row); }); }
       syncCond(row);
+      var opSel = row.querySelector('[data-cond-op]');
+      if (opSel) { opSel.addEventListener('change', function () { syncCondOp(row); }); }
+      syncCondOp(row);
     });
     // Add-condition within a Filter/Test card.
     document.querySelectorAll('[data-add-cond]').forEach(function (btn) {

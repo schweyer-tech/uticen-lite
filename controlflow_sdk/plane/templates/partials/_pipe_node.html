@@ -83,8 +83,22 @@
           <option value="{{ opval }}" {% if cond.op == opval %}selected{% endif %}>{{ oplabel }}</option>
           {% endfor %}
         </select>
+        {% set is_xsrc = cond.op in ('exists_in', 'not_exists_in') %}
         <input type="text" data-cond-val placeholder="value"
-               value="{{ cond.value if cond.value is not none and cond.value is defined else '' }}">
+               value="{{ cond.value if cond.value is not none and cond.value is defined else '' }}"
+               style="{% if is_xsrc %}display:none;{% endif %}">
+        <span data-xsrc style="{% if not is_xsrc %}display:none;{% endif %}">
+          <select data-xsrc-source>
+            <option value="">— other source —</option>
+            {% for s in sources %}
+            <option value="{{ s.id }}" {% if s.id == cond.get('other_source') %}selected{% endif %}>{{ s.title or s.id }}</option>
+            {% endfor %}
+          </select>
+          <input type="text" data-xsrc-this placeholder="this key"
+                 value="{{ cond.get('this_key') or '' }}">
+          <input type="text" data-xsrc-other placeholder="other key"
+                 value="{{ cond.get('other_key') or '' }}">
+        </span>
       </div>
     {% endfor %}
     <div class="pipe-row">

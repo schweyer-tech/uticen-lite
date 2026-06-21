@@ -503,6 +503,132 @@ def test_python_tab_editable_for_raw_python(client):
     r = client.get(f"/controls/{cid}/logic/python")
     assert 'name="test_code"' in r.text                      # editable textarea present
     # save edits
-    r2 = client.post(f"/controls/{cid}/logic/python",
-                     data={"test_code": "def test(pop):\n    return []"}, follow_redirects=False)
-    assert r2.status_code in (303, 302)
+    client.post(f"/controls/{cid}/logic/python",
+                data={"test_code": "def test(pop):\n    return []"}, follow_redirects=False)
+
+
+# ---------------------------------------------------------------------------
+# Task 7: cross-source (not_exists_in) condition round-trips through Builder
+# ---------------------------------------------------------------------------
+
+_XSRC_GRAPH = {
+    "nodes": [
+        {"id": "imp", "type": "import", "source_id": "cs_accounts", "narrative": ""},
+        {"id": "tst", "type": "test", "inputs": ["imp"], "narrative": "",
+         "config": {
+             "logic": "all",
+             "severity": "high",
+             "item_key_column": "account_id",
+             "description_template": "Account {account_id} has no matching employee",
+             "conditions": [{
+                 "column": "employee_id",
+                 "op": "not_exists_in",
+                 "other_source": "cs_employees",
+                 "this_key": "employee_id",
+                 "other_key": "employee_id",
+             }],
+         }},
+    ]
+}
+
+
+def _seed_cross_source(client):
+    _make_source(client, "cs_accounts",
+                 b"account_id,employee_id\nA1,E1\nA2,E2\nA3,E3\n")
+    _make_source(client, "cs_employees",
+                 b"employee_id,status\nE1,active\nE2,terminated\n")
+    _make_control(client, "CS1")
+
+
+def test_cross_source_condition_preserved_through_builder_save(client):
+    """Regression guard: a Test node condition with op=not_exists_in must survive
+    a Builder save round-trip without silent loss of other_source/this_key/other_key.
+
+    Two-part check:
+    1. The embedded graph-data JSON (used to initialise the JS graph state) carries
+       the full cross-source condition — so the hidden field is initialised correctly.
+    2. The rendered node-card HTML contains the cross-source DOM elements
+       (data-xsrc-source, data-xsrc-this, data-xsrc-other) and the op is selected
+       as "not_exists_in" — so the JS serialize() can read them back and a second
+       Save (simulated by re-posting the embedded graph) preserves the condition.
+    """
+    _seed_cross_source(client)
+
+    r = _save_pipeline(client, "CS1", _XSRC_GRAPH)
+    assert r.status_code in (302, 303), f"save failed: {r.status_code}"
+
+    # --- Check 1: embedded graph-data JSON carries the full condition -----------
+    builder_r = client.get("/controls/CS1/logic/builder")
+    assert builder_r.status_code == 200
+    html = builder_r.text
+
+    m = re.search(r'<script id="graph-data"[^>]*>(.*?)</script>', html, re.DOTALL)
+    assert m, "graph-data script tag not found in builder HTML"
+    embedded_graph = json.loads(m.group(1).strip())
+    test_nodes = [n for n in embedded_graph.get("nodes", []) if n.get("type") == "test"]
+    assert test_nodes, "no Test node in embedded graph"
+    conditions = test_nodes[0].get("config", {}).get("conditions", [])
+    assert conditions, "Test node has no conditions in embedded graph"
+    cond = conditions[0]
+    assert cond.get("op") == "not_exists_in", (
+        f"op={cond.get('op')!r} in embedded JSON — cross-source op dropped"
+    )
+    assert cond.get("other_source") == "cs_employees", (
+        f"other_source={cond.get('other_source')!r} in embedded JSON — dropped"
+    )
+    assert cond.get("this_key") == "employee_id", (
+        f"this_key={cond.get('this_key')!r} in embedded JSON — dropped"
+    )
+    assert cond.get("other_key") == "employee_id", (
+        f"other_key={cond.get('other_key')!r} in embedded JSON — dropped"
+    )
+
+    # --- Check 2: rendered DOM card has cross-source elements ------------------
+    # The op-select for the condition must include not_exists_in as the selected option.
+    assert 'value="not_exists_in" selected' in html, (
+        "not_exists_in option not selected in condition op-select — "
+        "JS serialize() would read the wrong op (e.g. 'eq') and silently drop the "
+        "cross-source condition on Save"
+    )
+    # The cross-source input widgets must be present in the HTML so JS can read them.
+    assert "data-xsrc-source" in html, (
+        "data-xsrc-source element missing from rendered HTML — "
+        "JS serialize() cannot read other_source on Save"
+    )
+    assert "data-xsrc-this" in html, (
+        "data-xsrc-this element missing from rendered HTML — "
+        "JS serialize() cannot read this_key on Save"
+    )
+    assert "data-xsrc-other" in html, (
+        "data-xsrc-other element missing from rendered HTML — "
+        "JS serialize() cannot read other_key on Save"
+    )
+
+    # --- Check 3: re-save the embedded graph (simulates JS Save click) ---------
+    # The embedded graph is what the JS would submit; saving it must keep the condition.
+    r2 = _save_pipeline(client, "CS1", embedded_graph)
+    assert r2.status_code in (302, 303), f"re-save returned {r2.status_code}"
+
+    from controlflow_sdk.store import repo
+    conn = _conn(client)
+    ctrl = repo.get_control(conn, "CS1")
+    conn.close()
+    pipeline = ctrl.get("pipeline") or {}
+    saved_nodes = pipeline.get("nodes", [])
+    saved_test = next((n for n in saved_nodes if n.get("type") == "test"), None)
+    assert saved_test, "Test node missing after re-save"
+    saved_conds = saved_test.get("config", {}).get("conditions", [])
+    assert saved_conds, "conditions dropped after re-save"
+    saved_cond = saved_conds[0]
+    assert saved_cond.get("op") == "not_exists_in", (
+        f"op={saved_cond.get('op')!r} after re-save — silently changed"
+    )
+    assert saved_cond.get("other_source") == "cs_employees", (
+        f"other_source={saved_cond.get('other_source')!r} after re-save — dropped"
+    )
+    assert saved_cond.get("this_key") == "employee_id", (
+        f"this_key={saved_cond.get('this_key')!r} after re-save — dropped"
+    )
+    assert saved_cond.get("other_key") == "employee_id", (
+        f"other_key={saved_cond.get('other_key')!r} after re-save — dropped"
+    )
