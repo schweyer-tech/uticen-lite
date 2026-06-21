@@ -1,4 +1,5 @@
 import io
+import json
 
 
 def _rule_control(client):
@@ -8,12 +9,22 @@ def _rule_control(client):
                 follow_redirects=False)
     client.post("/controls", data={
         "id": "sod", "title": "SoD", "objective": "o", "narrative": "n",
-        "test_kind": "rule", "rule_logic": "all", "rule_severity": "high",
-        "rule_description": "User {user_id}", "rule_item_key": "user_id",
-        "cond_column": ["can_create", "can_approve"], "cond_op": ["eq", "eq"],
-        "cond_value": ["true", "true"], "source_ids": ["users"],
+        "source_ids": ["users"],
         "failure_threshold_count": "0",
     }, follow_redirects=False)
+    graph = {"nodes": [
+        {"id": "imp", "type": "import", "source_id": "users"},
+        {"id": "tst", "type": "test", "inputs": ["imp"],
+         "config": {"logic": "all", "severity": "high", "item_key_column": "user_id",
+                    "description_template": "User {user_id}",
+                    "conditions": [
+                        {"column": "can_create", "op": "eq", "value": True},
+                        {"column": "can_approve", "op": "eq", "value": True},
+                    ]}},
+    ]}
+    client.post("/controls/sod/logic/builder",
+                data={"pipeline_json": json.dumps(graph)},
+                follow_redirects=False)
 
 
 def test_run_then_view(client):

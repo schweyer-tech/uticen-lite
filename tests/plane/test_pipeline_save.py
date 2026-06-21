@@ -43,10 +43,14 @@ def test_save_pure_pipeline_derives_sources_and_compiles_to_rule_spec(client):
          "config": {"logic": "all", "severity": "high", "item_key_column": "account_id",
                     "conditions": [{"column": "is_privileged", "op": "eq", "value": True}]}},
     ]}
-    resp = client.post("/controls", data={
+    # Step 1: create metadata shell.
+    client.post("/controls", data={
         "id": "pipe1", "title": "Pipe", "objective": "o", "narrative": "n",
-        "test_kind": "pipeline", "pipeline_json": json.dumps(graph),
     }, follow_redirects=False)
+    # Step 2: author logic via Builder.
+    resp = client.post("/controls/pipe1/logic/builder",
+                       data={"pipeline_json": json.dumps(graph)},
+                       follow_redirects=False)
     assert resp.status_code in (302, 303)
 
     from controlflow_sdk.store import repo
@@ -82,10 +86,14 @@ def test_save_cross_source_pipeline_compiles_to_test_code(client):
          "config": {"logic": "any", "severity": "critical", "item_key_column": "account_id",
                     "conditions": [{"column": "account_id", "op": "not_empty"}]}},
     ]}
-    resp = client.post("/controls", data={
+    # Step 1: create metadata shell.
+    client.post("/controls", data={
         "id": "pipe2", "title": "Cross", "objective": "", "narrative": "",
-        "test_kind": "pipeline", "pipeline_json": json.dumps(graph),
     }, follow_redirects=False)
+    # Step 2: author logic via Builder.
+    resp = client.post("/controls/pipe2/logic/builder",
+                       data={"pipeline_json": json.dumps(graph)},
+                       follow_redirects=False)
     assert resp.status_code in (302, 303)
 
     from controlflow_sdk.store import repo
@@ -117,10 +125,17 @@ def _custom_pipeline(code: str, flavor: str = "transform") -> dict:
 
 
 def _post_pipeline(client, cid: str, graph: dict):
-    return client.post("/controls", data={
+    """Create a bare control shell then POST the graph to the Builder route.
+
+    Returns the response from the Builder POST (which may be 303 on success or
+    422 on lint failure), mirroring what the tests assert against.
+    """
+    client.post("/controls", data={
         "id": cid, "title": "JE", "objective": "o", "narrative": "n",
-        "test_kind": "pipeline", "pipeline_json": json.dumps(graph),
     }, follow_redirects=False)
+    return client.post(f"/controls/{cid}/logic/builder",
+                       data={"pipeline_json": json.dumps(graph)},
+                       follow_redirects=False)
 
 
 def test_save_rejects_custom_node_that_reads_a_file(client):
@@ -130,11 +145,13 @@ def test_save_rejects_custom_node_that_reads_a_file(client):
     # Refused: re-rendered edit form (422), NOT a 303 redirect, NOT a 500.
     assert resp.status_code == 422
     assert _OFFRAMP_STABLE in resp.text
-    # And nothing was persisted.
+    # The control shell exists but the unsafe pipeline was NOT persisted.
     from controlflow_sdk.store import repo
     conn = _conn(client)
-    assert repo.get_control(conn, "bad1") is None
+    c = repo.get_control(conn, "bad1")
     conn.close()
+    assert c is not None
+    assert c["pipeline"] is None
 
 
 def test_save_rejects_custom_node_using_read_csv(client):
@@ -144,6 +161,11 @@ def test_save_rejects_custom_node_using_read_csv(client):
     assert resp.status_code == 422
     assert "read_csv" in resp.text
     assert _OFFRAMP_STABLE in resp.text
+    from controlflow_sdk.store import repo
+    conn = _conn(client)
+    c = repo.get_control(conn, "bad2")
+    conn.close()
+    assert c is not None and c["pipeline"] is None
 
 
 def test_save_rejects_custom_node_using_dunder_import(client):
@@ -152,6 +174,11 @@ def test_save_rejects_custom_node_using_dunder_import(client):
                           _custom_pipeline("m = __import__('os')\nrows = rows"))
     assert resp.status_code == 422
     assert "__import__" in resp.text
+    from controlflow_sdk.store import repo
+    conn = _conn(client)
+    c = repo.get_control(conn, "bad3")
+    conn.close()
+    assert c is not None and c["pipeline"] is None
 
 
 def test_save_rejects_custom_node_using_eval(client):
@@ -160,6 +187,11 @@ def test_save_rejects_custom_node_using_eval(client):
                           _custom_pipeline("rows = eval('rows')"))
     assert resp.status_code == 422
     assert "eval" in resp.text
+    from controlflow_sdk.store import repo
+    conn = _conn(client)
+    c = repo.get_control(conn, "bad4")
+    conn.close()
+    assert c is not None and c["pipeline"] is None
 
 
 def test_save_accepts_clean_custom_transform_node(client):

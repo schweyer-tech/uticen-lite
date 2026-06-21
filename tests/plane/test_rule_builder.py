@@ -1,4 +1,5 @@
 import io
+import json
 
 from controlflow_sdk.plane.routes.controls import (
     _conditions_view_from_form,
@@ -32,18 +33,28 @@ def _src(client):
 
 def test_rule_builder_builds_spec_from_conditions(client):
     _src(client)
+    # Step 1: create metadata shell via Definition form.
     client.post("/controls", data={
         "id": "sod", "title": "SoD", "objective": "o", "narrative": "n",
-        "test_kind": "rule", "rule_logic": "all", "rule_severity": "high",
-        "rule_description": "User {user_id} can create and approve",
-        "rule_item_key": "user_id",
-        "cond_column": ["can_create", "can_approve"],
-        "cond_op": ["eq", "eq"],
-        "cond_value": ["true", "true"],
         "source_ids": ["users"],
     }, follow_redirects=False)
+    # Step 2: author logic via Builder (Import→Test pipeline that compiles to rule_spec).
+    graph = {"nodes": [
+        {"id": "imp", "type": "import", "source_id": "users"},
+        {"id": "tst", "type": "test", "inputs": ["imp"],
+         "config": {"logic": "all", "severity": "high", "item_key_column": "user_id",
+                    "description_template": "User {user_id} can create and approve",
+                    "conditions": [
+                        {"column": "can_create", "op": "eq", "value": True},
+                        {"column": "can_approve", "op": "eq", "value": True},
+                    ]}},
+    ]}
+    client.post("/controls/sod/logic/builder",
+                data={"pipeline_json": json.dumps(graph)},
+                follow_redirects=False)
     c = repo.get_control(connect(client.app.state.project_root), "sod")
-    assert c["test_kind"] == "rule"
+    # Single-source pipeline compiles to a rule_spec artifact (test_kind="pipeline").
+    assert c["test_kind"] == "pipeline"
     spec = c["rule_spec"]
     assert spec["logic"] == "all" and spec["severity"] == "high"
     assert spec["conditions"] == [
@@ -232,7 +243,7 @@ def test_rule_spec_builds_cross_source_condition():
 
 
 def test_save_auto_binds_cross_source_b(client):
-    # two sources so source B (hr_roster) exists
+    # Two sources; both appear as Import nodes so the Builder auto-binds both.
     client.post("/sources", data={"source_id": "access", "format": "csv"},
                 files={"file": ("access.csv", io.BytesIO(b"user_id\nU1\n"), "text/csv")},
                 follow_redirects=False)
@@ -240,17 +251,28 @@ def test_save_auto_binds_cross_source_b(client):
                 files={"file": ("hr_roster.csv",
                                 io.BytesIO(b"employee_id\nU1\n"), "text/csv")},
                 follow_redirects=False)
+    # Step 1: create metadata shell (only A in the definition form).
     client.post("/controls", data={
         "id": "term", "title": "T", "objective": "o", "narrative": "n",
-        "test_kind": "rule", "rule_logic": "all", "rule_severity": "high",
-        "rule_description": "", "rule_item_key": "user_id",
-        "cond_column": ["user_id"], "cond_op": ["not_exists_in"], "cond_value": [""],
-        "cond_other_source": ["hr_roster"], "cond_this_key": ["user_id"],
-        "cond_other_key": ["employee_id"],
-        "source_ids": ["access"],  # only A ticked; B must be auto-bound
+        "source_ids": ["access"],
     }, follow_redirects=False)
+    # Step 2: author logic via Builder using Import nodes for both sources;
+    # the Builder derives source binding from Import nodes → both A and B are bound.
+    graph = {"nodes": [
+        {"id": "imp_a", "type": "import", "source_id": "access"},
+        {"id": "imp_b", "type": "import", "source_id": "hr_roster"},
+        {"id": "jn", "type": "join", "inputs": ["imp_a", "imp_b"],
+         "config": {"left_key": "user_id", "right_key": "employee_id", "mode": "exists"}},
+        {"id": "tst", "type": "test", "inputs": ["jn"],
+         "config": {"logic": "any", "severity": "high", "item_key_column": "user_id",
+                    "description_template": "",
+                    "conditions": [{"column": "user_id", "op": "not_empty"}]}},
+    ]}
+    client.post("/controls/term/logic/builder",
+                data={"pipeline_json": json.dumps(graph)},
+                follow_redirects=False)
     c = repo.get_control(connect(client.app.state.project_root), "term")
-    # B was unioned into the control's sources so the runner can load it
+    # Both Import sources are bound so the runner can load them.
     assert "access" in c["source_ids"] and "hr_roster" in c["source_ids"]
 
 
