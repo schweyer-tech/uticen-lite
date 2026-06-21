@@ -38,7 +38,6 @@ def _make_control(client, cid="C1"):
     """Create a bare control we can attach a pipeline to."""
     client.post("/controls", data={
         "id": cid, "title": "Term Access", "objective": "o", "narrative": "n",
-        "test_kind": "rule", "rule_logic": "all",
     }, follow_redirects=False)
 
 
@@ -387,27 +386,39 @@ def test_control_tab_says_logic_not_pipeline(client, seeded_pipeline_control):
 # ---------------------------------------------------------------------------
 
 def _make_rule_control(client) -> str:
-    """Create a control with a rule_spec (no pipeline) and a bound source."""
+    """Create a control with a bound source (no pipeline/rule_spec yet).
+
+    The Definition form no longer processes test_kind/rule_spec; controls start
+    with empty logic (test_kind="pipeline").  The Builder derives an Import→Test
+    scaffold from the bound source on first view, so tests that probe the Builder
+    output can rely on those derived nodes being present.
+    """
     _make_source(client, "rc_accounts", b"account_id,is_active\nA1,true\nA2,false\n")
     cid = "RC1"
     client.post("/controls", data={
         "id": cid, "title": "Rule Control", "objective": "o", "narrative": "n",
-        "test_kind": "rule", "rule_logic": "all",
         "source_ids": "rc_accounts",
     }, follow_redirects=False)
     return cid
 
 
 def _make_raw_python_control(client) -> str:
-    """Create a control that has hand-written test_code and no pipeline/rule_spec."""
+    """Create a control with hand-written test_code and no pipeline/rule_spec.
+
+    The Definition form no longer accepts test_code; raw-Python controls are
+    authored on the Logic ▸ Python tab (POST /controls/{id}/logic/python).
+    """
     _make_source(client, "rp_accounts", b"account_id,amount\nA1,100\n")
     cid = "RP1"
+    # 1. Create the metadata shell via the Definition form.
     client.post("/controls", data={
         "id": cid, "title": "Raw Python Control", "objective": "o", "narrative": "n",
-        "test_kind": "python",
-        "test_code": "def test(pop, sources):\n    return []\n",
         "source_ids": "rp_accounts",
     }, follow_redirects=False)
+    # 2. Write the hand-authored test_code via the Logic ▸ Python route.
+    client.post(f"/controls/{cid}/logic/python",
+                data={"test_code": "def test(pop, sources):\n    return []\n"},
+                follow_redirects=False)
     return cid
 
 

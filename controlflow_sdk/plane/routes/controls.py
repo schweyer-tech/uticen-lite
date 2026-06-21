@@ -251,40 +251,34 @@ def _save_pipeline_graph(
 
 
 def _save_from_form(conn: sqlite3.Connection, form: Any) -> str:
+    """Save the Definition form: metadata + sources only.
+
+    For an EXISTING control the logic fields (test_kind, rule_spec, test_code,
+    pipeline) are loaded from the store and passed through unchanged so that
+    editing metadata never clobbers logic authored on the Logic tab.
+
+    For a NEW control (no existing store record) the control is created with
+    empty logic (test_kind="pipeline", no rule_spec/test_code/pipeline); the
+    Logic ▸ Builder derives an Import→Test scaffold on first view.
+    """
     cid = str(form.get("id")).strip()
     nist = [s.strip() for s in str(form.get("framework_nist", "")).split(",") if s.strip()]
-    test_kind = form.get("test_kind", "rule")
-    rule_spec = _rule_spec_from_form(form) if test_kind == "rule" else None
-    test_code = form.get("test_code") if test_kind == "python" else None
-    pipeline = _pipeline_from_form(form) if test_kind == "pipeline" else None
     pct = form.get("failure_threshold_pct")
     cnt = form.get("failure_threshold_count")
-
-    # Source binding: explicit checkboxes for rule/python; DERIVED from the
-    # Import nodes for a pipeline (the analyst binds sources by adding Imports).
     source_ids = list(form.getlist("source_ids"))
 
-    if test_kind == "pipeline" and pipeline is not None:
-        # Compile the graph to the existing artifact the runner/bundle understand
-        # (a rule_spec for the pure single-source case, else a test() string), and
-        # derive the source binding from the Import nodes. The graph itself is
-        # store-only (the `pipeline` column) — never threaded into the bundle.
-        from controlflow_sdk.pipeline.compile import compile_pipeline
-        from controlflow_sdk.pipeline.lint import LintError, lint_pipeline
-        from controlflow_sdk.pipeline.model import parse_pipeline
-
-        parsed = parse_pipeline(pipeline)
-        parsed.validate_sources({s["id"] for s in repo.list_sources(conn)})
-        # Layer 1 of the §8 enforcement stack: allowlist AST deny-scan at SAVE.
-        # Refuse to persist a Custom Python node that could read a file / reach
-        # outside `rows` — the message names the "Convert to Python test" door.
-        lint_errors = lint_pipeline(parsed)
-        if lint_errors:
-            raise LintError(lint_errors)
-        compiled = compile_pipeline(parsed)
-        rule_spec = compiled.rule_spec
-        test_code = compiled.test_code
-        source_ids = parsed.import_source_ids()
+    # Preserve existing logic for updates; use empty logic for new controls.
+    existing = repo.get_control(conn, cid)
+    if existing is not None:
+        test_kind = existing["test_kind"]
+        rule_spec = existing["rule_spec"]
+        test_code = existing["test_code"]
+        pipeline = existing["pipeline"]
+    else:
+        test_kind = "pipeline"
+        rule_spec = None
+        test_code = None
+        pipeline = None
 
     repo.upsert_control(
         conn,
@@ -300,11 +294,6 @@ def _save_from_form(conn: sqlite3.Connection, form: Any) -> str:
         failure_threshold_pct=float(pct) if pct else None,
         failure_threshold_count=int(cnt) if cnt else None,
     )
-    # Auto-bind every source B referenced by a cross-source condition so the
-    # runner can load it — the analyst need not also tick B's checkbox.
-    for sid in _cross_source_ids(rule_spec):
-        if sid not in source_ids:
-            source_ids.append(sid)
     repo.set_control_sources(conn, cid, source_ids)
     return cid
 
