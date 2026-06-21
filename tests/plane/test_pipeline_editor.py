@@ -92,7 +92,7 @@ def _seed_terminated_access(client):
 
 
 def _save_pipeline(client, cid, graph):
-    return client.post(f"/controls/{cid}/pipeline",
+    return client.post(f"/controls/{cid}/logic/builder",
                        data={"pipeline_json": json.dumps(graph)},
                        follow_redirects=False)
 
@@ -234,7 +234,7 @@ def test_convert_to_python_sets_kind_and_prefills_code(client):
     _make_control(client, "C1")
     _save_pipeline(client, "C1", _terminated_access_graph())
 
-    resp = client.post("/controls/C1/pipeline/convert", follow_redirects=False)
+    resp = client.post("/controls/C1/logic/convert", follow_redirects=False)
     assert resp.status_code in (302, 303)
     assert resp.headers["location"] == "/controls/C1"
 
@@ -273,7 +273,7 @@ def test_convert_pure_pipeline_yields_runnable_test(client):
     # Saved as a pipeline that compiled to a rule_spec (stays no-code in bundle).
     assert c["test_kind"] == "pipeline" and c["rule_spec"] is not None
 
-    client.post("/controls/C3/pipeline/convert", follow_redirects=False)
+    client.post("/controls/C3/logic/convert", follow_redirects=False)
     conn = _conn(client)
     c = repo.get_control(conn, "C3")
     conn.close()
@@ -315,13 +315,65 @@ def test_custom_node_with_open_shows_inline_offramp_error(client):
 
 
 def test_pipeline_subroute_not_shadowed_by_catch_all(client):
-    """GET /controls/{id}/pipeline resolves to the editor, not the definition
+    """GET /controls/{id}/logic/builder resolves to the editor, not the definition
     catch-all (learning 0007 route-ordering)."""
     routes = [r for r in client.app.router.routes
-              if getattr(r, "path", "") == "/controls/{control_id}/pipeline"
+              if getattr(r, "path", "") == "/controls/{control_id}/logic/builder"
               and "GET" in getattr(r, "methods", set())]
-    assert routes, "pipeline GET sub-route is registered"
+    assert routes, "logic/builder GET sub-route is registered"
     paths = [getattr(r, "path", "") for r in client.app.router.routes]
-    assert paths.index("/controls/{control_id}/pipeline") < paths.index(
+    assert paths.index("/controls/{control_id}/logic/builder") < paths.index(
         "/controls/{control_id}"
-    ), "pipeline sub-route must precede the /{control_id} catch-all"
+    ), "logic/builder sub-route must precede the /{control_id} catch-all"
+
+
+# ---------------------------------------------------------------------------
+# Task 3: Logic sub-routes + tab nav
+# ---------------------------------------------------------------------------
+
+import pytest  # noqa: E402 — added below existing imports for minimal diff
+
+
+@pytest.fixture()
+def seeded_pipeline_control(client):
+    """A control with a minimal 2-node pipeline saved; returns the control id."""
+    _make_source(client, "sp_accounts", b"account_id,is_active\nA1,true\nA2,false\n")
+    cid = "SP1"
+    _make_control(client, cid)
+    graph = {"nodes": [
+        {"id": "imp", "type": "import", "source_id": "sp_accounts"},
+        {"id": "tst", "type": "test", "inputs": ["imp"],
+         "config": {"logic": "all", "severity": "high", "item_key_column": "account_id",
+                    "description_template": "Active {account_id}",
+                    "conditions": [{"column": "is_active", "op": "eq", "value": "true"}]}},
+    ]}
+    r = client.post(f"/controls/{cid}/logic/builder",
+                    data={"pipeline_json": json.dumps(graph)},
+                    follow_redirects=False)
+    assert r.status_code in (302, 303, 307), f"save failed: {r.status_code}"
+    return cid
+
+
+def test_logic_subroutes_render(client, seeded_pipeline_control):
+    cid = seeded_pipeline_control
+    for sub in ("builder", "flowchart", "python"):
+        r = client.get(f"/controls/{cid}/logic/{sub}")
+        assert r.status_code == 200, f"/logic/{sub} returned {r.status_code}"
+        assert 'class="tab active"' in r.text, f"/logic/{sub}: no active sub-tab"
+
+
+def test_logic_bare_redirects_to_builder(client, seeded_pipeline_control):
+    r = client.get(f"/controls/{seeded_pipeline_control}/logic", follow_redirects=False)
+    assert r.status_code in (302, 307)
+    assert r.headers["location"].endswith("/logic/builder")
+
+
+def test_old_pipeline_url_redirects(client, seeded_pipeline_control):
+    r = client.get(f"/controls/{seeded_pipeline_control}/pipeline", follow_redirects=False)
+    assert r.status_code in (301, 308)
+    assert r.headers["location"].endswith("/logic/builder")
+
+
+def test_control_tab_says_logic_not_pipeline(client, seeded_pipeline_control):
+    r = client.get(f"/controls/{seeded_pipeline_control}/logic/builder")
+    assert ">Logic<" in r.text and ">Pipeline<" not in r.text

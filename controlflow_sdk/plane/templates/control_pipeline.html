@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ project.name }} — Pipeline: {{ control.title if control else control_id }}{% endblock %}
+{% block title %}{{ project.name }} — Logic: {{ control.title if control else control_id }}{% endblock %}
 {% block head %}
 <style>
   /* ── stacked node cards ─────────────────────────────────────────────── */
@@ -66,10 +66,11 @@
 {% block body %}
 <a class="crumb" href="/controls/{{ control_id }}">← {{ control.title if control else control_id }}</a>
 <div class="page-head">
-  <h1>Pipeline</h1>
+  <h1>Logic</h1>
   <p class="muted mono">{{ control_id }}</p>
 </div>
 {% if control %}{% include "_control_tabs.html" %}{% endif %}
+{% if logic_tab is defined %}{% include "partials/_logic_tabs.html" %}{% endif %}
 
 <p class="lead">Build the control as a flow of typed steps. Data enters only through
   <strong>Import</strong> nodes; the row-count after each step is your sanity check
@@ -85,7 +86,7 @@
 <div class="banner banner-error" role="alert">{{ parse_error }}</div>
 {% endif %}
 
-<form method="post" action="/controls/{{ control_id }}/pipeline" id="pipeline-form">
+<form method="post" action="/controls/{{ control_id }}/logic/builder" id="pipeline-form">
   <input type="hidden" name="pipeline_json" id="pipeline-json" value="">
 
   <div class="card">
@@ -125,7 +126,7 @@
   <div class="card-head">
     <h2>Generated Python</h2>
     <div class="spacer"></div>
-    <form method="post" action="/controls/{{ control_id }}/pipeline/convert"
+    <form method="post" action="/controls/{{ control_id }}/logic/convert"
           onsubmit="return confirm('Convert this pipeline into a full Python test? This is a one-way door — the visual steps become editable Python and the graph is replaced.');">
       <button class="btn btn-sm btn-ghost" type="submit">Convert to Python test →</button>
     </form>

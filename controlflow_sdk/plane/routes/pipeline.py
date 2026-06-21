@@ -433,17 +433,53 @@ def register(
     # so they cannot be shadowed (learning 0007). NOTE: controls.register() is
     # called AFTER pipeline.register() in app.py for the same reason.
 
-    @app.get("/controls/{control_id}/pipeline", response_class=HTMLResponse)
-    def pipeline_editor(
+    # --- Logic sub-route redirects -------------------------------------------
+
+    @app.get("/controls/{control_id}/logic")
+    def logic_redirect(control_id: str) -> Any:
+        return RedirectResponse(f"/controls/{control_id}/logic/builder", status_code=302)
+
+    # --- Logic sub-route GETs ------------------------------------------------
+
+    @app.get("/controls/{control_id}/logic/builder", response_class=HTMLResponse)
+    def logic_builder(
         control_id: str,
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
     ) -> Any:
         root = request.app.state.project_root
         ctx = _editor_context(request, conn, root, control_id)
+        ctx["active"] = "logic"
+        ctx["logic_tab"] = "builder"
         return templates.TemplateResponse(request, "control_pipeline.html", ctx)
 
-    @app.post("/controls/{control_id}/pipeline")
+    @app.get("/controls/{control_id}/logic/flowchart", response_class=HTMLResponse)
+    def logic_flowchart(
+        control_id: str,
+        request: Request,
+        conn: sqlite3.Connection = Depends(get_conn),
+    ) -> Any:
+        root = request.app.state.project_root
+        ctx = _editor_context(request, conn, root, control_id)
+        ctx["active"] = "logic"
+        ctx["logic_tab"] = "flowchart"
+        return templates.TemplateResponse(request, "control_pipeline.html", ctx)
+
+    @app.get("/controls/{control_id}/logic/python", response_class=HTMLResponse)
+    def logic_python(
+        control_id: str,
+        request: Request,
+        conn: sqlite3.Connection = Depends(get_conn),
+    ) -> Any:
+        root = request.app.state.project_root
+        ctx = _editor_context(request, conn, root, control_id)
+        ctx["active"] = "logic"
+        ctx["logic_tab"] = "python"
+        return templates.TemplateResponse(request, "control_pipeline.html", ctx)
+
+    # --- Logic POST (save builder graph) -------------------------------------
+
+    @app.post("/controls/{control_id}/logic/builder")
     async def save_pipeline(control_id: str, request: Request) -> Any:
         from controlflow_sdk.plane.routes.controls import _save_pipeline_graph
 
@@ -466,14 +502,18 @@ def register(
                 # The just-rejected graph isn't persisted; render the SUBMITTED
                 # graph so the author sees their edits + inline node errors.
                 ctx["graph_json"] = json.dumps(graph)
+                ctx["active"] = "logic"
+                ctx["logic_tab"] = "builder"
                 return templates.TemplateResponse(
                     request, "control_pipeline.html", ctx, status_code=422
                 )
-            return RedirectResponse(f"/controls/{control_id}/pipeline", status_code=303)
+            return RedirectResponse(f"/controls/{control_id}/logic/builder", status_code=303)
         finally:
             conn.close()
 
-    @app.post("/controls/{control_id}/pipeline/convert")
+    # --- Logic POST (convert to Python) --------------------------------------
+
+    @app.post("/controls/{control_id}/logic/convert")
     async def convert_to_python(control_id: str, request: Request) -> Any:
         """One-way door (§9): compile the pipeline → ``test(pop, sources)`` and
         switch the control to ``test_kind='python'``, dropping the author into the
@@ -484,13 +524,13 @@ def register(
             control = repo.get_control(conn, control_id)
             if control is None or not control.get("pipeline"):
                 return RedirectResponse(
-                    f"/controls/{control_id}/pipeline", status_code=303
+                    f"/controls/{control_id}/logic/python", status_code=303
                 )
             try:
                 parsed = parse_pipeline(control["pipeline"])
             except PipelineError:
                 return RedirectResponse(
-                    f"/controls/{control_id}/pipeline", status_code=303
+                    f"/controls/{control_id}/logic/python", status_code=303
                 )
             # The offramp always graduates to runnable Python — for the pure
             # case this is the rule_spec rendered as an equivalent test().
@@ -512,3 +552,11 @@ def register(
             return RedirectResponse(f"/controls/{control_id}", status_code=303)
         finally:
             conn.close()
+
+    # --- Legacy /pipeline GET redirect (301 permanent) -----------------------
+
+    @app.get("/controls/{control_id}/pipeline")
+    def pipeline_redirect(control_id: str) -> Any:
+        return RedirectResponse(
+            f"/controls/{control_id}/logic/builder", status_code=301
+        )
