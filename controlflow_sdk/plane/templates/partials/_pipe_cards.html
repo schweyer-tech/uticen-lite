@@ -1,0 +1,10 @@
+{# Re-renderable cards fragment — inner content of #pipe-cards.
+   HTMX swaps this into #pipe-cards when the AI apply endpoint succeeds.
+   Context vars: nodes, sources, op_choices, join_mode_choices.
+#}
+{% for node in nodes %}
+  {% if not loop.first %}<div class="pipe-connector"></div>{% endif %}
+  {% include "partials/_pipe_node.html" %}
+{% else %}
+<p class="muted">No steps yet. Add an Import node to bind your first source.</p>
+{% endfor %}

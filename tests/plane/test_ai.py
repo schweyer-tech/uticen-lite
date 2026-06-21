@@ -224,4 +224,77 @@ def test_editor_shows_draft_when_configured(client, monkeypatch):
     _configure_ai(client)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     page = client.get(f"/controls/{cid}/logic/builder").text
-    assert 'hx-post="/controls/ai/draft"' in page
+    # F3: the button now posts to the per-control ai-apply endpoint so the
+    # drafted conditions are applied directly into the Test node (not previewed
+    # in a separate panel).
+    assert f'hx-post="/controls/{cid}/logic/ai-apply"' in page
+
+
+# --------------------------------------------------------------------------- #
+# F3: AI draft auto-applies into the Test node (pipe-cards partial)
+# --------------------------------------------------------------------------- #
+def test_ai_apply_populates_test_node_conditions(client, monkeypatch):
+    """POSTing to /controls/<id>/logic/ai-apply returns a pipe-cards partial
+    whose Test node card contains the drafted column/op/value — not merely a
+    preview panel.  No DB write happens (controls list stays unchanged)."""
+    _make_source(client)
+    cid = _make_control(client)
+    _configure_ai(client)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    _patch_fake_backend(monkeypatch, {
+        "logic": "all",
+        "severity": "high",
+        "conditions": [
+            {"column": "amount", "op": "gt", "value": 100},
+            {"column": "approved_by", "op": "is_empty"},
+        ],
+    })
+
+    # Submit the current (empty) graph from the builder.
+    import json as _json
+    empty_graph = _json.dumps({"nodes": []})
+    resp = client.post(
+        f"/controls/{cid}/logic/ai-apply",
+        data={"pipeline_json": empty_graph},
+    )
+
+    assert resp.status_code == 200
+    html = resp.text
+
+    # The response must be a pipe-cards fragment containing a Test node
+    # with the drafted conditions rendered as editable inputs — column
+    # values appear as selected options or input values.
+    assert "amount" in html
+    assert "approved_by" in html
+    # The Test node card rendered (data-type="test" marker is present).
+    assert 'data-type="test"' in html
+    # The gt operator appears in the rendered condition row.
+    assert "gt" in html
+
+    # No control was created or modified — it's preview-only until Save.
+    conn = connect(client.app.state.project_root)
+    controls = repo.list_controls(conn)
+    conn.close()
+    # The control we created above is still there but its pipeline is NOT
+    # updated — the apply endpoint never persists.
+    assert len(controls) == 1
+    assert controls[0]["pipeline"] is None  # still unpersisted
+
+
+def test_ai_apply_no_provider_returns_oob_error(client, monkeypatch):
+    """When no AI provider is configured, ai-apply returns an OOB error
+    fragment for #ai-draft-panel and leaves #pipe-cards untouched."""
+    _make_source(client)
+    cid = _make_control(client)
+    monkeypatch.setattr(
+        "controlflow_sdk.ai.draft.get_provider",
+        lambda provider: (_ for _ in ()).throw(AssertionError("must not call")),
+    )
+    resp = client.post(
+        f"/controls/{cid}/logic/ai-apply",
+        data={"pipeline_json": "{}"},
+    )
+    assert resp.status_code == 200
+    assert "not configured" in resp.text.lower()
+    # OOB swap target marker must be present so HTMX routes the error.
+    assert "ai-draft-panel" in resp.text
