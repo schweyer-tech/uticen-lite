@@ -275,13 +275,20 @@ def _row_counts(
 
     Returns ``{}`` when a source is unbound/missing or the probe fails (the
     template then renders "—"); never raises into the request.
+
+    Catches both ``RowCountError`` (runtime failures in the probe) and
+    ``RuleSpecError`` (an incomplete/malformed Test-node condition — e.g. a
+    condition with ``column=""`` added via "+ Add condition" before the author
+    fills it in).  Row counts are a non-critical preview; an in-progress graph
+    must NOT crash the editor.
     """
     from controlflow_sdk.pipeline.rowcounts import RowCountError, compute_row_counts
+    from controlflow_sdk.rules.spec import RuleSpecError
 
     frames = _load_sample_frames(conn, root, pipeline.import_source_ids())
     try:
         return compute_row_counts(pipeline, frames)
-    except RowCountError:
+    except (RowCountError, RuleSpecError):
         return {}
 
 

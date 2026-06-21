@@ -632,3 +632,65 @@ def test_cross_source_condition_preserved_through_builder_save(client):
     assert saved_cond.get("other_key") == "employee_id", (
         f"other_key={saved_cond.get('other_key')!r} after re-save — dropped"
     )
+
+
+# ---------------------------------------------------------------------------
+# Task 9: incomplete Test-node condition must NOT 500 the Builder GET
+# ---------------------------------------------------------------------------
+
+def test_builder_degrades_gracefully_on_incomplete_test_condition(client):
+    """GET /controls/{id}/logic/builder must return 200 (not 500) when the stored
+    pipeline graph has a Test node with an incomplete condition (column="").
+
+    Root cause: _row_counts() calls compute_row_counts() which parses the rule
+    spec and raises RuleSpecError on an empty column — but _row_counts only caught
+    RowCountError.  Row counts are non-critical preview; an incomplete in-progress
+    graph must degrade to empty counts (template shows "—"), not 500.
+    """
+    # Persist a control with an INCOMPLETE Test node (column="" is invalid).
+    _make_source(client, "inc_accounts", b"account_id,status\nA1,active\n")
+    _make_control(client, "INC1")
+
+    # Construct the stored graph directly via repo so the save path's validation
+    # is bypassed (the save route would reject it; we need the GET to survive it
+    # when the graph is already in that state — e.g. after a partial migration).
+    from controlflow_sdk.store import repo
+    conn = _conn(client)
+    ctrl = repo.get_control(conn, "INC1")
+    incomplete_graph = {
+        "nodes": [
+            {"id": "imp", "type": "import", "source_id": "inc_accounts", "narrative": ""},
+            {"id": "tst", "type": "test", "inputs": ["imp"], "narrative": "",
+             "config": {
+                 "logic": "all",
+                 "severity": "high",
+                 "item_key_column": "account_id",
+                 "description_template": "Account {account_id}",
+                 # INCOMPLETE condition: column="" triggers RuleSpecError in parse_rule_spec
+                 "conditions": [{"column": "", "op": "eq", "value": "active"}],
+             }},
+        ]
+    }
+    repo.upsert_control(
+        conn,
+        id=ctrl["id"],
+        title=ctrl["title"],
+        objective=ctrl["objective"],
+        narrative=ctrl["narrative"],
+        framework_refs=ctrl["framework_refs"],
+        test_kind="pipeline",
+        rule_spec=None,
+        test_code=None,
+        pipeline=incomplete_graph,
+        failure_threshold_pct=ctrl["failure_threshold_pct"],
+        failure_threshold_count=ctrl["failure_threshold_count"],
+    )
+    conn.close()
+
+    # The builder GET must return 200 (not 500) despite the broken condition.
+    r = client.get("/controls/INC1/logic/builder")
+    assert r.status_code == 200, (
+        f"Expected 200 but got {r.status_code} — incomplete Test-node condition 500s the editor"
+    )
+    # The node cards must still render (import + test nodes visible).
+    assert "data-node=" in r.text, "node cards missing from builder response"
