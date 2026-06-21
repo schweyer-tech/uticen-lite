@@ -27,11 +27,22 @@ Import and Test cards don't collide):
   - item key:  ``[data-node="tst"] [data-itemkey]``
 - Save:        ``button[type=submit]`` (text "Save pipeline")
 
-Clicking ``[data-add-cond]`` serialises the current card state to
-``pipeline_json`` and submits the form to POST /controls/{id}/logic/builder,
-which saves the pipeline and 303-redirects back to the Builder GET — the
-re-render shows the new empty condition row with the source's column dropdown
-pre-populated from the bound Import node.
+Clicking ``[data-add-cond]`` serialises the current card state via JS
+``serialize()`` (reading all [data-cond] rows, [data-severity], [data-desc],
+[data-itemkey] from the DOM), writes ``pipeline_json``, and submits the form to
+POST /controls/{id}/logic/builder, which saves the pipeline and 303-redirects
+back to the Builder GET — the re-render shows the new empty condition row with
+the source's column dropdown pre-populated from the bound Import node.
+
+The authoring sequence for the two-condition rule is therefore:
+  1. Set severity/desc/itemkey on the initial 0-condition scaffold.
+  2. Click ``[data-add-cond]`` — auto-save+redirect → GET re-renders Test node
+     with 1 empty condition row (column <select> pre-filled from the users source).
+  3. Fill condition row 0: select column=user_id, op=eq, value=U1.
+  4. Click ``[data-add-cond]`` again — auto-save+redirect → GET re-renders Test
+     node with condition row 0 preserved and a new empty condition row 1.
+  5. Fill condition row 1: select column=can_create, op=not_empty.
+  6. Click "Save pipeline" — final save+redirect, pipeline stored.
 """
 
 import json
@@ -102,14 +113,7 @@ def test_author_run_export_smoke(page: Page, live_server: str, tmp_path: Path) -
 
     test_card = page.locator('[data-node="tst"]')
 
-    # The Builder's JS serialises card DOM into a #pipeline-json hidden field on
-    # every submit. Rather than clicking "+ Add condition" (which auto-saves an
-    # intermediate pipeline with empty condition columns, crashing the row-count
-    # probe on the next GET), we:
-    #   1. Fill the Test node's fixed fields (severity, description, item key)
-    #      in the DOM so the JS serialize() picks them up.
-    #   2. Inject the complete two-condition array directly into the JS `graph`
-    #      object via page.evaluate(), update #pipeline-json, and submit once.
+    # Author the two-condition rule via the REAL Builder UI.
     #
     # Conditions:
     #   - user_id eq U1        (AND)
@@ -117,96 +121,53 @@ def test_author_run_export_smoke(page: Page, live_server: str, tmp_path: Path) -
     # Logic ALL (AND): only U1 satisfies both (user_id='U1' and can_create='true'
     # is truthy). U2 has user_id='U2' ≠ 'U1', so the first condition fails → U2
     # is NOT flagged. Exactly 1 exception: U1.
+    #
+    # The scaffold starts with 0 conditions. Each "[data-add-cond]" click serialises
+    # the current card DOM (via JS serialize()), appends an empty condition to the
+    # in-memory graph, writes #pipeline-json, and submits the form. The server saves
+    # the pipeline and 303-redirects to the GET, which re-renders the Test node with
+    # the new empty condition row and the source's column <select> pre-populated.
+    # We therefore set severity/desc/itemkey before the first click so they are
+    # saved in the initial POST; the re-renders restore them from the stored graph.
 
-    # Fill the Test card's fixed fields in the DOM so the JS serialize() picks
-    # them up (severity, description template, item key).
+    # --- Step 1: set fixed fields on the initial 0-condition scaffold, then add
+    #             condition 0 (saves scaffold fields + adds empty condition row). ---
     test_card.locator("[data-severity]").select_option("high")
     test_card.locator("[data-desc]").fill("User {user_id} flagged")
-    # item key: when the source is bound, [data-itemkey] is a <select>; pick user_id.
+    # item key: source is bound so [data-itemkey] is a <select>; pick user_id.
     test_card.locator("[data-itemkey]").select_option("user_id")
+    # Click "+ Add condition" — JS serialises the card, adds an empty condition,
+    # and submits the form. Wait for the resulting full-page navigation.
+    with page.expect_navigation():
+        test_card.locator("[data-add-cond]").click()
+    expect(page).to_have_url(base + "/controls/sod/logic/builder")
 
-    # Inject the two conditions. The Builder JS's serialize() reads [data-cond]
-    # rows from the DOM and rebuilds conditions from scratch — so we cannot just
-    # set pipeline-json directly (the submit listener overrides it). Instead we
-    # inject real DOM rows that serialize() will read correctly:
-    #   Row 0: column=user_id, op=eq, value=U1
-    #   Row 1: column=can_create, op=not_empty
-    # We do this by directly appending the DOM elements the template would have
-    # rendered, then let the normal "Save pipeline" submit serialise them.
-    #
-    # Logic ALL (AND): only U1 satisfies both (user_id='U1' and can_create='true'
-    # is truthy). U2 has user_id='U2' ≠ 'U1', so the first condition fails.
-    # Exactly 1 exception: U1.
-    page.evaluate("""() => {
-        const testCard = document.querySelector('[data-node="tst"]');
-        const pipeBody = testCard.querySelector('.pipe-body');
+    # --- Step 2: condition row 0 is now rendered with a column <select> (source
+    #             'users' is bound so the server pre-populates it). Fill it:
+    #             column=user_id, op=eq, value=U1. Then add condition 1. ---
+    test_card = page.locator('[data-node="tst"]')
+    cond_rows = test_card.locator("[data-cond]")
+    row0 = cond_rows.nth(0)
+    row0.locator("[data-cond-col]").select_option("user_id")
+    row0.locator("[data-cond-op]").select_option("eq")
+    row0.locator("[data-cond-val]").fill("U1")
+    # Click "+ Add condition" again — saves condition 0 + appends empty condition 1.
+    with page.expect_navigation():
+        test_card.locator("[data-add-cond]").click()
+    expect(page).to_have_url(base + "/controls/sod/logic/builder")
 
-        function makeCondRow(col, op, val) {
-            const div = document.createElement('div');
-            div.className = 'pipe-cond';
-            div.setAttribute('data-cond', '');
+    # --- Step 3: condition row 1 is now rendered. Fill it:
+    #             column=can_create, op=not_empty (no value needed). ---
+    test_card = page.locator('[data-node="tst"]')
+    cond_rows = test_card.locator("[data-cond]")
+    row1 = cond_rows.nth(1)
+    row1.locator("[data-cond-col]").select_option("can_create")
+    row1.locator("[data-cond-op]").select_option("not_empty")
 
-            // column: plain text input (no source columns in the scaffold yet)
-            const colInput = document.createElement('input');
-            colInput.type = 'text';
-            colInput.setAttribute('data-cond-col', '');
-            colInput.value = col;
-            div.appendChild(colInput);
-
-            // hidden free-text sibling (required by serialize when col is a select)
-            const freeInput = document.createElement('input');
-            freeInput.type = 'hidden';
-            freeInput.setAttribute('data-cond-col-free', '');
-            freeInput.value = '';
-            div.appendChild(freeInput);
-
-            // operator select
-            const opSel = document.createElement('select');
-            opSel.setAttribute('data-cond-op', '');
-            ['eq','ne','gt','ge','lt','le','is_empty','not_empty',
-             'in','not_in','regex','is_duplicate','exists_in','not_exists_in'
-            ].forEach(function(o) {
-                const opt = document.createElement('option');
-                opt.value = o; opt.text = o;
-                if (o === op) { opt.selected = true; }
-                opSel.appendChild(opt);
-            });
-            div.appendChild(opSel);
-
-            // value input
-            const valInput = document.createElement('input');
-            valInput.type = 'text';
-            valInput.setAttribute('data-cond-val', '');
-            valInput.value = val || '';
-            div.appendChild(valInput);
-
-            // hidden cross-source span (needed by serialize to avoid null errors)
-            const xsrc = document.createElement('span');
-            xsrc.setAttribute('data-xsrc', '');
-            xsrc.style.display = 'none';
-            div.appendChild(xsrc);
-
-            return div;
-        }
-
-        // Insert the two condition rows before the "+ Add condition" row.
-        const addBtn = testCard.querySelector('[data-add-cond]');
-        const addRow = addBtn ? addBtn.closest('.pipe-row') : null;
-        const row0 = makeCondRow('user_id', 'eq', 'U1');
-        const row1 = makeCondRow('can_create', 'not_empty', '');
-        if (addRow) {
-            pipeBody.insertBefore(row0, addRow);
-            pipeBody.insertBefore(row1, addRow);
-        } else {
-            pipeBody.appendChild(row0);
-            pipeBody.appendChild(row1);
-        }
-    }""")
-
-    # Save the pipeline. The form's submit listener calls serialize() which now
-    # reads the two injected [data-cond] rows and writes the complete pipeline
-    # graph to #pipeline-json, then POSTs to /controls/sod/logic/builder.
-    # On success: 303-redirect back to the Builder GET.
+    # --- Step 4: save the final pipeline. The form's submit listener calls
+    #             serialize() which reads both [data-cond] rows and the fixed
+    #             fields, writes #pipeline-json, and POSTs to the builder endpoint.
+    #             On success: 303-redirect back to the Builder GET. ---
     page.click("button:has-text('Save pipeline')")
     expect(page).to_have_url(base + "/controls/sod/logic/builder")
 
