@@ -1,3 +1,13 @@
+from controlflow_sdk.plane.__main__ import launch_banner
+
+
+def test_launch_banner_names_both_entry_points():
+    b = launch_banner("127.0.0.1", 8765)
+    assert "http://127.0.0.1:8765" in b
+    assert "controlplane" in b
+    assert "python -m controlflow_sdk.plane" in b
+
+
 def test_dashboard_renders(client):
     resp = client.get("/")
     assert resp.status_code == 200

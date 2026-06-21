@@ -1,28 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ project.name }} — {% if control %}Edit: {{ control.title }}{% else %}New Control{% endif %}{% endblock %}
-{% block head %}
-<link rel="stylesheet" href="/static/codemirror.min.css">
-<style>
-  /* Dark CodeMirror theme to match the control-plane palette. Loaded after
-     codemirror.min.css so these win. */
-  .CodeMirror {
-    background: var(--bg-input); color: var(--text-primary);
-    border: 1px solid var(--border-default); border-radius: var(--radius-input);
-    font-family: var(--font-mono); font-size: 12px; height: auto;
-  }
-  .CodeMirror-gutters { background: var(--bg-surface-1); border-right: 1px solid var(--border-default); }
-  .CodeMirror-linenumber { color: var(--text-tertiary); }
-  .CodeMirror-cursor { border-left: 1px solid var(--text-primary); }
-  .CodeMirror-selected { background: var(--accent-muted) !important; }
-  .cm-s-default .cm-keyword { color: var(--cm-keyword); }
-  .cm-s-default .cm-def, .cm-s-default .cm-variable { color: var(--text-primary); }
-  .cm-s-default .cm-string { color: var(--cm-string); }
-  .cm-s-default .cm-number { color: var(--cm-number); }
-  .cm-s-default .cm-comment { color: var(--text-tertiary); }
-  .cm-s-default .cm-builtin, .cm-s-default .cm-atom { color: var(--cm-builtin); }
-  .cm-s-default .cm-operator { color: var(--text-secondary); }
-</style>
-{% endblock %}
+{% block head %}{% endblock %}
 {% block body %}
 <a class="crumb" href="/">← Controls</a>
 <div class="page-head">
@@ -105,110 +83,9 @@
     {% endif %}
   </div>
 
-  <div class="card">
-    <div class="card-head">
-      <h2>Test logic</h2>
-      <div class="spacer"></div>
-      <div class="radio-row">
-        <label><input type="radio" name="test_kind" value="rule" data-test-toggle
-                      {% if not control or control.test_kind == 'rule' %}checked{% endif %}> No-code rule</label>
-        <label><input type="radio" name="test_kind" value="python" data-test-toggle
-                      {% if control and control.test_kind == 'python' %}checked{% endif %}> Python</label>
-      </div>
-    </div>
-
-    <div data-pane="rule">
-      <div class="ai-draft-bar" style="margin-bottom:12px;">
-        {% if ai_enabled %}
-        <button class="btn btn-sm btn-ghost" type="button"
-                hx-post="/controls/ai/draft"
-                hx-include="#f-obj, input[name=source_ids]"
-                hx-target="#rule-builder-pane" hx-swap="innerHTML">
-          Draft with AI
-        </button>
-        <span class="hint" style="margin:0;">Proposes a rule from the objective + the primary source — review before saving.</span>
-        {% else %}
-        <a class="btn btn-sm btn-ghost" href="/settings/ai">Enable AI drafting…</a>
-        {% endif %}
-      </div>
-      <div id="rule-builder-pane">
-        {% include "partials/rule_builder.html" %}
-      </div>
-    </div>
-
-    <div data-pane="python">
-      <p class="lead">Escape hatch — return violations from a Python <code class="mono">test()</code> function.</p>
-      <textarea name="test_code" rows="15">{{ control.test_code if control and control.test_code else '' }}</textarea>
-    </div>
-  </div>
-
   <div class="page-actions">
     <button class="btn btn-primary" type="submit">{% if control %}Save changes{% else %}Create control{% endif %}</button>
     <a class="btn btn-ghost" href="/">Cancel</a>
   </div>
 </form>
-
-<script src="/static/codemirror.min.js"></script>
-<script src="/static/codemirror-python.min.js"></script>
-<script>
-  (function () {
-    var cm = null;
-    var textarea = document.querySelector('textarea[name="test_code"]');
-    if (textarea && typeof window.CodeMirror !== "undefined") {
-      cm = window.CodeMirror.fromTextArea(textarea, {
-        mode: "python", lineNumbers: true, indentUnit: 4, matchBrackets: true
-      });
-    }
-
-    function syncPanes() {
-      var kind = document.querySelector('input[name="test_kind"]:checked');
-      kind = kind ? kind.value : "rule";
-      document.querySelectorAll('[data-pane]').forEach(function (pane) {
-        pane.style.display = pane.getAttribute('data-pane') === kind ? "" : "none";
-      });
-      if (cm && kind === "python") { cm.refresh(); }
-    }
-    document.querySelectorAll('[data-test-toggle]').forEach(function (el) {
-      el.addEventListener('change', syncPanes);
-    });
-    syncPanes();
-
-    // Pass the rule's primary source (first checked source) to the add-condition
-    // partial so new rows get the right column dropdown. This is a one-field
-    // request rewrite, not client-side tabs (learning 0007 unaffected).
-    document.body.addEventListener('htmx:configRequest', function (e) {
-      if (e.detail.elt.matches('[hx-get*="_condition_row"]')) {
-        var first = document.querySelector('input[name="source_ids"]:checked');
-        if (first) { e.detail.parameters['source_id'] = first.value; }
-      }
-    });
-
-    // Within a condition row: reveal the cross-source fields when the op is a
-    // cross-source op, and reveal the free-text column box when "Other" is picked.
-    function syncRow(row) {
-      var op = row.querySelector('[data-op-select]');
-      var xsrc = row.querySelector('[data-xsrc]');
-      var val = row.querySelector('[data-val]');
-      var isXsrc = op && (op.value === 'exists_in' || op.value === 'not_exists_in');
-      if (xsrc) { xsrc.style.display = isXsrc ? '' : 'none'; }
-      if (val) { val.style.display = isXsrc ? 'none' : ''; }
-      var sel = row.querySelector('[data-col-select]');
-      var free = row.querySelector('[data-col-freetext]');
-      if (sel && free && free.type !== 'hidden') {
-        free.style.display = (sel.value === '__other__') ? '' : 'none';
-      }
-    }
-    function wireRow(row) {
-      row.querySelectorAll('[data-op-select], [data-col-select]').forEach(function (el) {
-        el.addEventListener('change', function () { syncRow(row); });
-      });
-      syncRow(row);
-    }
-    document.querySelectorAll('[data-condition]').forEach(wireRow);
-    // Newly added rows (HTMX swap) get wired too.
-    document.body.addEventListener('htmx:afterSwap', function (e) {
-      e.target.querySelectorAll('[data-condition]').forEach(wireRow);
-    });
-  })();
-</script>
 {% endblock %}

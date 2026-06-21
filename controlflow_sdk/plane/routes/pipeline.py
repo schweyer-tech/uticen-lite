@@ -32,6 +32,7 @@ from fastapi.templating import Jinja2Templates
 
 from controlflow_sdk.pipeline.compile import compile_pipeline
 from controlflow_sdk.pipeline.model import Pipeline, PipelineError, parse_pipeline
+from controlflow_sdk.plane.logic_view import derive_builder_graph, is_raw_python
 from controlflow_sdk.store import repo
 from controlflow_sdk.store.db import connect
 
@@ -44,6 +45,8 @@ OP_CHOICES: list[tuple[str, str]] = [
     ("not_empty", "not_empty"), ("in", "in (pipe-separated)"),
     ("not_in", "not_in (pipe-separated)"), ("regex", "regex"),
     ("is_duplicate", "is_duplicate"),
+    ("exists_in", "exists in another source"),
+    ("not_exists_in", "not in another source"),
 ]
 JOIN_MODE_CHOICES: list[tuple[str, str]] = [
     ("inner", "inner — keep left rows with a match"),
@@ -272,13 +275,20 @@ def _row_counts(
 
     Returns ``{}`` when a source is unbound/missing or the probe fails (the
     template then renders "—"); never raises into the request.
+
+    Catches both ``RowCountError`` (runtime failures in the probe) and
+    ``RuleSpecError`` (an incomplete/malformed Test-node condition — e.g. a
+    condition with ``column=""`` added via "+ Add condition" before the author
+    fills it in).  Row counts are a non-critical preview; an in-progress graph
+    must NOT crash the editor.
     """
     from controlflow_sdk.pipeline.rowcounts import RowCountError, compute_row_counts
+    from controlflow_sdk.rules.spec import RuleSpecError
 
     frames = _load_sample_frames(conn, root, pipeline.import_source_ids())
     try:
         return compute_row_counts(pipeline, frames)
-    except RowCountError:
+    except (RowCountError, RuleSpecError):
         return {}
 
 
@@ -313,13 +323,29 @@ def _editor_context(
     request: Request, conn: sqlite3.Connection, root: Any, control_id: str,
     *, save_errors: list[str] | None = None,
     node_errors: dict[str, list[str]] | None = None,
+    for_builder: bool = False,
 ) -> dict[str, Any]:
-    """Build the full template context for the pipeline editor tab."""
+    """Build the full template context for the pipeline editor tab.
+
+    When ``for_builder=True`` the node cards are rendered from the *derived*
+    graph (``derive_builder_graph``) so that rule-spec and empty controls show
+    a meaningful Import→Test scaffold in the Builder, and the ``raw_python``
+    flag is set so the Builder can render the "authored directly in Python"
+    notice instead of node cards for hand-written Python controls.
+    """
     control = repo.get_control(conn, control_id)
     graph = _graph_of(control)
     source_columns = _source_columns(conn)
     sources = repo.list_sources(conn)
 
+    # Derive the graph the Builder should render (may differ from the stored graph).
+    raw_python = is_raw_python(control) if control else False
+    builder_graph: dict[str, Any] | None = None
+    if control is not None:
+        builder_graph = derive_builder_graph(control, list(control.get("source_ids") or []))
+
+    # The graph used for rendering the stored pipeline diagram / generated Python
+    # is always the *stored* graph.  The builder node cards may use a derived graph.
     parsed: Pipeline | None = None
     parse_error: str | None = None
     diagram: dict[str, Any] | None = None
@@ -340,21 +366,50 @@ def _editor_context(
         except Exception as exc:  # noqa: BLE001 — show parse errors, never 500
             parse_error = parse_error or f"could not generate Python: {exc}"
 
-    # Order the raw node dicts topologically for the cards (falls back to as-stored
-    # when the graph can't be parsed yet, so a half-built graph still renders).
-    ordered_nodes = (
-        [_card_vm(n, parsed, stream_columns, counts, node_errors or {})
-         for n in parsed.topological()]
-        if parsed is not None
-        else [_raw_card_vm(n, node_errors or {}) for n in graph.get("nodes", [])]
-    )
+    # For the Builder, render nodes from the *derived* graph so rule-spec /
+    # empty controls show a meaningful scaffold.  Fall back to the stored graph
+    # (and its parsed pipeline) when not building.
+    if for_builder and builder_graph is not None and not raw_python:
+        builder_parsed: Pipeline | None = None
+        builder_stream_cols: dict[str, list[dict]] = {}
+        builder_counts: dict[str, int] = {}
+        if builder_graph.get("nodes"):
+            try:
+                builder_parsed = parse_pipeline(builder_graph)
+            except PipelineError:
+                builder_parsed = None
+        if builder_parsed is not None:
+            builder_counts = _row_counts(conn, root, builder_parsed)
+            builder_stream_cols = _stream_columns(builder_parsed, source_columns)
+        ordered_nodes = (
+            [_card_vm(n, builder_parsed, builder_stream_cols, builder_counts, node_errors or {})
+             for n in builder_parsed.topological()]
+            if builder_parsed is not None
+            else [_raw_card_vm(n, node_errors or {}) for n in builder_graph.get("nodes", [])]
+        )
+        # The form must submit the DERIVED graph (the one the cards were rendered
+        # from), not the stored graph — the stored graph may be empty/absent for a
+        # rule_spec or fresh control, so submitting it would silently discard edits.
+        builder_graph_json = json.dumps(builder_graph)
+    else:
+        # Order the raw node dicts topologically for the cards (falls back to
+        # as-stored when the graph can't be parsed yet).
+        ordered_nodes = (
+            [_card_vm(n, parsed, stream_columns, counts, node_errors or {})
+             for n in parsed.topological()]
+            if parsed is not None
+            else [_raw_card_vm(n, node_errors or {}) for n in graph.get("nodes", [])]
+        )
+        builder_graph_json = json.dumps(graph)
+
+    from controlflow_sdk.plane.routes.ai import _ai_configured
 
     return {
         "project": repo.get_project(conn) or {"name": ""},
         "control": control,
         "control_id": control_id,
         "active": "pipeline",
-        "graph_json": json.dumps(graph),
+        "graph_json": builder_graph_json,
         "nodes": ordered_nodes,
         "diagram": diagram,
         "generated_python": generated,
@@ -363,6 +418,9 @@ def _editor_context(
         "join_mode_choices": JOIN_MODE_CHOICES,
         "parse_error": parse_error,
         "save_errors": save_errors or [],
+        "raw_python": raw_python,
+        "builder_graph": builder_graph,
+        "ai_enabled": _ai_configured(conn),
     }
 
 
@@ -433,17 +491,84 @@ def register(
     # so they cannot be shadowed (learning 0007). NOTE: controls.register() is
     # called AFTER pipeline.register() in app.py for the same reason.
 
-    @app.get("/controls/{control_id}/pipeline", response_class=HTMLResponse)
-    def pipeline_editor(
+    # --- Logic sub-route redirects -------------------------------------------
+
+    @app.get("/controls/{control_id}/logic")
+    def logic_redirect(control_id: str) -> Any:
+        return RedirectResponse(f"/controls/{control_id}/logic/builder", status_code=302)
+
+    # --- Logic sub-route GETs ------------------------------------------------
+
+    @app.get("/controls/{control_id}/logic/builder", response_class=HTMLResponse)
+    def logic_builder(
+        control_id: str,
+        request: Request,
+        conn: sqlite3.Connection = Depends(get_conn),
+    ) -> Any:
+        root = request.app.state.project_root
+        ctx = _editor_context(request, conn, root, control_id, for_builder=True)
+        ctx["active"] = "logic"
+        ctx["logic_tab"] = "builder"
+        return templates.TemplateResponse(request, "logic_builder.html", ctx)
+
+    @app.get("/controls/{control_id}/logic/flowchart", response_class=HTMLResponse)
+    def logic_flowchart(
         control_id: str,
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
     ) -> Any:
         root = request.app.state.project_root
         ctx = _editor_context(request, conn, root, control_id)
-        return templates.TemplateResponse(request, "control_pipeline.html", ctx)
+        ctx["active"] = "logic"
+        ctx["logic_tab"] = "flowchart"
+        return templates.TemplateResponse(request, "logic_flowchart.html", ctx)
 
-    @app.post("/controls/{control_id}/pipeline")
+    @app.get("/controls/{control_id}/logic/python", response_class=HTMLResponse)
+    def logic_python(
+        control_id: str,
+        request: Request,
+        conn: sqlite3.Connection = Depends(get_conn),
+    ) -> Any:
+        root = request.app.state.project_root
+        ctx = _editor_context(request, conn, root, control_id)
+        ctx["active"] = "logic"
+        ctx["logic_tab"] = "python"
+        return templates.TemplateResponse(request, "logic_python.html", ctx)
+
+    # --- Logic POST (save raw Python test_code) ------------------------------
+
+    @app.post("/controls/{control_id}/logic/python")
+    async def save_python(control_id: str, request: Request) -> Any:
+        """Save hand-written test_code for a raw-Python control."""
+        root = request.app.state.project_root
+        conn = connect(root)
+        try:
+            control = repo.get_control(conn, control_id)
+            if control is None:
+                return RedirectResponse(f"/controls/{control_id}/logic/python", status_code=303)
+            form = await request.form()
+            code = str(form.get("test_code", ""))
+            repo.upsert_control(
+                conn,
+                id=control["id"],
+                title=control["title"],
+                objective=control["objective"],
+                narrative=control["narrative"],
+                framework_refs=control["framework_refs"],
+                test_kind="python",
+                rule_spec=None,
+                test_code=code,
+                pipeline=None,
+                failure_threshold_pct=control["failure_threshold_pct"],
+                failure_threshold_count=control["failure_threshold_count"],
+            )
+            return RedirectResponse(f"/controls/{control_id}/logic/python", status_code=303)
+        finally:
+            conn.close()
+
+    # --- Logic POST (save builder graph) -------------------------------------
+
+    @app.post("/controls/{control_id}/logic/builder")
     async def save_pipeline(control_id: str, request: Request) -> Any:
         from controlflow_sdk.plane.routes.controls import _save_pipeline_graph
 
@@ -462,18 +587,23 @@ def register(
                 ctx = _editor_context(
                     request, conn, root, control_id,
                     save_errors=errors, node_errors=node_errors,
+                    for_builder=True,
                 )
                 # The just-rejected graph isn't persisted; render the SUBMITTED
                 # graph so the author sees their edits + inline node errors.
                 ctx["graph_json"] = json.dumps(graph)
+                ctx["active"] = "logic"
+                ctx["logic_tab"] = "builder"
                 return templates.TemplateResponse(
-                    request, "control_pipeline.html", ctx, status_code=422
+                    request, "logic_builder.html", ctx, status_code=422
                 )
-            return RedirectResponse(f"/controls/{control_id}/pipeline", status_code=303)
+            return RedirectResponse(f"/controls/{control_id}/logic/builder", status_code=303)
         finally:
             conn.close()
 
-    @app.post("/controls/{control_id}/pipeline/convert")
+    # --- Logic POST (convert to Python) --------------------------------------
+
+    @app.post("/controls/{control_id}/logic/convert")
     async def convert_to_python(control_id: str, request: Request) -> Any:
         """One-way door (§9): compile the pipeline → ``test(pop, sources)`` and
         switch the control to ``test_kind='python'``, dropping the author into the
@@ -484,13 +614,13 @@ def register(
             control = repo.get_control(conn, control_id)
             if control is None or not control.get("pipeline"):
                 return RedirectResponse(
-                    f"/controls/{control_id}/pipeline", status_code=303
+                    f"/controls/{control_id}/logic/python", status_code=303
                 )
             try:
                 parsed = parse_pipeline(control["pipeline"])
             except PipelineError:
                 return RedirectResponse(
-                    f"/controls/{control_id}/pipeline", status_code=303
+                    f"/controls/{control_id}/logic/python", status_code=303
                 )
             # The offramp always graduates to runnable Python — for the pure
             # case this is the rule_spec rendered as an equivalent test().
@@ -509,6 +639,14 @@ def register(
                 failure_threshold_pct=control["failure_threshold_pct"],
                 failure_threshold_count=control["failure_threshold_count"],
             )
-            return RedirectResponse(f"/controls/{control_id}", status_code=303)
+            return RedirectResponse(f"/controls/{control_id}/logic/python", status_code=303)
         finally:
             conn.close()
+
+    # --- Legacy /pipeline GET redirect (301 permanent) -----------------------
+
+    @app.get("/controls/{control_id}/pipeline")
+    def pipeline_redirect(control_id: str) -> Any:
+        return RedirectResponse(
+            f"/controls/{control_id}/logic/builder", status_code=301
+        )

@@ -43,10 +43,14 @@ def test_save_pure_pipeline_derives_sources_and_compiles_to_rule_spec(client):
          "config": {"logic": "all", "severity": "high", "item_key_column": "account_id",
                     "conditions": [{"column": "is_privileged", "op": "eq", "value": True}]}},
     ]}
-    resp = client.post("/controls", data={
+    # Step 1: create metadata shell.
+    client.post("/controls", data={
         "id": "pipe1", "title": "Pipe", "objective": "o", "narrative": "n",
-        "test_kind": "pipeline", "pipeline_json": json.dumps(graph),
     }, follow_redirects=False)
+    # Step 2: author logic via Builder.
+    resp = client.post("/controls/pipe1/logic/builder",
+                       data={"pipeline_json": json.dumps(graph)},
+                       follow_redirects=False)
     assert resp.status_code in (302, 303)
 
     from controlflow_sdk.store import repo
@@ -82,10 +86,14 @@ def test_save_cross_source_pipeline_compiles_to_test_code(client):
          "config": {"logic": "any", "severity": "critical", "item_key_column": "account_id",
                     "conditions": [{"column": "account_id", "op": "not_empty"}]}},
     ]}
-    resp = client.post("/controls", data={
+    # Step 1: create metadata shell.
+    client.post("/controls", data={
         "id": "pipe2", "title": "Cross", "objective": "", "narrative": "",
-        "test_kind": "pipeline", "pipeline_json": json.dumps(graph),
     }, follow_redirects=False)
+    # Step 2: author logic via Builder.
+    resp = client.post("/controls/pipe2/logic/builder",
+                       data={"pipeline_json": json.dumps(graph)},
+                       follow_redirects=False)
     assert resp.status_code in (302, 303)
 
     from controlflow_sdk.store import repo
@@ -117,10 +125,17 @@ def _custom_pipeline(code: str, flavor: str = "transform") -> dict:
 
 
 def _post_pipeline(client, cid: str, graph: dict):
-    return client.post("/controls", data={
+    """Create a bare control shell then POST the graph to the Builder route.
+
+    Returns the response from the Builder POST (which may be 303 on success or
+    422 on lint failure), mirroring what the tests assert against.
+    """
+    client.post("/controls", data={
         "id": cid, "title": "JE", "objective": "o", "narrative": "n",
-        "test_kind": "pipeline", "pipeline_json": json.dumps(graph),
     }, follow_redirects=False)
+    return client.post(f"/controls/{cid}/logic/builder",
+                       data={"pipeline_json": json.dumps(graph)},
+                       follow_redirects=False)
 
 
 def test_save_rejects_custom_node_that_reads_a_file(client):
@@ -130,11 +145,13 @@ def test_save_rejects_custom_node_that_reads_a_file(client):
     # Refused: re-rendered edit form (422), NOT a 303 redirect, NOT a 500.
     assert resp.status_code == 422
     assert _OFFRAMP_STABLE in resp.text
-    # And nothing was persisted.
+    # The control shell exists but the unsafe pipeline was NOT persisted.
     from controlflow_sdk.store import repo
     conn = _conn(client)
-    assert repo.get_control(conn, "bad1") is None
+    c = repo.get_control(conn, "bad1")
     conn.close()
+    assert c is not None
+    assert c["pipeline"] is None
 
 
 def test_save_rejects_custom_node_using_read_csv(client):
@@ -144,6 +161,11 @@ def test_save_rejects_custom_node_using_read_csv(client):
     assert resp.status_code == 422
     assert "read_csv" in resp.text
     assert _OFFRAMP_STABLE in resp.text
+    from controlflow_sdk.store import repo
+    conn = _conn(client)
+    c = repo.get_control(conn, "bad2")
+    conn.close()
+    assert c is not None and c["pipeline"] is None
 
 
 def test_save_rejects_custom_node_using_dunder_import(client):
@@ -152,6 +174,11 @@ def test_save_rejects_custom_node_using_dunder_import(client):
                           _custom_pipeline("m = __import__('os')\nrows = rows"))
     assert resp.status_code == 422
     assert "__import__" in resp.text
+    from controlflow_sdk.store import repo
+    conn = _conn(client)
+    c = repo.get_control(conn, "bad3")
+    conn.close()
+    assert c is not None and c["pipeline"] is None
 
 
 def test_save_rejects_custom_node_using_eval(client):
@@ -160,6 +187,11 @@ def test_save_rejects_custom_node_using_eval(client):
                           _custom_pipeline("rows = eval('rows')"))
     assert resp.status_code == 422
     assert "eval" in resp.text
+    from controlflow_sdk.store import repo
+    conn = _conn(client)
+    c = repo.get_control(conn, "bad4")
+    conn.close()
+    assert c is not None and c["pipeline"] is None
 
 
 def test_save_accepts_clean_custom_transform_node(client):
@@ -176,3 +208,125 @@ def test_save_accepts_clean_custom_transform_node(client):
     assert c is not None
     assert c["test_kind"] == "pipeline"
     assert "def _node_cust(rows):" in c["test_code"]
+
+
+# ---------------------------------------------------------------------------
+# T8 regression: cross-source exists_in/not_exists_in in Test node
+# ---------------------------------------------------------------------------
+
+def test_save_single_import_test_with_not_exists_in_binds_both_sources(client):
+    """T8 regression: a single-Import pipeline whose Test node has a
+    not_exists_in condition referencing a second source MUST bind both sources.
+
+    Pre-fix, _save_pipeline_graph only called parsed.import_source_ids() which
+    returns only sources bound by Import nodes; the other_source referenced by
+    exists_in/not_exists_in conditions was never added to source_ids.  Running
+    the control then raised "exists_in references unknown source".
+    """
+    # Source A: the primary population (single Import node)
+    _make_source(client, "active_users",
+                 b"user_id,name\nU1,Alice\nU2,Bob\nU3,Carol\n")
+    # Source B: the reference set (referenced only by not_exists_in, no Import node)
+    _make_source(client, "terminated_users",
+                 b"user_id,reason\nU3,resigned\n")
+
+    # Single-Import graph: Import(active_users) → Test with not_exists_in(terminated_users)
+    graph = {"nodes": [
+        {"id": "imp", "type": "import", "source_id": "active_users",
+         "narrative": "All active users"},
+        {"id": "tst", "type": "test", "inputs": ["imp"],
+         "config": {
+             "logic": "all",
+             "severity": "high",
+             "item_key_column": "user_id",
+             "conditions": [
+                 {
+                     "op": "not_exists_in",
+                     "column": "user_id",
+                     "other_source": "terminated_users",
+                     "this_key": "user_id",
+                     "other_key": "user_id",
+                 }
+             ],
+         }},
+    ]}
+
+    # Create the control shell then save the pipeline via the Builder route.
+    client.post("/controls", data={
+        "id": "cross1", "title": "Access vs Terminated", "objective": "o", "narrative": "n",
+    }, follow_redirects=False)
+    resp = client.post("/controls/cross1/logic/builder",
+                       data={"pipeline_json": json.dumps(graph)},
+                       follow_redirects=False)
+    assert resp.status_code in (302, 303), f"save failed: {resp.status_code} {resp.text[:200]}"
+
+    from controlflow_sdk.store import repo
+    conn = _conn(client)
+    c = repo.get_control(conn, "cross1")
+    conn.close()
+
+    # BOTH sources must be bound — active_users (Import) + terminated_users (other_source).
+    assert c is not None
+    assert "active_users" in c["source_ids"], (
+        "Import source must be bound"
+    )
+    assert "terminated_users" in c["source_ids"], (
+        "other_source from not_exists_in condition must also be bound (T8 bug)"
+    )
+    # Import source should come first (deterministic ordering).
+    assert c["source_ids"][0] == "active_users"
+
+
+def test_run_with_not_exists_in_condition_succeeds_without_unknown_source_error(client):
+    """T8 regression: after the fix, running a control with a not_exists_in
+    condition must not raise 'exists_in references unknown source'.
+
+    U3 is in both sources, so the test flags U3 as a violation (active user who
+    is also in the terminated list).  U1 and U2 pass.  We assert a clean run
+    (no RunnerError) and exactly 1 violation.
+    """
+    # Seed both sources.
+    _make_source(client, "active_users2",
+                 b"user_id,name\nU1,Alice\nU2,Bob\nU3,Carol\n")
+    _make_source(client, "terminated_users2",
+                 b"user_id,reason\nU3,resigned\n")
+
+    graph = {"nodes": [
+        {"id": "imp", "type": "import", "source_id": "active_users2"},
+        {"id": "tst", "type": "test", "inputs": ["imp"],
+         "config": {
+             "logic": "all",
+             "severity": "high",
+             "item_key_column": "user_id",
+             "description_template": "User {user_id} is active but terminated",
+             "conditions": [
+                 {
+                     "op": "not_exists_in",
+                     "column": "user_id",
+                     "other_source": "terminated_users2",
+                     "this_key": "user_id",
+                     "other_key": "user_id",
+                 }
+             ],
+         }},
+    ]}
+
+    client.post("/controls", data={
+        "id": "cross2", "title": "Access T8 Run", "objective": "o", "narrative": "n",
+    }, follow_redirects=False)
+    resp = client.post("/controls/cross2/logic/builder",
+                       data={"pipeline_json": json.dumps(graph)},
+                       follow_redirects=False)
+    assert resp.status_code in (302, 303)
+
+    # Run the control — must NOT raise "unknown source" (T8 bug).
+    run_resp = client.post("/controls/cross2/run", follow_redirects=False)
+    assert run_resp.status_code in (302, 303), (
+        f"run failed (unknown-source bug?): {run_resp.status_code} {run_resp.text[:300]}"
+    )
+
+    # Verify the workpaper shows exactly 1 violation (U3).
+    run_url = run_resp.headers["location"]
+    view = client.get(run_url)
+    assert view.status_code == 200
+    assert "U3" in view.text  # the one violation (Carol, in terminated list)

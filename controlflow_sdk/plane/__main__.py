@@ -5,6 +5,14 @@ import webbrowser
 from pathlib import Path
 
 
+def launch_banner(host: str, port: int) -> str:
+    url = f"http://{host}:{port}"
+    return (
+        f"ControlFlow Control Plane — {url}\n"
+        f"  launch with:  controlplane   (or)   python -m controlflow_sdk.plane"
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="controlplane")
     parser.add_argument("--project", default=".")
@@ -20,6 +28,7 @@ def main(argv: list[str] | None = None) -> int:
     app = create_app(Path(args.project))
     if not args.no_browser:
         webbrowser.open(f"http://{args.host}:{args.port}")
+    print(launch_banner(args.host, args.port))
     uvicorn.run(app, host=args.host, port=args.port)
     return 0
 

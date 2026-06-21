@@ -2,18 +2,47 @@
 
 Drives a *live* ``controlplane`` through the real authoring flow with a real
 browser (Chromium via pytest-playwright): upload + map a CSV source → author a
-no-code rule control → run → assert the run view → export the bundle → assert it
-validates against ``contract/bundle.schema.json``. This guards the rendered UI
-end-to-end (the multi-run ordering regression in PR #5 was caught only by human
-review). The export assertion IS the cardinal-rule-0001 contract guard.
+no-code rule control via the Logic ▸ Builder → run → assert the run view →
+export the bundle → assert it validates against ``contract/bundle.schema.json``.
+This guards the rendered UI end-to-end (the multi-run ordering regression in
+PR #5 was caught only by human review). The export assertion IS the cardinal-
+rule-0001 contract guard.
 
 Excluded from the fast unit lane (``addopts = "--ignore=tests/e2e"``); run in CI
 via ``pytest tests/e2e -m browser`` after ``playwright install chromium``.
 
 Every selector below was grounded against the actual HTML rendered by the live
-app via the FastAPI TestClient (the #9 work made the condition COLUMN field a
-server-rendered ``<select>`` for a bound source, with a free-text fallback when
-none is bound — both surfaces are exercised here).
+app (the Builder node cards use ``data-*`` attributes, not ``name`` fields, for
+the JS-serialised graph; the selectors are scoped to ``[data-node="<id>"]`` so
+Import and Test cards don't collide):
+
+- Import card: ``[data-node="src"] [data-source]`` — the source ``<select>``
+- Test card:   ``[data-node="tst"] [data-cond]`` — each condition row
+  - column:    ``[data-cond-col]``  (<select> when source is bound, <input> otherwise)
+  - operator:  ``[data-cond-op]``   (<select>)
+  - value:     ``[data-cond-val]``  (<input type=text>)
+  - add-cond:  ``[data-add-cond]``  (button inside the Test card)
+  - severity:  ``[data-node="tst"] [data-severity]``
+  - description: ``[data-node="tst"] [data-desc]``
+  - item key:  ``[data-node="tst"] [data-itemkey]``
+- Save:        ``button[type=submit]`` (text "Save pipeline")
+
+Clicking ``[data-add-cond]`` serialises the current card state via JS
+``serialize()`` (reading all [data-cond] rows, [data-severity], [data-desc],
+[data-itemkey] from the DOM), writes ``pipeline_json``, and submits the form to
+POST /controls/{id}/logic/builder, which saves the pipeline and 303-redirects
+back to the Builder GET — the re-render shows the new empty condition row with
+the source's column dropdown pre-populated from the bound Import node.
+
+The authoring sequence for the two-condition rule is therefore:
+  1. Set severity/desc/itemkey on the initial 0-condition scaffold.
+  2. Click ``[data-add-cond]`` — auto-save+redirect → GET re-renders Test node
+     with 1 empty condition row (column <select> pre-filled from the users source).
+  3. Fill condition row 0: select column=user_id, op=eq, value=U1.
+  4. Click ``[data-add-cond]`` again — auto-save+redirect → GET re-renders Test
+     node with condition row 0 preserved and a new empty condition row 1.
+  5. Fill condition row 1: select column=can_create, op=not_empty.
+  6. Click "Save pipeline" — final save+redirect, pipeline stored.
 """
 
 import json
@@ -56,48 +85,95 @@ def test_author_run_export_smoke(page: Page, live_server: str, tmp_path: Path) -
     page.click("button[type=submit]")
     expect(page).to_have_url(base + "/sources/users")
 
-    # 3. Author a rule control. GET /controls/new (control_edit.html) renders the
-    #    Details fields, the source checkbox list, and the rule builder. The
-    #    FIRST condition row is a free-text input[name=cond_column] because no
-    #    source is bound at form-render time.
+    # 3. Author a rule control via the Logic ▸ Builder.
+    #
+    #    Step A — create the control (Definition). GET /controls/new renders the
+    #    metadata fields and the data-source checkbox list (no rule builder —
+    #    Definition is now metadata-only). Bind the 'users' source so
+    #    derive_builder_graph picks it as the Import node's source_id.
     page.goto(base + "/controls/new")
     page.fill("#f-id", "sod")
     page.fill("#f-title", "Segregation of duties")
-    page.fill("input[name='rule_description']", "User {user_id} flagged")
-    page.fill("input[name='rule_item_key']", "user_id")
-    page.select_option("select[name='rule_severity']", "high")
-    # logic defaults to "all" (AND); fail on any exception.
     page.fill("#f-cnt", "0")
-
-    # Condition 1 (free-text row): user_id eq U1.
-    cond_columns = page.locator("[name='cond_column']")
-    expect(cond_columns).to_have_count(1)
-    cond_columns.first.fill("user_id")
-    page.locator("select[name='cond_op']").first.select_option("eq")
-    page.locator("input[name='cond_value']").first.fill("U1")
-
-    # Bind the source BEFORE adding the second condition: the "+ Add condition"
-    # button rewrites the htmx request with source_id = first checked source, so
-    # the new row renders the #9 server-side COLUMN <select> dropdown.
     page.check("input[name='source_ids'][value='users']")
-
-    # Condition 2 (dropdown row, injected by htmx): can_create not_empty.
-    page.click("button:has-text('+ Add condition')")
-    expect(cond_columns).to_have_count(2)
-    # Binding the source (U1, #9) upgrades EVERY condition row's column field to
-    # the server-rendered <select> in place — so both rows are now dropdowns
-    # (row 1's free-text "user_id" was carried over and re-rendered as a selected
-    # option). Target the second row's <select> explicitly; select_option keys off
-    # the option value, confirming the dropdown is the one in play.
-    page.locator("select[name='cond_column']").nth(1).select_option("can_create")
-    page.locator("select[name='cond_op']").nth(1).select_option("not_empty")
-
-    page.click("button[type=submit]")  # POST /controls -> 303 /controls/sod
+    page.click("button[type=submit]")  # POST /controls → 303 /controls/sod
     expect(page).to_have_url(base + "/controls/sod")
 
-    # 4. Run it. control_edit.html has no Run button — the run lives on the
-    #    dashboard as a row-scoped <form action="/controls/sod/run"> with a "Run"
-    #    submit button. POST /controls/sod/run 303-redirects to the run view.
+    #    Step B — author logic in the Builder. GET /controls/sod/logic/builder
+    #    renders the derived Import→Test scaffold: node "src" (Import, source
+    #    already set to 'users') and node "tst" (Test, 0 conditions, severity
+    #    'medium'). Selectors are scoped to [data-node="<id>"] so the Import and
+    #    Test cards don't collide.
+    page.goto(base + "/controls/sod/logic/builder")
+
+    # The Import node's source should already be 'users' from the bound source_ids.
+    # Assert it as a sanity check before touching the Test node.
+    import_card = page.locator('[data-node="src"]')
+    expect(import_card.locator("[data-source]")).to_have_value("users")
+
+    test_card = page.locator('[data-node="tst"]')
+
+    # Author the two-condition rule via the REAL Builder UI.
+    #
+    # Conditions:
+    #   - user_id eq U1        (AND)
+    #   - can_create not_empty
+    # Logic ALL (AND): only U1 satisfies both (user_id='U1' and can_create='true'
+    # is truthy). U2 has user_id='U2' ≠ 'U1', so the first condition fails → U2
+    # is NOT flagged. Exactly 1 exception: U1.
+    #
+    # The scaffold starts with 0 conditions. Each "[data-add-cond]" click serialises
+    # the current card DOM (via JS serialize()), appends an empty condition to the
+    # in-memory graph, writes #pipeline-json, and submits the form. The server saves
+    # the pipeline and 303-redirects to the GET, which re-renders the Test node with
+    # the new empty condition row and the source's column <select> pre-populated.
+    # We therefore set severity/desc/itemkey before the first click so they are
+    # saved in the initial POST; the re-renders restore them from the stored graph.
+
+    # --- Step 1: set fixed fields on the initial 0-condition scaffold, then add
+    #             condition 0 (saves scaffold fields + adds empty condition row). ---
+    test_card.locator("[data-severity]").select_option("high")
+    test_card.locator("[data-desc]").fill("User {user_id} flagged")
+    # item key: source is bound so [data-itemkey] is a <select>; pick user_id.
+    test_card.locator("[data-itemkey]").select_option("user_id")
+    # Click "+ Add condition" — JS serialises the card, adds an empty condition,
+    # and submits the form. Wait for the resulting full-page navigation.
+    with page.expect_navigation():
+        test_card.locator("[data-add-cond]").click()
+    expect(page).to_have_url(base + "/controls/sod/logic/builder")
+
+    # --- Step 2: condition row 0 is now rendered with a column <select> (source
+    #             'users' is bound so the server pre-populates it). Fill it:
+    #             column=user_id, op=eq, value=U1. Then add condition 1. ---
+    test_card = page.locator('[data-node="tst"]')
+    cond_rows = test_card.locator("[data-cond]")
+    row0 = cond_rows.nth(0)
+    row0.locator("[data-cond-col]").select_option("user_id")
+    row0.locator("[data-cond-op]").select_option("eq")
+    row0.locator("[data-cond-val]").fill("U1")
+    # Click "+ Add condition" again — saves condition 0 + appends empty condition 1.
+    with page.expect_navigation():
+        test_card.locator("[data-add-cond]").click()
+    expect(page).to_have_url(base + "/controls/sod/logic/builder")
+
+    # --- Step 3: condition row 1 is now rendered. Fill it:
+    #             column=can_create, op=not_empty (no value needed). ---
+    test_card = page.locator('[data-node="tst"]')
+    cond_rows = test_card.locator("[data-cond]")
+    row1 = cond_rows.nth(1)
+    row1.locator("[data-cond-col]").select_option("can_create")
+    row1.locator("[data-cond-op]").select_option("not_empty")
+
+    # --- Step 4: save the final pipeline. The form's submit listener calls
+    #             serialize() which reads both [data-cond] rows and the fixed
+    #             fields, writes #pipeline-json, and POSTs to the builder endpoint.
+    #             On success: 303-redirect back to the Builder GET. ---
+    page.click("button:has-text('Save pipeline')")
+    expect(page).to_have_url(base + "/controls/sod/logic/builder")
+
+    # 4. Run it. The run button lives on the dashboard as a row-scoped
+    #    <form action="/controls/sod/run"> with a "Run" submit button.
+    #    POST /controls/sod/run 303-redirects to the run view.
     page.goto(base + "/")
     page.click("form[action='/controls/sod/run'] button[type=submit]")
     expect(page).to_have_url(re.compile(r"/controls/sod/runs/"))

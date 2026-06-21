@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ project.name }} — Logic: {{ control.title if control else control_id }}{% endblock %}
+{% block title %}{{ project.name }} — Logic Builder: {{ control.title if control else control_id }}{% endblock %}
 {% block head %}
 <style>
   /* ── stacked node cards ─────────────────────────────────────────────── */
@@ -47,19 +47,11 @@
   .pipe-cond { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .pipe-toolbar { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0; }
 
-  /* ── generated SVG flowchart ────────────────────────────────────────── */
-  .flowchart svg { max-width: 100%; height: auto; }
-  .fc-box rect { fill: var(--bg-surface-2); stroke: var(--border-strong); }
-  .fc-box.fc-terminal rect { stroke: var(--accent-primary); }
-  .fc-box text { fill: var(--text-primary); font-family: var(--font-sans); font-size: 12px; }
-  .fc-box .fc-count { fill: var(--text-secondary); font-family: var(--font-mono); font-size: 11px; }
-  .fc-edge { stroke: var(--border-strong); stroke-width: 2; fill: none; }
-
-  .gen-python pre {
-    background: var(--bg-input); color: var(--text-primary);
-    border: 1px solid var(--border-default); border-radius: var(--radius-input);
-    padding: 12px; overflow-x: auto; font-family: var(--font-mono); font-size: 12px;
-    line-height: 1.5; white-space: pre;
+  /* ── raw-python notice ──────────────────────────────────────────────── */
+  .raw-python-notice {
+    padding: 16px 20px; border: 1px solid var(--border-default);
+    border-radius: var(--radius-card); background: var(--bg-surface-1);
+    color: var(--text-secondary); font-size: 14px;
   }
 </style>
 {% endblock %}
@@ -86,6 +78,17 @@
 <div class="banner banner-error" role="alert">{{ parse_error }}</div>
 {% endif %}
 
+{% if raw_python %}
+<div class="card">
+  <div class="card-head"><h2>Steps</h2></div>
+  <div class="raw-python-notice">
+    This control's logic was authored directly in Python via the Python tab.
+    The visual builder is not available for hand-written Python controls.
+    Switch to the <a href="/controls/{{ control_id }}/logic/python">Python tab</a>
+    to edit the code directly.
+  </div>
+</div>
+{% else %}
 <form method="post" action="/controls/{{ control_id }}/logic/builder" id="pipeline-form">
   <input type="hidden" name="pipeline_json" id="pipeline-json" value="">
 
@@ -114,26 +117,37 @@
   </div>
 </form>
 
-{% if diagram %}
-<div class="card">
-  <div class="card-head"><h2>Flowchart</h2></div>
-  <div class="flowchart">{% include "partials/_pipe_diagram.html" %}</div>
-</div>
-{% endif %}
-
-{% if generated_python %}
-<div class="card">
+<!-- ── Draft with AI ─────────────────────────────────────────────────────── -->
+{% if not raw_python %}
+<div class="card" id="ai-draft-card">
   <div class="card-head">
-    <h2>Generated Python</h2>
-    <div class="spacer"></div>
-    <form method="post" action="/controls/{{ control_id }}/logic/convert"
-          onsubmit="return confirm('Convert this pipeline into a full Python test? This is a one-way door — the visual steps become editable Python and the graph is replaced.');">
-      <button class="btn btn-sm btn-ghost" type="submit">Convert to Python test →</button>
+    <h2>Draft with AI</h2>
+  </div>
+  <p class="lead">Let AI draft the Test node's conditions from this control's objective
+    and a sample of the bound source data. Review the suggestion, then copy the
+    conditions into the Test node above.</p>
+  {% if ai_enabled %}
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <form hx-post="/controls/ai/draft"
+          hx-target="#ai-draft-panel"
+          hx-swap="innerHTML"
+          hx-indicator="#ai-draft-card"
+          style="display:contents;">
+      <input type="hidden" name="objective"
+             value="{{ control.objective if control else '' }}">
+      {% for src in (control.source_ids if control and control.source_ids else []) %}
+      <input type="hidden" name="source_ids" value="{{ src }}">
+      {% endfor %}
+      <button class="btn btn-sm" type="submit">Draft with AI</button>
     </form>
   </div>
-  <p class="lead">The glass-box — exactly what runs. Generated blocks are read-only;
-    convert to a Python test to edit by hand.</p>
-  <div class="gen-python"><pre>{{ generated_python }}</pre></div>
+  {% else %}
+  <p class="muted">
+    AI authoring is not configured.
+    <a href="/settings/ai">Set up a provider in AI Settings</a> to enable this feature.
+  </p>
+  {% endif %}
+  <div id="ai-draft-panel" style="margin-top:14px;"></div>
 </div>
 {% endif %}
 
@@ -175,9 +189,18 @@
             if (col === '__other__' && free) { col = free; }
             var op = (row.querySelector('[data-cond-op]') || {}).value || 'eq';
             var raw = (row.querySelector('[data-cond-val]') || {}).value;
-            if (!col) { return; }
+            var isXsrc = op === 'exists_in' || op === 'not_exists_in';
+            if (!col && !isXsrc) { return; }
             var cond = { column: col, op: op };
-            if (['is_empty', 'not_empty', 'is_duplicate'].indexOf(op) === -1) {
+            if (isXsrc) {
+              var otherSrc = (row.querySelector('[data-xsrc-source]') || {}).value || '';
+              var thisKey = (row.querySelector('[data-xsrc-this]') || {}).value || '';
+              var otherKey = (row.querySelector('[data-xsrc-other]') || {}).value || '';
+              cond.other_source = otherSrc;
+              cond.this_key = thisKey;
+              cond.other_key = otherKey;
+              if (thisKey) { cond.column = thisKey; }
+            } else if (['is_empty', 'not_empty', 'is_duplicate'].indexOf(op) === -1) {
               if (op === 'in' || op === 'not_in') {
                 cond.value = raw.split('|').map(function (p) { return typed(p.trim()); })
                                 .filter(function (p) { return p !== ''; });
@@ -262,10 +285,23 @@
       var free = row.querySelector('[data-cond-col-free]');
       if (sel && free) { free.style.display = (sel.value === '__other__') ? '' : 'none'; }
     }
+    // Show/hide cross-source widgets vs. the plain value input when op changes.
+    function syncCondOp(row) {
+      var opSel = row.querySelector('[data-cond-op]');
+      if (!opSel) { return; }
+      var xsrc = opSel.value === 'exists_in' || opSel.value === 'not_exists_in';
+      var valInput = row.querySelector('[data-cond-val]');
+      var xsrcSpan = row.querySelector('[data-xsrc]');
+      if (valInput) { valInput.style.display = xsrc ? 'none' : ''; }
+      if (xsrcSpan) { xsrcSpan.style.display = xsrc ? '' : 'none'; }
+    }
     document.querySelectorAll('[data-cond]').forEach(function (row) {
       var sel = row.querySelector('[data-cond-col]');
       if (sel) { sel.addEventListener('change', function () { syncCond(row); }); }
       syncCond(row);
+      var opSel = row.querySelector('[data-cond-op]');
+      if (opSel) { opSel.addEventListener('change', function () { syncCondOp(row); }); }
+      syncCondOp(row);
     });
     // Add-condition within a Filter/Test card.
     document.querySelectorAll('[data-add-cond]').forEach(function (btn) {
@@ -283,4 +319,5 @@
     });
   })();
 </script>
+{% endif %}
 {% endblock %}

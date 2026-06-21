@@ -204,6 +204,23 @@ def _pipeline_from_form(form: Any) -> dict[str, Any] | None:
     return graph if isinstance(graph, dict) else None
 
 
+def _other_source_ids(pipeline: Any) -> list[str]:
+    """Source ids referenced by cross-source conditions (exists_in/not_exists_in).
+
+    Walks every node's ``config.conditions`` list and collects unique
+    ``other_source`` values so they can be unioned into the control's bound
+    ``source_ids`` alongside the Import-node sources.  Preserves insertion order
+    and skips duplicates and empty strings.
+    """
+    out: list[str] = []
+    for node in pipeline.nodes:
+        for cond in node.config.get("conditions", []):
+            other = cond.get("other_source", "")
+            if other and other not in out:
+                out.append(other)
+    return out
+
+
 def _save_pipeline_graph(
     conn: sqlite3.Connection, control_id: str, graph: dict[str, Any]
 ) -> list[str]:
@@ -214,6 +231,18 @@ def _save_pipeline_graph(
     change). Returns a list of errors (id-prefixed for lint failures so the
     editor can pin them per-node) — ``[]`` on success. Nothing is persisted when
     there are errors, mirroring the create/update guardrail (§8 layer 1).
+
+    Source binding is derived from TWO sources:
+
+    1. Import nodes (``parsed.import_source_ids()``) — the primary population(s).
+    2. ``other_source`` values in any node's ``config.conditions`` — the reference
+       sets for ``exists_in`` / ``not_exists_in`` cross-source conditions.
+
+    Both are unioned (Import sources first; extra ``other_source`` values appended
+    in the order they appear) so the runner can load them all.  Pre-fix, only (1)
+    was collected, causing ``ValueError: exists_in references unknown source`` at
+    run time for single-Import pipelines whose Test node used a second source via
+    ``not_exists_in`` (T6/T7 regression, issue #25).
     """
     from controlflow_sdk.pipeline.compile import compile_pipeline
     from controlflow_sdk.pipeline.lint import lint_pipeline
@@ -246,45 +275,44 @@ def _save_pipeline_graph(
         failure_threshold_pct=control["failure_threshold_pct"],
         failure_threshold_count=control["failure_threshold_count"],
     )
-    repo.set_control_sources(conn, control["id"], parsed.import_source_ids())
+    # Union Import-node sources (primary) with other_source values from
+    # cross-source conditions — Import sources come first (they are the primary
+    # population), then any extra other_source not already present.
+    import_ids = parsed.import_source_ids()
+    extra_ids = [sid for sid in _other_source_ids(parsed) if sid not in import_ids]
+    repo.set_control_sources(conn, control["id"], import_ids + extra_ids)
     return []
 
 
 def _save_from_form(conn: sqlite3.Connection, form: Any) -> str:
+    """Save the Definition form: metadata + sources only.
+
+    For an EXISTING control the logic fields (test_kind, rule_spec, test_code,
+    pipeline) are loaded from the store and passed through unchanged so that
+    editing metadata never clobbers logic authored on the Logic tab.
+
+    For a NEW control (no existing store record) the control is created with
+    empty logic (test_kind="pipeline", no rule_spec/test_code/pipeline); the
+    Logic ▸ Builder derives an Import→Test scaffold on first view.
+    """
     cid = str(form.get("id")).strip()
     nist = [s.strip() for s in str(form.get("framework_nist", "")).split(",") if s.strip()]
-    test_kind = form.get("test_kind", "rule")
-    rule_spec = _rule_spec_from_form(form) if test_kind == "rule" else None
-    test_code = form.get("test_code") if test_kind == "python" else None
-    pipeline = _pipeline_from_form(form) if test_kind == "pipeline" else None
     pct = form.get("failure_threshold_pct")
     cnt = form.get("failure_threshold_count")
-
-    # Source binding: explicit checkboxes for rule/python; DERIVED from the
-    # Import nodes for a pipeline (the analyst binds sources by adding Imports).
     source_ids = list(form.getlist("source_ids"))
 
-    if test_kind == "pipeline" and pipeline is not None:
-        # Compile the graph to the existing artifact the runner/bundle understand
-        # (a rule_spec for the pure single-source case, else a test() string), and
-        # derive the source binding from the Import nodes. The graph itself is
-        # store-only (the `pipeline` column) — never threaded into the bundle.
-        from controlflow_sdk.pipeline.compile import compile_pipeline
-        from controlflow_sdk.pipeline.lint import LintError, lint_pipeline
-        from controlflow_sdk.pipeline.model import parse_pipeline
-
-        parsed = parse_pipeline(pipeline)
-        parsed.validate_sources({s["id"] for s in repo.list_sources(conn)})
-        # Layer 1 of the §8 enforcement stack: allowlist AST deny-scan at SAVE.
-        # Refuse to persist a Custom Python node that could read a file / reach
-        # outside `rows` — the message names the "Convert to Python test" door.
-        lint_errors = lint_pipeline(parsed)
-        if lint_errors:
-            raise LintError(lint_errors)
-        compiled = compile_pipeline(parsed)
-        rule_spec = compiled.rule_spec
-        test_code = compiled.test_code
-        source_ids = parsed.import_source_ids()
+    # Preserve existing logic for updates; use empty logic for new controls.
+    existing = repo.get_control(conn, cid)
+    if existing is not None:
+        test_kind = existing["test_kind"]
+        rule_spec = existing["rule_spec"]
+        test_code = existing["test_code"]
+        pipeline = existing["pipeline"]
+    else:
+        test_kind = "pipeline"
+        rule_spec = None
+        test_code = None
+        pipeline = None
 
     repo.upsert_control(
         conn,
@@ -300,11 +328,6 @@ def _save_from_form(conn: sqlite3.Connection, form: Any) -> str:
         failure_threshold_pct=float(pct) if pct else None,
         failure_threshold_count=int(cnt) if cnt else None,
     )
-    # Auto-bind every source B referenced by a cross-source condition so the
-    # runner can load it — the analyst need not also tick B's checkbox.
-    for sid in _cross_source_ids(rule_spec):
-        if sid not in source_ids:
-            source_ids.append(sid)
     repo.set_control_sources(conn, cid, source_ids)
     return cid
 
