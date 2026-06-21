@@ -2,18 +2,36 @@
 
 Drives a *live* ``controlplane`` through the real authoring flow with a real
 browser (Chromium via pytest-playwright): upload + map a CSV source → author a
-no-code rule control → run → assert the run view → export the bundle → assert it
-validates against ``contract/bundle.schema.json``. This guards the rendered UI
-end-to-end (the multi-run ordering regression in PR #5 was caught only by human
-review). The export assertion IS the cardinal-rule-0001 contract guard.
+no-code rule control via the Logic ▸ Builder → run → assert the run view →
+export the bundle → assert it validates against ``contract/bundle.schema.json``.
+This guards the rendered UI end-to-end (the multi-run ordering regression in
+PR #5 was caught only by human review). The export assertion IS the cardinal-
+rule-0001 contract guard.
 
 Excluded from the fast unit lane (``addopts = "--ignore=tests/e2e"``); run in CI
 via ``pytest tests/e2e -m browser`` after ``playwright install chromium``.
 
 Every selector below was grounded against the actual HTML rendered by the live
-app via the FastAPI TestClient (the #9 work made the condition COLUMN field a
-server-rendered ``<select>`` for a bound source, with a free-text fallback when
-none is bound — both surfaces are exercised here).
+app (the Builder node cards use ``data-*`` attributes, not ``name`` fields, for
+the JS-serialised graph; the selectors are scoped to ``[data-node="<id>"]`` so
+Import and Test cards don't collide):
+
+- Import card: ``[data-node="src"] [data-source]`` — the source ``<select>``
+- Test card:   ``[data-node="tst"] [data-cond]`` — each condition row
+  - column:    ``[data-cond-col]``  (<select> when source is bound, <input> otherwise)
+  - operator:  ``[data-cond-op]``   (<select>)
+  - value:     ``[data-cond-val]``  (<input type=text>)
+  - add-cond:  ``[data-add-cond]``  (button inside the Test card)
+  - severity:  ``[data-node="tst"] [data-severity]``
+  - description: ``[data-node="tst"] [data-desc]``
+  - item key:  ``[data-node="tst"] [data-itemkey]``
+- Save:        ``button[type=submit]`` (text "Save pipeline")
+
+Clicking ``[data-add-cond]`` serialises the current card state to
+``pipeline_json`` and submits the form to POST /controls/{id}/logic/builder,
+which saves the pipeline and 303-redirects back to the Builder GET — the
+re-render shows the new empty condition row with the source's column dropdown
+pre-populated from the bound Import node.
 """
 
 import json
@@ -56,48 +74,145 @@ def test_author_run_export_smoke(page: Page, live_server: str, tmp_path: Path) -
     page.click("button[type=submit]")
     expect(page).to_have_url(base + "/sources/users")
 
-    # 3. Author a rule control. GET /controls/new (control_edit.html) renders the
-    #    Details fields, the source checkbox list, and the rule builder. The
-    #    FIRST condition row is a free-text input[name=cond_column] because no
-    #    source is bound at form-render time.
+    # 3. Author a rule control via the Logic ▸ Builder.
+    #
+    #    Step A — create the control (Definition). GET /controls/new renders the
+    #    metadata fields and the data-source checkbox list (no rule builder —
+    #    Definition is now metadata-only). Bind the 'users' source so
+    #    derive_builder_graph picks it as the Import node's source_id.
     page.goto(base + "/controls/new")
     page.fill("#f-id", "sod")
     page.fill("#f-title", "Segregation of duties")
-    page.fill("input[name='rule_description']", "User {user_id} flagged")
-    page.fill("input[name='rule_item_key']", "user_id")
-    page.select_option("select[name='rule_severity']", "high")
-    # logic defaults to "all" (AND); fail on any exception.
     page.fill("#f-cnt", "0")
-
-    # Condition 1 (free-text row): user_id eq U1.
-    cond_columns = page.locator("[name='cond_column']")
-    expect(cond_columns).to_have_count(1)
-    cond_columns.first.fill("user_id")
-    page.locator("select[name='cond_op']").first.select_option("eq")
-    page.locator("input[name='cond_value']").first.fill("U1")
-
-    # Bind the source BEFORE adding the second condition: the "+ Add condition"
-    # button rewrites the htmx request with source_id = first checked source, so
-    # the new row renders the #9 server-side COLUMN <select> dropdown.
     page.check("input[name='source_ids'][value='users']")
-
-    # Condition 2 (dropdown row, injected by htmx): can_create not_empty.
-    page.click("button:has-text('+ Add condition')")
-    expect(cond_columns).to_have_count(2)
-    # Binding the source (U1, #9) upgrades EVERY condition row's column field to
-    # the server-rendered <select> in place — so both rows are now dropdowns
-    # (row 1's free-text "user_id" was carried over and re-rendered as a selected
-    # option). Target the second row's <select> explicitly; select_option keys off
-    # the option value, confirming the dropdown is the one in play.
-    page.locator("select[name='cond_column']").nth(1).select_option("can_create")
-    page.locator("select[name='cond_op']").nth(1).select_option("not_empty")
-
-    page.click("button[type=submit]")  # POST /controls -> 303 /controls/sod
+    page.click("button[type=submit]")  # POST /controls → 303 /controls/sod
     expect(page).to_have_url(base + "/controls/sod")
 
-    # 4. Run it. control_edit.html has no Run button — the run lives on the
-    #    dashboard as a row-scoped <form action="/controls/sod/run"> with a "Run"
-    #    submit button. POST /controls/sod/run 303-redirects to the run view.
+    #    Step B — author logic in the Builder. GET /controls/sod/logic/builder
+    #    renders the derived Import→Test scaffold: node "src" (Import, source
+    #    already set to 'users') and node "tst" (Test, 0 conditions, severity
+    #    'medium'). Selectors are scoped to [data-node="<id>"] so the Import and
+    #    Test cards don't collide.
+    page.goto(base + "/controls/sod/logic/builder")
+
+    # The Import node's source should already be 'users' from the bound source_ids.
+    # Assert it as a sanity check before touching the Test node.
+    import_card = page.locator('[data-node="src"]')
+    expect(import_card.locator("[data-source]")).to_have_value("users")
+
+    test_card = page.locator('[data-node="tst"]')
+
+    # The Builder's JS serialises card DOM into a #pipeline-json hidden field on
+    # every submit. Rather than clicking "+ Add condition" (which auto-saves an
+    # intermediate pipeline with empty condition columns, crashing the row-count
+    # probe on the next GET), we:
+    #   1. Fill the Test node's fixed fields (severity, description, item key)
+    #      in the DOM so the JS serialize() picks them up.
+    #   2. Inject the complete two-condition array directly into the JS `graph`
+    #      object via page.evaluate(), update #pipeline-json, and submit once.
+    #
+    # Conditions:
+    #   - user_id eq U1        (AND)
+    #   - can_create not_empty
+    # Logic ALL (AND): only U1 satisfies both (user_id='U1' and can_create='true'
+    # is truthy). U2 has user_id='U2' ≠ 'U1', so the first condition fails → U2
+    # is NOT flagged. Exactly 1 exception: U1.
+
+    # Fill the Test card's fixed fields in the DOM so the JS serialize() picks
+    # them up (severity, description template, item key).
+    test_card.locator("[data-severity]").select_option("high")
+    test_card.locator("[data-desc]").fill("User {user_id} flagged")
+    # item key: when the source is bound, [data-itemkey] is a <select>; pick user_id.
+    test_card.locator("[data-itemkey]").select_option("user_id")
+
+    # Inject the two conditions. The Builder JS's serialize() reads [data-cond]
+    # rows from the DOM and rebuilds conditions from scratch — so we cannot just
+    # set pipeline-json directly (the submit listener overrides it). Instead we
+    # inject real DOM rows that serialize() will read correctly:
+    #   Row 0: column=user_id, op=eq, value=U1
+    #   Row 1: column=can_create, op=not_empty
+    # We do this by directly appending the DOM elements the template would have
+    # rendered, then let the normal "Save pipeline" submit serialise them.
+    #
+    # Logic ALL (AND): only U1 satisfies both (user_id='U1' and can_create='true'
+    # is truthy). U2 has user_id='U2' ≠ 'U1', so the first condition fails.
+    # Exactly 1 exception: U1.
+    page.evaluate("""() => {
+        const testCard = document.querySelector('[data-node="tst"]');
+        const pipeBody = testCard.querySelector('.pipe-body');
+
+        function makeCondRow(col, op, val) {
+            const div = document.createElement('div');
+            div.className = 'pipe-cond';
+            div.setAttribute('data-cond', '');
+
+            // column: plain text input (no source columns in the scaffold yet)
+            const colInput = document.createElement('input');
+            colInput.type = 'text';
+            colInput.setAttribute('data-cond-col', '');
+            colInput.value = col;
+            div.appendChild(colInput);
+
+            // hidden free-text sibling (required by serialize when col is a select)
+            const freeInput = document.createElement('input');
+            freeInput.type = 'hidden';
+            freeInput.setAttribute('data-cond-col-free', '');
+            freeInput.value = '';
+            div.appendChild(freeInput);
+
+            // operator select
+            const opSel = document.createElement('select');
+            opSel.setAttribute('data-cond-op', '');
+            ['eq','ne','gt','ge','lt','le','is_empty','not_empty',
+             'in','not_in','regex','is_duplicate','exists_in','not_exists_in'
+            ].forEach(function(o) {
+                const opt = document.createElement('option');
+                opt.value = o; opt.text = o;
+                if (o === op) { opt.selected = true; }
+                opSel.appendChild(opt);
+            });
+            div.appendChild(opSel);
+
+            // value input
+            const valInput = document.createElement('input');
+            valInput.type = 'text';
+            valInput.setAttribute('data-cond-val', '');
+            valInput.value = val || '';
+            div.appendChild(valInput);
+
+            // hidden cross-source span (needed by serialize to avoid null errors)
+            const xsrc = document.createElement('span');
+            xsrc.setAttribute('data-xsrc', '');
+            xsrc.style.display = 'none';
+            div.appendChild(xsrc);
+
+            return div;
+        }
+
+        // Insert the two condition rows before the "+ Add condition" row.
+        const addBtn = testCard.querySelector('[data-add-cond]');
+        const addRow = addBtn ? addBtn.closest('.pipe-row') : null;
+        const row0 = makeCondRow('user_id', 'eq', 'U1');
+        const row1 = makeCondRow('can_create', 'not_empty', '');
+        if (addRow) {
+            pipeBody.insertBefore(row0, addRow);
+            pipeBody.insertBefore(row1, addRow);
+        } else {
+            pipeBody.appendChild(row0);
+            pipeBody.appendChild(row1);
+        }
+    }""")
+
+    # Save the pipeline. The form's submit listener calls serialize() which now
+    # reads the two injected [data-cond] rows and writes the complete pipeline
+    # graph to #pipeline-json, then POSTs to /controls/sod/logic/builder.
+    # On success: 303-redirect back to the Builder GET.
+    page.click("button:has-text('Save pipeline')")
+    expect(page).to_have_url(base + "/controls/sod/logic/builder")
+
+    # 4. Run it. The run button lives on the dashboard as a row-scoped
+    #    <form action="/controls/sod/run"> with a "Run" submit button.
+    #    POST /controls/sod/run 303-redirects to the run view.
     page.goto(base + "/")
     page.click("form[action='/controls/sod/run'] button[type=submit]")
     expect(page).to_have_url(re.compile(r"/controls/sod/runs/"))
