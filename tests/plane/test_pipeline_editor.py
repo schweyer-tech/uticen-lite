@@ -239,7 +239,7 @@ def test_convert_to_python_sets_kind_and_prefills_code(client):
 
     resp = client.post("/controls/C1/logic/convert", follow_redirects=False)
     assert resp.status_code in (302, 303)
-    assert resp.headers["location"] == "/controls/C1"
+    assert resp.headers["location"] == "/controls/C1/logic/python"
 
     from controlflow_sdk.store import repo
     conn = _conn(client)
@@ -249,8 +249,8 @@ def test_convert_to_python_sets_kind_and_prefills_code(client):
     assert c["test_kind"] == "python"
     assert c["test_code"] is not None and "def test(pop, sources):" in c["test_code"]
     assert c["pipeline"] is None
-    # The escape-hatch editor renders the prefilled code.
-    body = client.get("/controls/C1").text
+    # The escape-hatch editor renders the prefilled code on the Python tab.
+    body = client.get("/controls/C1/logic/python").text
     assert "def test(pop, sources):" in body
 
 
@@ -475,3 +475,23 @@ def test_builder_shows_python_notice_for_raw_python(client):
     r = client.get(f"/controls/{cid}/logic/builder")
     assert r.status_code == 200
     assert "authored directly in Python" in r.text
+
+
+# ---------------------------------------------------------------------------
+# Task 5: Logic ▸ Python tab — generated view + relocated escape hatch
+# ---------------------------------------------------------------------------
+
+def test_python_tab_readonly_generated_for_graph_control(client, seeded_pipeline_control):
+    r = client.get(f"/controls/{seeded_pipeline_control}/logic/python")
+    assert "def test(" in r.text
+    assert "Convert to Python test" in r.text
+
+
+def test_python_tab_editable_for_raw_python(client):
+    cid = _make_raw_python_control(client)
+    r = client.get(f"/controls/{cid}/logic/python")
+    assert 'name="test_code"' in r.text                      # editable textarea present
+    # save edits
+    r2 = client.post(f"/controls/{cid}/logic/python",
+                     data={"test_code": "def test(pop):\n    return []"}, follow_redirects=False)
+    assert r2.status_code in (303, 302)

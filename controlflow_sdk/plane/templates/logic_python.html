@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — Logic Python: {{ control.title if control else control_id }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="/static/codemirror.min.css">
+<style>
+  /* Dark CodeMirror theme to match the control-plane palette. Loaded after
+     codemirror.min.css so these win. */
+  .CodeMirror {
+    background: var(--bg-input); color: var(--text-primary);
+    border: 1px solid var(--border-default); border-radius: var(--radius-input);
+    font-family: var(--font-mono); font-size: 12px; height: auto;
+  }
+  .CodeMirror-gutters { background: var(--bg-surface-1); border-right: 1px solid var(--border-default); }
+  .CodeMirror-linenumber { color: var(--text-tertiary); }
+  .CodeMirror-cursor { border-left: 1px solid var(--text-primary); }
+  .CodeMirror-selected { background: var(--accent-muted) !important; }
+  .cm-s-default .cm-keyword { color: var(--cm-keyword); }
+  .cm-s-default .cm-def, .cm-s-default .cm-variable { color: var(--text-primary); }
+  .cm-s-default .cm-string { color: var(--cm-string); }
+  .cm-s-default .cm-number { color: var(--cm-number); }
+  .cm-s-default .cm-comment { color: var(--text-tertiary); }
+  .cm-s-default .cm-builtin, .cm-s-default .cm-atom { color: var(--cm-builtin); }
+  .cm-s-default .cm-operator { color: var(--text-secondary); }
+
+  .gen-python pre {
+    background: var(--bg-input); color: var(--text-primary);
+    border: 1px solid var(--border-default); border-radius: var(--radius-input);
+    padding: 12px; overflow-x: auto; font-family: var(--font-mono); font-size: 12px;
+    line-height: 1.5; white-space: pre;
+  }
+</style>
+{% endblock %}
+{% block body %}
+<a class="crumb" href="/controls/{{ control_id }}">← {{ control.title if control else control_id }}</a>
+<div class="page-head">
+  <h1>Logic</h1>
+  <p class="muted mono">{{ control_id }}</p>
+</div>
+{% if control %}{% include "_control_tabs.html" %}{% endif %}
+{% if logic_tab is defined %}{% include "partials/_logic_tabs.html" %}{% endif %}
+
+{% if raw_python %}
+{# Editable escape hatch for raw-Python controls #}
+<form method="post" action="/controls/{{ control_id }}/logic/python">
+  <div class="card">
+    <div class="card-head">
+      <h2>Python test</h2>
+    </div>
+    <p class="lead">Escape hatch — return violations from a Python <code class="mono">test()</code> function.</p>
+    <textarea name="test_code" rows="20">{{ control.test_code if control and control.test_code else '' }}</textarea>
+    <div class="page-actions">
+      <button class="btn btn-primary" type="submit">Save</button>
+    </div>
+  </div>
+</form>
+
+<script src="/static/codemirror.min.js"></script>
+<script src="/static/codemirror-python.min.js"></script>
+<script>
+  (function () {
+    var textarea = document.querySelector('textarea[name="test_code"]');
+    if (textarea && typeof window.CodeMirror !== "undefined") {
+      window.CodeMirror.fromTextArea(textarea, {
+        mode: "python", lineNumbers: true, indentUnit: 4, matchBrackets: true
+      });
+    }
+  })();
+</script>
+
+{% else %}
+{# Read-only generated Python glass-box for graph controls #}
+<div class="card">
+  <div class="card-head">
+    <h2>Generated Python</h2>
+    <div class="spacer"></div>
+    <form method="post" action="/controls/{{ control_id }}/logic/convert"
+          onsubmit="return confirm('Convert this pipeline into a full Python test? This is a one-way door — the visual steps become editable Python and the graph is replaced.');">
+      <button class="btn btn-sm btn-ghost" type="submit">Convert to Python test →</button>
+    </form>
+  </div>
+  <p class="lead">The glass-box — exactly what runs. Generated blocks are read-only;
+    convert to a Python test to edit by hand.</p>
+  {% if generated_python %}
+  <div class="gen-python"><pre>{{ generated_python }}</pre></div>
+  {% else %}
+  <p class="muted">No pipeline defined yet. Build one in the
+    <a href="/controls/{{ control_id }}/logic/builder">Builder</a> tab.</p>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

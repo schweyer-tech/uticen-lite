@@ -521,7 +521,38 @@ def register(
         ctx = _editor_context(request, conn, root, control_id)
         ctx["active"] = "logic"
         ctx["logic_tab"] = "python"
-        return templates.TemplateResponse(request, "control_pipeline.html", ctx)
+        return templates.TemplateResponse(request, "logic_python.html", ctx)
+
+    # --- Logic POST (save raw Python test_code) ------------------------------
+
+    @app.post("/controls/{control_id}/logic/python")
+    async def save_python(control_id: str, request: Request) -> Any:
+        """Save hand-written test_code for a raw-Python control."""
+        root = request.app.state.project_root
+        conn = connect(root)
+        try:
+            control = repo.get_control(conn, control_id)
+            if control is None:
+                return RedirectResponse(f"/controls/{control_id}/logic/python", status_code=303)
+            form = await request.form()
+            code = str(form.get("test_code", ""))
+            repo.upsert_control(
+                conn,
+                id=control["id"],
+                title=control["title"],
+                objective=control["objective"],
+                narrative=control["narrative"],
+                framework_refs=control["framework_refs"],
+                test_kind="python",
+                rule_spec=None,
+                test_code=code,
+                pipeline=None,
+                failure_threshold_pct=control["failure_threshold_pct"],
+                failure_threshold_count=control["failure_threshold_count"],
+            )
+            return RedirectResponse(f"/controls/{control_id}/logic/python", status_code=303)
+        finally:
+            conn.close()
 
     # --- Logic POST (save builder graph) -------------------------------------
 
@@ -596,7 +627,7 @@ def register(
                 failure_threshold_pct=control["failure_threshold_pct"],
                 failure_threshold_count=control["failure_threshold_count"],
             )
-            return RedirectResponse(f"/controls/{control_id}", status_code=303)
+            return RedirectResponse(f"/controls/{control_id}/logic/python", status_code=303)
         finally:
             conn.close()
 
