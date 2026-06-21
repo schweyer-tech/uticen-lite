@@ -298,12 +298,7 @@ def _required_source_ids(existing: dict) -> list[str]:
             from controlflow_sdk.pipeline.model import parse_pipeline
             parsed = parse_pipeline(existing["pipeline"])
             import_ids = parsed.import_source_ids()
-            extra: list[str] = []
-            for node in parsed.nodes:
-                for cond in node.config.get("conditions", []):
-                    other = cond.get("other_source", "")
-                    if other and other not in import_ids and other not in extra:
-                        extra.append(other)
+            extra = [sid for sid in _other_source_ids(parsed) if sid not in import_ids]
             return import_ids + extra
         if existing.get("rule_spec"):
             return _cross_source_ids(existing["rule_spec"])

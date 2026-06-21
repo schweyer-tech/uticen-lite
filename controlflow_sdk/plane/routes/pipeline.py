@@ -860,9 +860,8 @@ def register(
                     "sources": sources,
                     "op_choices": OP_CHOICES,
                     "join_mode_choices": JOIN_MODE_CHOICES,
-                    # Pass the updated graph JSON so the JS can pick it up.
-                    "ai_applied_graph_json": json.dumps(merged_graph),
                 },
+                # The JS picks up the merged graph from this HX-Trigger event.
                 headers={"HX-Trigger": json.dumps(
                     {"aiDraftApplied": json.dumps(merged_graph)}
                 )},
