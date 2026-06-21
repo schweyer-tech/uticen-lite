@@ -117,6 +117,40 @@
   </div>
 </form>
 
+<!-- ── Draft with AI ─────────────────────────────────────────────────────── -->
+{% if not raw_python %}
+<div class="card" id="ai-draft-card">
+  <div class="card-head">
+    <h2>Draft with AI</h2>
+  </div>
+  <p class="lead">Let AI draft the Test node's conditions from this control's objective
+    and a sample of the bound source data. Review the suggestion, then copy the
+    conditions into the Test node above.</p>
+  {% if ai_enabled %}
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <form hx-post="/controls/ai/draft"
+          hx-target="#ai-draft-panel"
+          hx-swap="innerHTML"
+          hx-indicator="#ai-draft-card"
+          style="display:contents;">
+      <input type="hidden" name="objective"
+             value="{{ control.objective if control else '' }}">
+      {% for src in (control.source_ids if control and control.source_ids else []) %}
+      <input type="hidden" name="source_ids" value="{{ src }}">
+      {% endfor %}
+      <button class="btn btn-sm" type="submit">Draft with AI</button>
+    </form>
+  </div>
+  {% else %}
+  <p class="muted">
+    AI authoring is not configured.
+    <a href="/settings/ai">Set up a provider in AI Settings</a> to enable this feature.
+  </p>
+  {% endif %}
+  <div id="ai-draft-panel" style="margin-top:14px;"></div>
+</div>
+{% endif %}
+
 <!-- The whole graph as JSON; the editor script mutates it and the cards read it. -->
 <script id="graph-data" type="application/json">{{ graph_json | safe }}</script>
 <script>

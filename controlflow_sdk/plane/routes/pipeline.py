@@ -395,6 +395,8 @@ def _editor_context(
         )
         builder_graph_json = json.dumps(graph)
 
+    from controlflow_sdk.plane.routes.ai import _ai_configured
+
     return {
         "project": repo.get_project(conn) or {"name": ""},
         "control": control,
@@ -411,6 +413,7 @@ def _editor_context(
         "save_errors": save_errors or [],
         "raw_python": raw_python,
         "builder_graph": builder_graph,
+        "ai_enabled": _ai_configured(conn),
     }
 
 

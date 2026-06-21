@@ -195,11 +195,24 @@ def test_settings_post_persists_selection(client):
 
 
 # --------------------------------------------------------------------------- #
-# Editor affordance gating
+# Editor affordance gating  (Logic ▸ Builder tab, not the Definition page)
 # --------------------------------------------------------------------------- #
+def _make_control(client, source_id="payments") -> str:
+    """Create a minimal control bound to *source_id* and return its id."""
+    resp = client.post(
+        "/controls",
+        data={"id": "AI-01", "title": "AI test ctrl", "objective": "Flag big payments",
+              "narrative": "n", "source_ids": source_id},
+        follow_redirects=False,
+    )
+    assert resp.status_code in (200, 302, 303)
+    return "AI-01"
+
+
 def test_editor_hides_draft_when_not_configured(client):
     _make_source(client)
-    page = client.get("/controls/new").text
+    cid = _make_control(client)
+    page = client.get(f"/controls/{cid}/logic/builder").text
     # Not configured → the affordance links to settings rather than posting a draft.
     assert 'href="/settings/ai"' in page
     assert 'hx-post="/controls/ai/draft"' not in page
@@ -207,7 +220,8 @@ def test_editor_hides_draft_when_not_configured(client):
 
 def test_editor_shows_draft_when_configured(client, monkeypatch):
     _make_source(client)
+    cid = _make_control(client)
     _configure_ai(client)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-    page = client.get("/controls/new").text
+    page = client.get(f"/controls/{cid}/logic/builder").text
     assert 'hx-post="/controls/ai/draft"' in page
