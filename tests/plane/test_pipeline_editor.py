@@ -15,6 +15,8 @@ import io
 import json
 import re
 
+import pytest
+
 from controlflow_sdk.pipeline.lint import OFFRAMP_MESSAGE
 
 _OFFRAMP_STABLE = "pull data in with an Import node, or convert this control"
@@ -332,8 +334,6 @@ def test_pipeline_subroute_not_shadowed_by_catch_all(client):
 # ---------------------------------------------------------------------------
 # Task 3: Logic sub-routes + tab nav
 # ---------------------------------------------------------------------------
-
-import pytest  # noqa: E402 — added below existing imports for minimal diff
 
 
 @pytest.fixture()
