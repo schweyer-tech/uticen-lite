@@ -1,3 +1,5 @@
+from controlflow_sdk.pipeline.compile import compile_pipeline
+from controlflow_sdk.pipeline.model import parse_pipeline
 from controlflow_sdk.plane.logic_view import derive_builder_graph, is_raw_python
 
 
@@ -72,3 +74,27 @@ def test_raw_python_returns_none():
     )
     assert is_raw_python({"test_code": "def test(pop): ..."}) is True
     assert is_raw_python({"rule_spec": {"conditions": []}}) is False
+
+
+def test_cross_source_rule_round_trips_to_same_rule_spec():
+    rule = {
+        "logic": "all",
+        "severity": "high",
+        "item_key_column": "pid",
+        "description_template": "x",
+        "conditions": [
+            {
+                "op": "not_exists_in",
+                "column": "vendor_id",
+                "other_source": "vmaster",
+                "this_key": "vendor_id",
+                "other_key": "vendor_id",
+            }
+        ],
+    }
+    g = derive_builder_graph(
+        {"rule_spec": rule, "source_ids": ["pay", "vmaster"]}, ["pay", "vmaster"]
+    )
+    compiled = compile_pipeline(parse_pipeline(g))
+    assert compiled.rule_spec is not None
+    assert compiled.rule_spec["conditions"] == rule["conditions"]
