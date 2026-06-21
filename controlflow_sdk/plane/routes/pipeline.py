@@ -539,12 +539,22 @@ def register(
 
     @app.post("/controls/{control_id}/logic/python")
     async def save_python(control_id: str, request: Request) -> Any:
-        """Save hand-written test_code for a raw-Python control."""
+        """Save hand-written test_code for a raw-Python control.
+
+        Guard: if the control already has a pipeline or rule_spec it is NOT a
+        raw-python control.  A stray/curl POST must not wipe the stored logic —
+        redirect back without writing so the round-trip is a no-op for the user.
+        """
         root = request.app.state.project_root
         conn = connect(root)
         try:
             control = repo.get_control(conn, control_id)
             if control is None:
+                return RedirectResponse(f"/controls/{control_id}/logic/python", status_code=303)
+            # Guard: only honour the write when the control has no pipeline or
+            # rule_spec.  A stray POST to a GRAPH control (one whose logic was
+            # authored in the Builder) must not silently wipe that logic.
+            if control.get("pipeline") or control.get("rule_spec"):
                 return RedirectResponse(f"/controls/{control_id}/logic/python", status_code=303)
             form = await request.form()
             code = str(form.get("test_code", ""))
