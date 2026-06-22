@@ -179,15 +179,11 @@ class _RollUpDetermination(Determination):
     every procedure against its own threshold.
     """
 
-    _all_pass: bool = True
+    _all_pass: bool = False
 
     @property
     def passed(self) -> bool:  # type: ignore[override]
         return self._all_pass
-
-    @property
-    def verdict(self) -> str:
-        return "Operated effectively" if self.passed else "Operated with deficiencies"
 
 
 @dataclass

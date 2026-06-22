@@ -46,10 +46,10 @@ def _per_procedure_threshold(
     count = pipeline_node_config.get("failure_threshold_count")
     if pct is None and count is None:
         return control_threshold
-    return Threshold(
-        failure_threshold_pct=float(pct) if pct is not None else None,
-        failure_threshold_count=int(count) if count is not None else None,
-    )
+    return Threshold.from_raw({
+        "failure_threshold_pct": pct,
+        "failure_threshold_count": count,
+    })
 
 
 def _run_multi_procedure(
@@ -142,9 +142,7 @@ def _run_multi_procedure(
     # population_size is identical across all procedures (they share the same primary source).
     union_run = per_proc_runs[0][1]
     if len(per_proc_runs) > 1:
-        from controlflow_sdk.model.run import RunRecord as RR
-
-        union_run = RR(
+        union_run = RunRecord(
             control_id=control.id,
             executed_at=executed_at,
             population_size=per_proc_runs[0][1].population_size,

@@ -39,16 +39,21 @@ def _emit_counts_body(pipeline: Pipeline) -> str:
 
     ``frames`` maps an Import node's ``source_id`` to its loaded DataFrame. Each
     non-terminal node assigns ``_f_<id>`` exactly as the compiler does, then the
-    body records ``len(_f_<id>)``. The terminal node records the violation count:
+    body records ``len(_f_<id>)``. Each terminal node records its violation count:
     the masked length for a rule-style Test, or ``len`` of the custom helper's
     output for a custom-python test-flavor terminal.
+
+    For a multi-terminal pipeline, all terminals are skipped in the trunk loop and
+    each emits its own count — mirroring the compile.py ``_emit_python`` pattern.
+    The single-terminal output is byte-identical to the original behaviour.
     """
     order = pipeline.topological()
-    terminal = pipeline.terminal
+    terminals = pipeline.terminals
+    terminal_ids = {t.id for t in terminals}
 
     lines: list[str] = ["def _probe(frames, _node_fns):", "    _counts = {}"]
     for node in order:
-        if node.id == terminal.id:
+        if node.id in terminal_ids:
             continue
         if node.type == "import":
             # Read the bound source frame directly (no pop/sources split here —
@@ -64,7 +69,8 @@ def _emit_counts_body(pipeline: Pipeline) -> str:
                 lines.append(f"    {ln}")
         lines.append(f"    _counts[{node.id!r}] = len({_frame(node.id)})")
 
-    lines.extend("    " + ln for ln in _emit_terminal_count(terminal, pipeline))
+    for terminal in terminals:
+        lines.extend("    " + ln for ln in _emit_terminal_count(terminal, pipeline))
     lines.append("    return _counts")
     return "\n".join(lines)
 
