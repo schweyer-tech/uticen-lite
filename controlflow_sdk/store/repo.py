@@ -37,6 +37,27 @@ def get_project(conn: sqlite3.Connection) -> dict | None:
     return d
 
 
+def get_check_updates_on_launch(conn: sqlite3.Connection) -> bool:
+    """Whether the control plane checks for a newer version on launch (default False)."""
+    project = get_project(conn) or {}
+    system = project.get("system") or {}
+    return bool(system.get("check_updates_on_launch", False))
+
+
+def set_check_updates_on_launch(conn: sqlite3.Connection, value: bool) -> None:
+    """Persist the opt-in update-check toggle, preserving the rest of the project record."""
+    project = get_project(conn) or {}
+    system = dict(project.get("system") or {})
+    system["check_updates_on_launch"] = bool(value)
+    upsert_project(
+        conn,
+        name=project.get("name", "") or "",
+        framework=project.get("framework"),
+        system=system,
+        created_at=project.get("created_at", "") or "",
+    )
+
+
 # ---- sources + columns -----------------------------------------------------
 def upsert_source(
     conn: sqlite3.Connection, *, id: str, format: str, path: str,
