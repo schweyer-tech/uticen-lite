@@ -152,6 +152,8 @@ def _run_multi_procedure(
             provenance=per_proc_runs[0][1].provenance,
             procedure_id="",
         )
+        # Persist the aggregate so the run view can look it up by run_id.
+        repo.insert_run(conn, union_run)
     return union_run
 
 

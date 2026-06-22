@@ -909,9 +909,17 @@ def _emit_data_table(emit, sample: DataSample) -> None:
 
 def _emit_procedures(emit, wp: Workpaper) -> None:
     _section_open(emit, "procedures")
+    multi = len(wp.procedures) > 1
     for i, proc in enumerate(wp.procedures, start=1):
         run = proc.result
-        passed = run.failed == 0
+        # For N>1: use the threshold-aware determination for the badge so that a
+        # procedure with exceptions that still passes its threshold shows PASS.
+        # For N==1: keep the historical behaviour (passed iff zero exceptions).
+        if multi:
+            det = proc.determination
+            passed = det.passed
+        else:
+            passed = run.failed == 0
         badge = (
             '<span class="badge pass">PASS</span>'
             if passed
@@ -939,8 +947,7 @@ def _emit_procedures(emit, wp: Workpaper) -> None:
         )
 
         # per-procedure verdict pill — only for N>1 (N==1 is byte-identical to today)
-        if len(wp.procedures) > 1:
-            det = proc.determination
+        if multi:
             pill_cls = "ok" if det.passed else "bad"
             threshold_text, result_text = det.conclusion_text()
             emit(

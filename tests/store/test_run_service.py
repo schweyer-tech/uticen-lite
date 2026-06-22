@@ -80,16 +80,21 @@ def _seed_forked_pipeline(tmp_path: Path):
 
 
 def test_forked_control_runs_one_result_per_procedure(tmp_path: Path):
-    """For a 2-terminal pipeline: two RunRecords are persisted with distinct procedure_ids."""
+    """For a 2-terminal pipeline: three RunRecords are persisted.
+
+    Two procedure-specific runs (procedure_id in {"a","b"}) plus one union
+    aggregate run (procedure_id=="") that is persisted so the run-view route
+    can look it up via the run_id returned by run_control_in_store.
+    """
     conn = _seed_forked_pipeline(tmp_path)
     result = run_control_in_store(conn, tmp_path, "forked", "2026-03-31T00:00:00+00:00")
 
-    # Two runs persisted — one per terminal procedure.
+    # Three runs persisted: one per terminal procedure + one union aggregate.
     all_runs = repo.list_runs_for(conn, "forked")
-    assert len(all_runs) == 2, f"expected 2 runs, got {len(all_runs)}"
+    assert len(all_runs) == 3, f"expected 3 runs, got {len(all_runs)}"
 
     proc_ids = {r["procedure_id"] for r in all_runs}
-    assert proc_ids == {"a", "b"}, f"unexpected procedure_ids: {proc_ids}"
+    assert proc_ids == {"a", "b", ""}, f"unexpected procedure_ids: {proc_ids}"
 
     # Branch A (value > 100): 4 records total, 1 exception (I3).
     run_a = next(r for r in all_runs if r["procedure_id"] == "a")
@@ -100,6 +105,11 @@ def test_forked_control_runs_one_result_per_procedure(tmp_path: Path):
     run_b = next(r for r in all_runs if r["procedure_id"] == "b")
     assert run_b["failed"] == 2, f"branch B: expected 2 exceptions, got {run_b['failed']}"
     assert run_b["total"] == 4
+
+    # Union aggregate: combines all violations (3 total: 1 from A, 2 from B).
+    run_union = next(r for r in all_runs if r["procedure_id"] == "")
+    assert run_union["failed"] == 3, f"union: expected 3 exceptions, got {run_union['failed']}"
+    assert run_union["total"] == 4
 
     # The workpaper files are written once under the control id.
     assert (tmp_path / "target" / "workpapers" / "forked.html").exists()
@@ -114,6 +124,10 @@ def test_forked_control_runs_one_result_per_procedure(tmp_path: Path):
 
     # The returned record is the union aggregate (back-compat: callers get one record).
     assert result.control_id == "forked"
+    # The union aggregate run_id is stored in the DB so the run-view route can look it up.
+    assert repo.get_run(conn, result.run_id) is not None, (
+        "union aggregate run_id not found in DB — run-view would 404"
+    )
 
 
 def _seed(tmp_path: Path):
