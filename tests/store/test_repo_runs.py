@@ -44,3 +44,28 @@ def test_latest_run(tmp_path):
     repo.insert_run(conn, newer)
     assert repo.latest_run(conn, "c1")["run_id"] == newer.run_id
     assert len(repo.list_runs_for(conn, "c1")) == 2
+
+
+def test_run_persists_procedure_id(tmp_path):
+    conn = _db(tmp_path)
+    run = RunRecord(control_id="c1", executed_at="2026-01-01T00:00:00+00:00",
+                    population_size=3, violations=[], provenance=[], procedure_id="b")
+    repo.insert_run(conn, run)
+    rows = repo.list_runs_for(conn, "c1")
+    assert rows[0]["procedure_id"] == "b"
+
+
+def test_procedure_id_defaults_empty(tmp_path):
+    conn = _db(tmp_path)
+    run = RunRecord(control_id="c1", executed_at="2026-01-02T00:00:00+00:00",
+                    population_size=2, violations=[], provenance=[])
+    repo.insert_run(conn, run)
+    rows = repo.list_runs_for(conn, "c1")
+    assert rows[0]["procedure_id"] == ""
+
+
+def test_procedure_id_not_in_bundle_dict(tmp_path):
+    """procedure_id is store-only — must NOT appear in RunRecord.to_dict()."""
+    run = RunRecord(control_id="c1", executed_at="2026-01-03T00:00:00+00:00",
+                    population_size=1, violations=[], provenance=[], procedure_id="x")
+    assert "procedure_id" not in run.to_dict()

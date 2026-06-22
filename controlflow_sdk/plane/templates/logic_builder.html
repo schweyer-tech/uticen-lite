@@ -214,6 +214,18 @@
             node.config.severity = (card.querySelector('[data-severity]') || {}).value || 'medium';
             node.config.description_template = (card.querySelector('[data-desc]') || {}).value || '';
             node.config.item_key_column = (card.querySelector('[data-itemkey]') || {}).value || null;
+            var procTitle = (card.querySelector('[data-proc-title]') || {}).value || '';
+            if (procTitle) { node.config.title = procTitle; }
+            var tPct = (card.querySelector('[data-threshold-pct]') || {}).value;
+            if (tPct !== '' && tPct !== undefined) {
+              var pctNum = Number(tPct);
+              if (!isNaN(pctNum)) { node.config.failure_threshold_pct = pctNum; }
+            }
+            var tCnt = (card.querySelector('[data-threshold-count]') || {}).value;
+            if (tCnt !== '' && tCnt !== undefined) {
+              var cntNum = Number(tCnt);
+              if (!isNaN(cntNum)) { node.config.failure_threshold_count = cntNum; }
+            }
           }
           node.config.logic = (card.querySelector('[data-logic]') || {}).value || 'all';
           node.config.conditions = [];

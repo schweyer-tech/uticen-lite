@@ -522,9 +522,10 @@ def test_workpaper_reflects_latest_run_not_oldest(test_py_file: pathlib.Path) ->
     )
     repo.insert_run(conn, newer)
 
-    # _to_run_dicts is the unit under test: must return ASC order
+    # _to_run_dicts is the unit under test: must return ASC order.
+    # Returns a tuple (runs_by_control, procedure_run_map); unpack the first.
     project = load_project_from_store(conn)
-    runs_by_control = _to_run_dicts(conn, project.controls)
+    runs_by_control, _ = _to_run_dicts(conn, project.controls)
     conn.close()
 
     assert "cash_cutoff" in runs_by_control

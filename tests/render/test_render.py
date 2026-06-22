@@ -304,3 +304,156 @@ class TestRenderHtml:
         html = render_html(workpaper)
         assert html.count("no sampling applied") == 0
         assert "No sampling was applied" not in html
+
+
+# ── N>1 procedure rendering tests ─────────────────────────────────────────────
+
+
+def _make_two_procedure_workpaper() -> Workpaper:
+    """A 2-procedure workpaper built via the real ``Workpaper.assemble_procedures`` factory.
+
+    P1 passes (0 violations, zero-tolerance threshold); P2 fails (1 violation,
+    zero-tolerance threshold).  Uses the genuine factory path — the same one
+    Task 4's run service drives — so the renderer gets real per-procedure
+    determinations.
+    """
+    from controlflow_sdk.model.control import ControlDef, FrameworkRefs, Threshold
+    from controlflow_sdk.model.workpaper import ProcedureSpec, Workpaper
+
+    control = ControlDef(
+        id="ctrl-mp",
+        title="Multi-Procedure Control",
+        objective="Ensure items comply with both checks.",
+        narrative="Finance team.",
+        framework_refs=FrameworkRefs(nist=[], extra={}),
+        risk=None,
+        sources=[],
+    )
+
+    prov = SourceProvenance(
+        source_id="src-1",
+        path="/data/invoices.csv",
+        sha256="abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
+        row_count=50,
+    )
+    run_pass = RunRecord(
+        control_id="ctrl-mp",
+        executed_at="2026-06-22T00:00:00Z",
+        population_size=50,
+        violations=[],
+        provenance=[prov],
+    )
+    run_fail = RunRecord(
+        control_id="ctrl-mp",
+        executed_at="2026-06-22T00:00:00Z",
+        population_size=50,
+        violations=[
+            Violation(
+                item_key="INV-999",
+                description="Over limit",
+                severity=Severity.HIGH,
+            ),
+        ],
+        provenance=[prov],
+    )
+    spec_pass = ProcedureSpec(
+        title="Approval Check",
+        narrative="All items require approval.",
+        test_code="result = df[df['approved'] == False]",
+        threshold=Threshold(),
+    )
+    spec_fail = ProcedureSpec(
+        title="Amount Limit Check",
+        narrative="No item may exceed the limit.",
+        test_code="result = df[df['amount'] > 5000]",
+        threshold=Threshold(),
+    )
+    return Workpaper.assemble_procedures(
+        control,
+        [(spec_pass, run_pass), (spec_fail, run_fail)],
+        generated_at="2026-06-22T00:00:00Z",
+        data_samples=None,
+    )
+
+
+class TestMultiProcedureHtml:
+    def test_both_procedure_titles_present(self) -> None:
+        html = render_html(_make_two_procedure_workpaper())
+        assert "Approval Check" in html
+        assert "Amount Limit Check" in html
+
+    def test_per_procedure_verdict_pills_present(self) -> None:
+        """Each procedure must have its own verdict pill in the Procedures section."""
+        html = render_html(_make_two_procedure_workpaper())
+        # P1 passes → "Operated effectively"; P2 fails → "Operated with deficiencies"
+        procedures_start = html.index('<section id="procedures"')
+        procedures_end = html.index('<section id="exceptions"')
+        procedures_block = html[procedures_start:procedures_end]
+        assert "Operated effectively" in procedures_block
+        assert "Operated with deficiencies" in procedures_block
+
+    def test_per_procedure_verdict_pill_count(self) -> None:
+        """Exactly 2 verdict pills in the procedures section for a 2-procedure workpaper."""
+        html = render_html(_make_two_procedure_workpaper())
+        procedures_start = html.index('<section id="procedures"')
+        procedures_end = html.index('<section id="exceptions"')
+        procedures_block = html[procedures_start:procedures_end]
+        # Both verdict strings together = 2 pills
+        assert procedures_block.count("Operated effectively") == 1
+        assert procedures_block.count("Operated with deficiencies") == 1
+
+    def test_overall_verdict_shows_deficiencies(self) -> None:
+        """Overall verdict is deficiencies when any procedure fails."""
+        html = render_html(_make_two_procedure_workpaper())
+        # The results bar pill reflects the overall control verdict
+        bar_start = html.index('<div class="wp-resultbar">')
+        bar_end = html.index("</div>", bar_start)
+        bar = html[bar_start:bar_end]
+        assert "Operated with deficiencies" in bar
+
+    def test_n1_procedures_section_no_pill(self, workpaper: Workpaper) -> None:
+        """N==1: procedures section has NO per-procedure verdict pill (byte-identical to today)."""
+        html = render_html(workpaper)
+        procedures_start = html.index('<section id="procedures"')
+        procedures_end = html.index('<section id="exceptions"')
+        procedures_block = html[procedures_start:procedures_end]
+        # N==1 must NOT add a verdict pill inside the procedures section
+        assert "Operated with deficiencies" not in procedures_block
+        assert "Operated effectively" not in procedures_block
+
+    def test_n1_backward_compat_overall_verdict(self, workpaper: Workpaper) -> None:
+        """N==1: overall verdict in results bar is still 'Operated with deficiencies'."""
+        html = render_html(workpaper)
+        bar_start = html.index('<div class="wp-resultbar">')
+        bar_end = html.index("</div>", bar_start)
+        bar = html[bar_start:bar_end]
+        assert "Operated with deficiencies" in bar
+
+
+class TestMultiProcedureMarkdown:
+    def test_both_procedure_titles_present(self) -> None:
+        md = render_markdown(_make_two_procedure_workpaper())
+        assert "Approval Check" in md
+        assert "Amount Limit Check" in md
+
+    def test_per_procedure_verdict_in_procedures_section(self) -> None:
+        """Each procedure heading shows its own verdict."""
+        md = render_markdown(_make_two_procedure_workpaper())
+        procedures_start = md.index("## Procedures")
+        exceptions_start = md.index("## Exceptions")
+        procedures_block = md[procedures_start:exceptions_start]
+        assert "Operated effectively" in procedures_block
+        assert "Operated with deficiencies" in procedures_block
+
+    def test_overall_verdict_shows_deficiencies(self) -> None:
+        """Overall verdict reflects any-fails roll-up."""
+        md = render_markdown(_make_two_procedure_workpaper())
+        assert "Operated with deficiencies" in md
+
+    def test_n1_procedures_section_no_verdict_line(self, workpaper: Workpaper) -> None:
+        """N==1: procedures section has NO per-procedure verdict line (byte-identical to today)."""
+        md = render_markdown(workpaper)
+        procedures_start = md.index("## Procedures")
+        exceptions_start = md.index("## Exceptions")
+        procedures_block = md[procedures_start:exceptions_start]
+        assert "Procedure verdict:" not in procedures_block

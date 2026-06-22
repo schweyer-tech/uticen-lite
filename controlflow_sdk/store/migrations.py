@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 # Forward-only, idempotent DDL. Index = target user_version.
 _STEPS: list[str] = [
@@ -114,6 +114,14 @@ _STEPS: list[str] = [
     # schema_version. The column is NULL for rule/python controls.
     """
     ALTER TABLE controls ADD COLUMN pipeline TEXT;
+    """,
+    # --- step 5 -> user_version 5 -------------------------------------------
+    # Store-only: which terminal procedure produced a run (multi-procedure
+    # controls, issue #X). Default '' = sole/legacy procedure. NOT carried into
+    # the bundle — $defs/run in contract/bundle.schema.json has no procedure_id
+    # (learning 0001). RunRecord.to_dict() intentionally omits this field.
+    """
+    ALTER TABLE runs ADD COLUMN procedure_id TEXT NOT NULL DEFAULT '';
     """,
 ]
 

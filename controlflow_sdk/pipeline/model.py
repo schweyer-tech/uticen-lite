@@ -2,7 +2,7 @@
 
 A control's pipeline is a small DAG (mostly linear; the only fan-in is a Join).
 Each node is ``{id, type, narrative, config, inputs: [node_id, ...]}``. Import
-nodes have a ``source_id`` and no inputs; there is exactly one terminal Test.
+nodes have a ``source_id`` and no inputs; there are one or more terminal Tests.
 
 This module is **Pyodide-safe**: it is pure ``dataclasses`` + stdlib. It never
 imports pandas — the pandas work lives in the generated code that runs under the
@@ -59,7 +59,7 @@ class Node:
 
 @dataclass(frozen=True)
 class Pipeline:
-    """An ordered DAG of :class:`Node` with exactly one terminal Test node."""
+    """An ordered DAG of :class:`Node` with one or more terminal Test nodes."""
 
     nodes: list[Node]
 
@@ -70,14 +70,20 @@ class Pipeline:
         raise KeyError(node_id)  # pragma: no cover (validated upstream)
 
     @property
-    def terminal(self) -> Node:
-        """The single terminal node — the unique sink that feeds nothing.
+    def terminals(self) -> list[Node]:
+        """All terminal nodes — sinks that feed nothing and are terminal-capable.
 
-        It is either a ``test`` node or a ``custom_python`` test-flavor node
-        (``rows → violations``). Validated unique at parse time.
+        Each is either a ``test`` node or a ``custom_python`` test-flavor node
+        (``rows → violations``). Order matches the declared node order.
+        Validated non-empty at parse time.
         """
         consumed = {src for n in self.nodes for src in n.inputs}
-        return next(n for n in self.nodes if n.id not in consumed and _is_terminal(n))
+        return [n for n in self.nodes if n.id not in consumed and _is_terminal(n)]
+
+    @property
+    def terminal(self) -> Node:
+        """The first terminal node (back-compat alias for ``terminals[0]``)."""
+        return self.terminals[0]
 
     def import_source_ids(self) -> list[str]:
         """Source ids bound by Import nodes, in node order, de-duplicated.
@@ -212,22 +218,21 @@ def _validate_inputs(nodes: list[Node], known_ids: set[str]) -> None:
 
 
 def _validate_terminal(nodes: list[Node]) -> None:
-    """Exactly one terminal (Test, or custom_python test-flavor) sink.
+    """Every sink must be a terminal-capable node; at least one must exist.
 
-    The sink is the node that feeds nothing. There must be exactly one node that
-    feeds nothing, and it must be a terminal-capable node.
+    A sink is a node that feeds nothing. Every sink must be a ``test`` node or a
+    ``custom_python`` test-flavor node; non-terminal dangling nodes are rejected.
     """
     consumed = {src for n in nodes for src in n.inputs}
     sinks = [n for n in nodes if n.id not in consumed]
-    if len(sinks) != 1:
+    non_terminal = [s for s in sinks if not _is_terminal(s)]
+    if non_terminal:
         raise PipelineError(
-            "a pipeline needs exactly one terminal node (the sink that feeds nothing)"
+            "every pipeline endpoint must be a Test (or a custom_python test-flavor) "
+            f"node; node {non_terminal[0].id!r} feeds nothing and is not a Test"
         )
-    sink = sinks[0]
-    if not _is_terminal(sink):
-        raise PipelineError(
-            "a pipeline needs a terminal Test node (or a custom_python test-flavor node)"
-        )
+    if not any(_is_terminal(s) for s in sinks):
+        raise PipelineError("a pipeline needs at least one terminal Test node")
 
 
 def _reject_cycles(nodes: list[Node]) -> None:

@@ -45,26 +45,45 @@ def _enforce_custom_python_gate(conn: sqlite3.Connection) -> None:
         raise LintError(blocking)
 
 
-def _to_run_dicts(conn: sqlite3.Connection, controls: list) -> dict[str, list[dict]]:
+def _to_run_dicts(
+    conn: sqlite3.Connection,
+    controls: list,
+) -> tuple[dict[str, list[dict]], dict[str, dict[str, dict]]]:
     """Reconstruct ``RunRecord.to_dict()`` shapes from stored run dicts.
 
     The store returns raw dicts; this helper re-instantiates
     :class:`~controlflow_sdk.model.run.RunRecord` objects (with their derived
     properties) so the bundle receives exactly the same shape as the old
     ``run-log.json`` path produced.
+
+    Returns:
+        A tuple of:
+        - ``runs_by_control``: ``{control_id: [run_dict, ...]}`` in chronological
+          (ASC) order, without ``procedure_id`` (not a bundle field).
+        - ``procedure_run_map``: ``{control_id: {procedure_id: latest_run_dict}}``
+          for controls that have per-procedure runs (``procedure_id != ""``).
+          Run dicts here also omit ``procedure_id``.
     """
     from controlflow_sdk.model.run import RunRecord, SourceProvenance
     from controlflow_sdk.model.violation import Violation
 
-    out: dict[str, list[dict]] = {}
+    runs_by_control: dict[str, list[dict]] = {}
+    procedure_run_map: dict[str, dict[str, dict]] = {}
+
     for c in controls:
         # list_runs_for returns DESC (newest-first); reverse to ASC so that
         # runs[-1] in assemble_bundle correctly selects the latest run.
-        runs = list(reversed(repo.list_runs_for(conn, c.id)))
-        if not runs:
+        raw_runs = list(reversed(repo.list_runs_for(conn, c.id)))
+        if not raw_runs:
             continue
-        rebuilt = []
-        for r in runs:
+
+        rebuilt: list[dict] = []
+        # Track latest run per procedure_id (for multi-procedure controls).
+        # Iterating ASC means we overwrite with progressively newer runs, so
+        # after the loop proc_latest[pid] == the newest run for that procedure.
+        proc_latest: dict[str, dict] = {}
+
+        for r in raw_runs:
             rr = RunRecord(
                 control_id=r["control_id"],
                 executed_at=r["executed_at"],
@@ -72,8 +91,73 @@ def _to_run_dicts(conn: sqlite3.Connection, controls: list) -> dict[str, list[di
                 violations=[Violation.from_raw(v) for v in r["violations"]],
                 provenance=[SourceProvenance(**p) for p in r["provenance"]],
             )
-            rebuilt.append(rr.to_dict())
-        out[c.id] = rebuilt
+            run_dict = rr.to_dict()
+            rebuilt.append(run_dict)
+            pid = r.get("procedure_id") or ""
+            if pid:
+                proc_latest[pid] = run_dict
+
+        runs_by_control[c.id] = rebuilt
+        if proc_latest:
+            procedure_run_map[c.id] = proc_latest
+
+    return runs_by_control, procedure_run_map
+
+
+def _procedure_info_by_control(conn: sqlite3.Connection) -> dict[str, list[dict]]:
+    """Build per-procedure metadata for multi-terminal pipeline controls.
+
+    For each stored control that is a ``pipeline`` with ≥2 terminals, compile
+    the procedures and return ``{control_id: [{procedure_id, title, narrative,
+    test_code}, ...]}``.  Single-terminal or non-pipeline controls are excluded
+    (they use the existing single-procedure path in ``_build_workpaper``).
+
+    ``test_code`` here is the per-procedure rendered text (rule → text or
+    generated Python) derived from each terminal's sub-pipeline — the same
+    source used by ``_run_multi_procedure`` when building the workpaper.
+    """
+    from controlflow_sdk.model.control import ControlDef, FrameworkRefs
+    from controlflow_sdk.pipeline.compile import compile_pipeline_procedures
+    from controlflow_sdk.rules.resolve import resolve_test_code
+
+    out: dict[str, list[dict]] = {}
+    for raw in repo.list_controls(conn):
+        if raw.get("test_kind") != "pipeline":
+            continue
+        graph = raw.get("pipeline")
+        if not graph:
+            continue
+        try:
+            pipeline = parse_pipeline(graph)
+        except ValueError:
+            continue
+        if len(pipeline.terminals) < 2:
+            continue
+
+        procs = compile_pipeline_procedures(pipeline)
+        proc_info: list[dict] = []
+        for proc in procs:
+            # Build a transient ControlDef carrying only this procedure's artifact
+            # so resolve_test_code renders rule→text the same way run_service does.
+            transient = ControlDef(
+                id=raw["id"],
+                title=proc.title,
+                objective=raw["objective"],
+                narrative=proc.narrative,
+                framework_refs=FrameworkRefs(),
+                risk=None,
+                sources=[],
+                test_path="",
+                test_code=proc.result.test_code if proc.result.test_kind == "python" else None,
+                rule_spec=proc.result.rule_spec if proc.result.test_kind == "rule" else None,
+            )
+            proc_info.append({
+                "procedure_id": proc.procedure_id,
+                "title": proc.title,
+                "narrative": proc.narrative,
+                "test_code": resolve_test_code(transient),
+            })
+        out[raw["id"]] = proc_info
     return out
 
 
@@ -103,9 +187,14 @@ def build_bundle(
     # stored pipeline's custom node could read a file / reach outside `rows`.
     _enforce_custom_python_gate(conn)
     project = load_project_from_store(conn)
-    runs_by_control = _to_run_dicts(conn, project.controls)
+    runs_by_control, procedure_run_map = _to_run_dicts(conn, project.controls)
     if not runs_by_control:
         raise ValueError("no runs to export")
-    manifest = assemble_bundle(project, runs_by_control, generated_at)
+    proc_info_map = _procedure_info_by_control(conn)
+    manifest = assemble_bundle(
+        project, runs_by_control, generated_at,
+        procedure_run_map=procedure_run_map,
+        procedure_info_by_control=proc_info_map,
+    )
     target_dir = root / "target"
     return write_bundle(manifest, target_dir, out_path)

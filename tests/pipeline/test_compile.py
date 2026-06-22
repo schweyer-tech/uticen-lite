@@ -17,7 +17,11 @@ import pandas as pd
 
 from controlflow_sdk.adapters.files import source_for
 from controlflow_sdk.model.population import ColumnMeta, Population
-from controlflow_sdk.pipeline.compile import CompileResult, compile_pipeline
+from controlflow_sdk.pipeline.compile import (
+    CompileResult,
+    compile_pipeline,
+    compile_pipeline_procedures,
+)
 from controlflow_sdk.pipeline.model import parse_pipeline
 from controlflow_sdk.project.loader import load_sources
 from controlflow_sdk.rules.evaluate import evaluate_rule
@@ -435,3 +439,49 @@ def test_custom_test_flavor_terminal_cannot_see_sources():
     ns: dict = {}
     exec(compile(result.test_code, "<g>", "exec"), ns)  # noqa: S102
     assert "sources" not in ns["_node_dup"].__globals__
+
+
+# ---------------------------------------------------------------------------
+# Multi-terminal: per-procedure compile + union test()
+# ---------------------------------------------------------------------------
+
+def _forked():
+    return parse_pipeline({"nodes": [
+        {"id": "imp", "type": "import", "source_id": "inv"},
+        {"id": "flt", "type": "filter", "inputs": ["imp"],
+         "config": {"logic": "all",
+                    "conditions": [{"column": "status", "op": "eq", "value": "posted"}]}},
+        {"id": "a", "type": "test", "inputs": ["flt"], "narrative": "approver",
+         "config": {"logic": "all", "item_key_column": "id",
+                    "conditions": [{"column": "approver", "op": "is_empty"}]}},
+        {"id": "b", "type": "test", "inputs": ["flt"], "narrative": "po",
+         "config": {"logic": "all", "item_key_column": "id",
+                    "conditions": [{"column": "po", "op": "is_empty"}]}},
+    ]})
+
+
+def test_compile_one_procedure_per_terminal():
+    procs = compile_pipeline_procedures(_forked())
+    assert [p.procedure_id for p in procs] == ["a", "b"]
+    # Procedure "a" is a pure single-source chain → rule_spec referencing approver only.
+    a = next(p for p in procs if p.procedure_id == "a")
+    assert a.result.test_kind == "rule"
+    cols = [c["column"] for c in a.result.rule_spec["conditions"]]
+    assert "approver" in cols and "po" not in cols  # b's condition does NOT leak into a
+
+
+def test_union_test_code_runs_both_branches_and_concatenates(tmp_path):
+    # equivalence: exec the union test() over a fixture; violations == branch a + branch b
+    union = compile_pipeline(_forked())
+    assert union.test_kind == "python"
+    ns = {}
+    exec(union.test_code, ns)
+    df = pd.DataFrame([
+        {"id": "1", "status": "posted", "approver": "", "po": "PO1"},   # fails a only
+        {"id": "2", "status": "posted", "approver": "X", "po": ""},     # fails b only
+        {"id": "3", "status": "draft",  "approver": "", "po": ""},      # filtered out
+    ])
+    pop = _pop(df, "id")
+    out = ns["test"](pop, {"inv": pop})
+    keys = sorted(v["item_key"] for v in out)
+    assert keys == ["1", "2"]  # both branches' violations, trunk computed once

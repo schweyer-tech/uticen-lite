@@ -133,9 +133,9 @@ def _diagram(pipeline: Pipeline, counts: dict[str, int]) -> dict[str, Any]:
     Layout is **presentation-only** — it never reorders execution. Compile/run
     still use :meth:`Pipeline.topological`; this view-model only positions boxes.
     """
-    # Vertical order: DFS post-order from the terminal so a node's inputs sit
+    # Vertical order: DFS post-order from each terminal so a node's inputs sit
     # contiguously above it (each branch stays together). Then any node not
-    # reachable from the terminal, in topological order, for determinism.
+    # reachable from any terminal, in topological order, for determinism.
     order: list[Any] = []
     seen: set[str] = set()
 
@@ -148,13 +148,15 @@ def _diagram(pipeline: Pipeline, counts: dict[str, int]) -> dict[str, Any]:
             _visit(src)
         order.append(node)
 
-    _visit(pipeline.terminal.id)
-    for n in pipeline.topological():  # include any node not reachable from terminal
+    for t in pipeline.terminals:
+        _visit(t.id)
+    for n in pipeline.topological():  # include any node not reachable from any terminal
         if n.id not in seen:
             seen.add(n.id)
             order.append(n)
     index = {n.id: i for i, n in enumerate(order)}
 
+    terminal_ids = {t.id for t in pipeline.terminals}
     lanes = _assign_lanes(pipeline, order)
     lane_count = (max(lanes.values()) + 1) if lanes else 1
 
@@ -167,7 +169,7 @@ def _diagram(pipeline: Pipeline, counts: dict[str, int]) -> dict[str, Any]:
             "count": counts.get(n.id),
             "row": i,
             "lane": lanes[n.id],
-            "terminal": n.id == pipeline.terminal.id,
+            "terminal": n.id in terminal_ids,
         }
         for i, n in enumerate(order)
     ]
@@ -210,8 +212,10 @@ def _assign_lanes(pipeline: Pipeline, order: list[Any]) -> dict[str, int]:
                 next_lane[0] += 1
                 _walk(src, branch_lane)  # extra inputs fan out to the right
 
-    _walk(pipeline.terminal.id, 0)
-    for n in order:  # detached nodes (not reachable from terminal) get their own lane
+    for t in pipeline.terminals:
+        if t.id not in lane:
+            _walk(t.id, next_lane[0])
+    for n in order:  # detached nodes (not reachable from any terminal) get their own lane
         if n.id not in lane:
             branch_lane = next_lane[0]
             next_lane[0] += 1
@@ -516,6 +520,7 @@ def _card_vm(
     counts: dict[str, int], node_errors: dict[str, list[str]],
 ) -> dict[str, Any]:
     """View-model for one node card (parsed graph)."""
+    terminal_ids = {t.id for t in pipeline.terminals}
     return {
         "id": node.id,
         "type": node.type,
@@ -526,7 +531,7 @@ def _card_vm(
         "source_id": node.source_id,
         "columns": _input_columns_for(pipeline, node, stream_columns),
         "count": counts.get(node.id),
-        "terminal": node.id == pipeline.terminal.id,
+        "terminal": node.id in terminal_ids,
         "errors": node_errors.get(node.id, []),
     }
 

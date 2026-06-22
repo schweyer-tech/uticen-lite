@@ -59,22 +59,48 @@ def test_rejects_missing_terminal_test():
              "config": {"logic": "all", "conditions": []}},
         ]
     }
-    with pytest.raises(PipelineError, match="terminal"):
+    with pytest.raises(PipelineError, match="endpoint|terminal"):
         parse_pipeline(raw)
 
 
-def test_rejects_two_terminal_tests():
-    raw = {
-        "nodes": [
-            {"id": "imp", "type": "import", "source_id": "s"},
-            {"id": "t1", "type": "test", "inputs": ["imp"],
-             "config": {"logic": "all", "conditions": []}},
-            {"id": "t2", "type": "test", "inputs": ["imp"],
-             "config": {"logic": "all", "conditions": []}},
-        ]
-    }
-    with pytest.raises(PipelineError, match="exactly one"):
-        parse_pipeline(raw)
+def test_pipeline_allows_two_terminal_tests():
+    graph = {"nodes": [
+        {"id": "imp", "type": "import", "source_id": "s"},
+        {"id": "flt", "type": "filter", "inputs": ["imp"],
+         "config": {"logic": "all", "conditions": [
+             {"column": "status", "op": "eq", "value": "posted"},
+         ]}},
+        {"id": "a", "type": "test", "inputs": ["flt"],
+         "config": {"logic": "all", "conditions": [{"column": "approver", "op": "is_empty"}]}},
+        {"id": "b", "type": "test", "inputs": ["flt"],
+         "config": {"logic": "all", "conditions": [{"column": "po", "op": "is_empty"}]}},
+    ]}
+    p = parse_pipeline(graph)
+    assert [t.id for t in p.terminals] == ["a", "b"]
+    assert p.terminal.id == "a"  # back-compat: first terminal
+
+
+def test_pipeline_rejects_non_test_sink():
+    graph = {"nodes": [
+        {"id": "imp", "type": "import", "source_id": "s"},
+        {"id": "flt", "type": "filter", "inputs": ["imp"],
+         "config": {"logic": "all", "conditions": [{"column": "x", "op": "is_empty"}]}},
+        {"id": "tst", "type": "test", "inputs": ["imp"],
+         "config": {"logic": "all", "conditions": [{"column": "x", "op": "is_empty"}]}},
+    ]}  # flt is a dangling non-test sink
+    with pytest.raises(PipelineError, match="endpoint"):
+        parse_pipeline(graph)
+
+
+def test_single_terminal_back_compat_unchanged():
+    graph = {"nodes": [
+        {"id": "imp", "type": "import", "source_id": "s"},
+        {"id": "tst", "type": "test", "inputs": ["imp"],
+         "config": {"logic": "all", "conditions": [{"column": "x", "op": "is_empty"}]}},
+    ]}
+    p = parse_pipeline(graph)
+    assert [t.id for t in p.terminals] == ["tst"]
+    assert p.terminal.id == "tst"
 
 
 def test_rejects_cycle():

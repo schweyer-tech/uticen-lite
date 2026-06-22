@@ -277,11 +277,13 @@ def insert_run(conn: sqlite3.Connection, run: RunRecord) -> None:
     conn.execute(
         """INSERT OR REPLACE INTO runs
              (run_id, control_id, executed_at, population_size,
-              total, passed, failed, pass_rate, provenance, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+              total, passed, failed, pass_rate, provenance, created_at,
+              procedure_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (run.run_id, run.control_id, run.executed_at, run.population_size,
          run.population_size, run.passed, run.failed, run.pass_rate,
-         json.dumps([p.to_dict() for p in run.provenance]), run.executed_at),
+         json.dumps([p.to_dict() for p in run.provenance]), run.executed_at,
+         run.procedure_id),
     )
     conn.execute("DELETE FROM violations WHERE run_id = ?", (run.run_id,))
     conn.executemany(

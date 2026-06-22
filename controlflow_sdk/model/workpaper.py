@@ -21,19 +21,47 @@ def _fmt_num(value: float) -> str:
 
 
 @dataclass
+class ProcedureSpec:
+    """Metadata for a single procedure in a multi-procedure assemble call.
+
+    Pairs with a :class:`~controlflow_sdk.model.run.RunRecord` to build one
+    :class:`Procedure`.  The ``threshold`` is per-procedure — each procedure is
+    evaluated against its own pass/fail rule.
+    """
+
+    title: str
+    narrative: str
+    test_code: str
+    threshold: Threshold = field(default_factory=Threshold)
+
+
+@dataclass
 class Procedure:
     """A single test procedure within a workpaper.
 
-    In v1 there is exactly one procedure per control — one automated test mapped
-    to one run result.
+    Each procedure carries its own :class:`~controlflow_sdk.model.control.Threshold`
+    and exposes a ``determination`` property computed against that threshold.
+    The bundle-facing :meth:`to_dict` intentionally excludes both — per-procedure
+    threshold and determination are render/store concerns only.
     """
 
     title: str
     narrative: str
     test_code: str
     result: RunRecord
+    threshold: Threshold = field(default_factory=Threshold)
+
+    @property
+    def determination(self) -> Determination:
+        """Pass/fail determination for this procedure against its own threshold."""
+        return Determination(
+            threshold=self.threshold,
+            exception_count=len(self.result.violations),
+            records_tested=self.result.population_size,
+        )
 
     def to_dict(self) -> dict[str, Any]:
+        """Return the bundle-facing dict — threshold and determination are excluded."""
         return {
             "title": self.title,
             "narrative": self.narrative,
@@ -141,6 +169,23 @@ class Determination:
         return threshold_text, result_text
 
 
+@dataclass(frozen=True)
+class _RollUpDetermination(Determination):
+    """Internal subclass that overrides ``passed`` with an explicit any-fails flag.
+
+    Used only for N>1 procedures.  Keeps the aggregate headline counts (for
+    display) while correctly reporting the multi-procedure roll-up verdict.
+    ``_all_pass`` is set by :meth:`Workpaper.determination` after evaluating
+    every procedure against its own threshold.
+    """
+
+    _all_pass: bool = False
+
+    @property
+    def passed(self) -> bool:  # type: ignore[override]
+        return self._all_pass
+
+
 @dataclass
 class Workpaper:
     """Structured audit workpaper assembled from a control definition and run record.
@@ -173,11 +218,32 @@ class Workpaper:
 
     @property
     def determination(self) -> Determination:
-        """Threshold-based pass/fail — the single source of truth for the verdict."""
-        return Determination(
+        """Any-fails roll-up: passes iff every procedure passes its own threshold.
+
+        The headline ``exception_count`` and ``records_tested`` always aggregate
+        across all procedures (for display).
+
+        For N<=1: uses the workpaper-level threshold against aggregate counts —
+        identical to the original single-procedure behaviour, so all existing
+        workpapers built via ``assemble`` or direct construction are unaffected.
+
+        For N>1 (multi-procedure): each procedure is evaluated against its own
+        per-procedure threshold; the control passes iff every procedure passes.
+        """
+        if len(self.procedures) <= 1:
+            # N==0 or N==1: original aggregate behaviour, workpaper-level threshold.
+            return Determination(
+                threshold=self.threshold,
+                exception_count=self.exception_count,
+                records_tested=self.records_tested,
+            )
+        # N>1: any-fails roll-up — override passed/verdict while keeping aggregate counts.
+        all_pass = all(p.determination.passed for p in self.procedures)
+        return _RollUpDetermination(
             threshold=self.threshold,
             exception_count=self.exception_count,
             records_tested=self.records_tested,
+            _all_pass=all_pass,
         )
 
     # ── factory ──────────────────────────────────────────────────────────────
@@ -216,6 +282,7 @@ class Workpaper:
             narrative=control.narrative,
             test_code=test_code,
             result=run,
+            threshold=control.threshold,
         )
 
         return cls(
@@ -225,6 +292,57 @@ class Workpaper:
             narrative=control.narrative,
             framework_refs=framework_refs,
             procedures=[procedure],
+            generated_at=generated_at,
+            threshold=control.threshold,
+            data_samples=list(data_samples or []),
+        )
+
+    @classmethod
+    def assemble_procedures(
+        cls,
+        control: ControlDef,
+        procedures: list[tuple[ProcedureSpec, RunRecord]],
+        generated_at: str,
+        data_samples: list[DataSample] | None = None,
+    ) -> Workpaper:
+        """Build a Workpaper from a ControlDef and multiple (ProcedureSpec, RunRecord) pairs.
+
+        Each pair becomes one :class:`Procedure` with its own threshold and
+        per-procedure determination.  :attr:`Workpaper.determination` rolls up
+        across all procedures: the control passes iff every procedure passes.
+
+        ``control`` supplies the top-level metadata (id, title, objective,
+        narrative, framework_refs) and the *control-level* threshold (used as the
+        roll-up fallback / headline display threshold).  Per-procedure thresholds
+        are carried in each :class:`ProcedureSpec`.
+
+        ``generated_at`` is an ISO-8601 string supplied by the caller so this
+        stays deterministic and testable.
+        """
+        # Serialise FrameworkRefs to a plain dict (mirrors ControlDef.to_dict()).
+        framework_refs: dict[str, Any] = {
+            "nist": list(control.framework_refs.nist),
+            "extra": {k: list(v) for k, v in control.framework_refs.extra.items()},
+        }
+
+        built: list[Procedure] = [
+            Procedure(
+                title=spec.title,
+                narrative=spec.narrative,
+                test_code=spec.test_code,
+                result=run,
+                threshold=spec.threshold,
+            )
+            for spec, run in procedures
+        ]
+
+        return cls(
+            control_id=control.id,
+            title=control.title,
+            objective=control.objective,
+            narrative=control.narrative,
+            framework_refs=framework_refs,
+            procedures=built,
             generated_at=generated_at,
             threshold=control.threshold,
             data_samples=list(data_samples or []),

@@ -109,6 +109,22 @@
     {# Test terminal extras. #}
     {% if node.type == 'test' %}
     <div class="pipe-row">
+      <label>Procedure title</label>
+      <input type="text" data-proc-title style="flex:1;min-width:240px;"
+             placeholder="Procedure title (optional)"
+             value="{{ node.config.get('title', '') }}">
+    </div>
+    <div class="pipe-row">
+      <label>Threshold %</label>
+      <input type="text" data-threshold-pct style="width:80px;"
+             placeholder="e.g. 5"
+             value="{{ node.config.get('failure_threshold_pct', '') if node.config.get('failure_threshold_pct') is not none else '' }}">
+      <label>Count</label>
+      <input type="text" data-threshold-count style="width:80px;"
+             placeholder="e.g. 10"
+             value="{{ node.config.get('failure_threshold_count', '') if node.config.get('failure_threshold_count') is not none else '' }}">
+    </div>
+    <div class="pipe-row">
       <label>Severity</label>
       <select data-severity>
         {% for sev in ['low', 'medium', 'high', 'critical'] %}

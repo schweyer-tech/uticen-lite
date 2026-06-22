@@ -72,15 +72,54 @@ def _build_workpaper(
     test_code: str,
     runs: list[dict[str, Any]],
     generated_at: str,
+    procedure_run_map: dict[str, dict[str, Any]] | None = None,
+    procedure_info: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Build the workpaper dict for a control.
 
-    When runs are available the latest run is used to assemble a ``Procedure``
-    (mirrors ``Workpaper.assemble``).  When there are no runs the workpaper has
-    an empty ``procedures`` list.
+    **Single-procedure path** (N==1 or no per-procedure info): uses the most
+    recent run (``runs[-1]``) as the canonical result — output is byte-identical
+    to the pre-multi behaviour.
+
+    **Multi-procedure path** (N>=2 terminals, ``procedure_info`` supplied):
+    emits one ``procedure`` dict per terminal, pairing each with the latest
+    stored run for that ``procedure_id`` from ``procedure_run_map``.  Each
+    procedure carries its own ``title``, ``narrative``, and ``test_code``
+    (the per-procedure rendered rule or Python text).
+
+    ``procedure_run_map``  — ``{procedure_id: run_dict}`` for this control.
+    ``procedure_info``     — ``[{procedure_id, title, narrative, test_code}, ...]``
+                             in terminal order.  Neither carries extra keys that
+                             are not in ``$defs/procedure``; ``procedure_id`` is
+                             used only for grouping and is not emitted.
     """
     framework_refs = _serialise_framework_refs(control)
 
+    # Multi-procedure path: ≥2 terminal procedures with per-procedure run info.
+    if procedure_info and len(procedure_info) >= 2 and procedure_run_map:
+        procedures: list[dict[str, Any]] = []
+        for pi in procedure_info:
+            pid = pi["procedure_id"]
+            proc_run = procedure_run_map.get(pid)
+            if proc_run is None:
+                continue  # no run yet for this procedure — skip (no result)
+            procedures.append({
+                "narrative": pi["narrative"],
+                "result": proc_run,
+                "test_code": pi["test_code"],
+                "title": pi["title"],
+            })
+        return {
+            "control_id": control.id,
+            "framework_refs": framework_refs,
+            "generated_at": generated_at,
+            "narrative": control.narrative,
+            "objective": control.objective,
+            "procedures": procedures,
+            "title": control.title,
+        }
+
+    # Single-procedure path (N==1 or fallback): byte-identical to pre-multi output.
     if not runs:
         return {
             "control_id": control.id,
@@ -116,12 +155,18 @@ def _build_control_block(
     control: ControlDef,
     runs: list[dict[str, Any]],
     generated_at: str,
+    procedure_run_map: dict[str, dict[str, Any]] | None = None,
+    procedure_info: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Assemble the full control block for the bundle.
 
     Resolves ``test_code`` via
     :func:`~controlflow_sdk.rules.resolve.resolve_test_code` (inline → rule →
     file content).  The path itself is never included in the output.
+
+    ``procedure_run_map`` and ``procedure_info`` are forwarded to
+    :func:`_build_workpaper` to enable N-procedure workpaper assembly for
+    forked (multi-terminal) pipeline controls.
     """
     test_code = resolve_test_code(control)
 
@@ -135,7 +180,11 @@ def _build_control_block(
         "sources": _serialise_sources(control),
         "test_code": test_code,
         "title": control.title,
-        "workpaper": _build_workpaper(control, test_code, runs, generated_at),
+        "workpaper": _build_workpaper(
+            control, test_code, runs, generated_at,
+            procedure_run_map=procedure_run_map,
+            procedure_info=procedure_info,
+        ),
     }
     return _sort_dict(block)
 
@@ -166,6 +215,9 @@ def assemble_bundle(
     project: Project,
     runs_by_control: dict[str, list[dict[str, Any]]],
     generated_at: str,
+    *,
+    procedure_run_map: dict[str, dict[str, dict[str, Any]]] | None = None,
+    procedure_info_by_control: dict[str, list[dict[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     """Build a validated import-manifest dict from a project and its run log.
 
@@ -176,6 +228,15 @@ def assemble_bundle(
                           from this dict receive an empty ``runs`` list.
         generated_at:     ISO-8601 timestamp string supplied by the caller so the
                           output is fully deterministic.
+        procedure_run_map: Optional mapping ``{control_id: {procedure_id: run_dict}}``
+                          supplying the latest run per procedure for multi-terminal
+                          pipeline controls.  When present and a control has ≥2
+                          procedures the workpaper emits one ``procedure`` per entry.
+        procedure_info_by_control: Optional mapping ``{control_id: [{procedure_id,
+                          title, narrative, test_code}, ...]}`` in terminal order.
+                          Used together with ``procedure_run_map`` to emit N-procedure
+                          workpapers; single-procedure / rule / python controls are
+                          unaffected (byte-identical output).
 
     Returns:
         A plain dict matching ``bundle.schema.json``, with all keys sorted for
@@ -188,7 +249,13 @@ def assemble_bundle(
     controls: list[dict[str, Any]] = []
     for control in project.controls:
         runs = runs_by_control.get(control.id, [])
-        controls.append(_build_control_block(control, runs, generated_at))
+        ctrl_proc_run_map = (procedure_run_map or {}).get(control.id)
+        ctrl_proc_info = (procedure_info_by_control or {}).get(control.id)
+        controls.append(_build_control_block(
+            control, runs, generated_at,
+            procedure_run_map=ctrl_proc_run_map,
+            procedure_info=ctrl_proc_info,
+        ))
 
     manifest: dict[str, Any] = {
         "controls": controls,

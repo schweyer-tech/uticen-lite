@@ -190,6 +190,14 @@ def render_markdown(
         lines.append(f"| Failed | {_md_cell(run.failed)} |")
         lines.append(f"| Pass Rate | {_md_cell(run.pass_rate)}% |")
         lines.append("")
+        # per-procedure verdict — only for N>1 (N==1 is byte-identical to today)
+        if len(wp.procedures) > 1:
+            det = proc.determination
+            threshold_text, result_text = det.conclusion_text()
+            lines.append(
+                f"**Procedure verdict: {det.verdict}** — {threshold_text} {result_text}"
+            )
+            lines.append("")
         if run.violations:
             lines.append("| Item Key | Severity | Description |")
             lines.append("| --- | --- | --- |")

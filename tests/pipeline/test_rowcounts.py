@@ -83,6 +83,50 @@ def test_row_counts_with_custom_transform_node():
     assert counts["tst"] == 2
 
 
+def test_row_counts_forked_pipeline_counts_all_terminals():
+    """A forked (2-terminal) pipeline must return counts for BOTH terminal ids.
+
+    Without the fix, ``_emit_counts_body`` skips only ``terminals[0]``;
+    the second terminal falls through ``_emit_node_lines`` (no ``test`` branch),
+    so no ``_f_<id>`` frame is assigned → ``RowCountError`` → returns ``{}`` →
+    the editor shows "—" for every node.
+    """
+    graph = {"nodes": [
+        {"id": "imp", "type": "import", "source_id": "je"},
+        {"id": "flt_high", "type": "filter", "inputs": ["imp"],
+         "config": {"logic": "all",
+                    "conditions": [{"column": "amount", "op": "gt", "value": 100}]}},
+        {"id": "flt_round", "type": "filter", "inputs": ["imp"],
+         "config": {"logic": "all",
+                    "conditions": [{"column": "amount", "op": "gt", "value": 50}]}},
+        {"id": "tst_high", "type": "test", "inputs": ["flt_high"],
+         "config": {"logic": "any", "item_key_column": "entry_id",
+                    "description_template": "High entry {entry_id}",
+                    "conditions": [{"column": "entry_id", "op": "not_empty"}]}},
+        {"id": "tst_round", "type": "test", "inputs": ["flt_round"],
+         "config": {"logic": "any", "item_key_column": "entry_id",
+                    "description_template": "Round entry {entry_id}",
+                    "conditions": [{"column": "entry_id", "op": "not_empty"}]}},
+    ]}
+    pipeline = parse_pipeline(graph)
+    je = pd.DataFrame({
+        "entry_id": ["E1", "E2", "E3", "E4"],
+        "amount": [200, 75, 30, 150],
+    })
+    counts = compute_row_counts(pipeline, {"je": je})
+
+    # trunk node: all 4 rows
+    assert counts["imp"] == 4
+    # flt_high: amount > 100 → E1 (200), E4 (150) → 2 rows
+    assert counts["flt_high"] == 2
+    # flt_round: amount > 50 → E1 (200), E2 (75), E4 (150) → 3 rows
+    assert counts["flt_round"] == 3
+    # tst_high: 2 rows with non-empty entry_id → 2 violations
+    assert counts["tst_high"] == 2
+    # tst_round: 3 rows with non-empty entry_id → 3 violations
+    assert counts["tst_round"] == 3
+
+
 def test_row_counts_raises_on_bad_frame():
     graph = {"nodes": [
         {"id": "imp", "type": "import", "source_id": "je"},

@@ -51,6 +51,9 @@ class RunRecord:
     population_size: int
     violations: list[Violation] = field(default_factory=list)
     provenance: list[SourceProvenance] = field(default_factory=list)
+    # Store-only: which terminal procedure produced this run. Default '' = sole/legacy procedure.
+    # NOT included in to_dict() — the bundle contract ($defs/run) does not carry this field.
+    procedure_id: str = ""
 
     # Derived on first access; stored to avoid recomputing on repeated calls.
     run_id: str = field(init=False)
