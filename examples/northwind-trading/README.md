@@ -83,36 +83,60 @@ cp -r examples/northwind-trading my-audit
 cd my-audit
 
 # Replace CSV files in data/
-# Edit control.yaml files in controls/*/
-# Edit test.py in controls/*/
+# Describe each source in sources.yaml
+# Edit control.yaml files in controls/*/  (objective, narrative, framework refs)
+# Author each control's logic — see "Authoring control logic" below
 # Update this README
 ```
 
-**Multi-source patterns:** Most controls join multiple sources. See `three-way-match/test.py` for a three-source example:
+### Authoring control logic
+
+Reach for the **no-code builder first** and drop to Python only when the logic genuinely
+needs it. Each control directory authors its test logic with exactly one of these
+sidecars (precedence: `rule.yaml` → `pipeline.yaml` → `test.py`):
+
+1. **No-code rule** — `rule.yaml`. A declarative rule (AND/OR over typed conditions,
+   severity, description template). Best for single-source checks. Match each condition
+   value to the source's loaded `data_type` (a `boolean` column compares to `true`/`false`,
+   a `date` column to an ISO date). See [`mfa-enforcement/rule.yaml`](controls/mfa-enforcement/rule.yaml).
+
+2. **Visual pipeline** — `pipeline.yaml`. A small graph of `Import → Filter → Join → Test`
+   nodes for cross-source joins and AND-of-OR shapes a flat rule can't express. Still no
+   Python. See [`terminated-access/pipeline.yaml`](controls/terminated-access/pipeline.yaml)
+   (cross-source join) and [`privileged-access-review/pipeline.yaml`](controls/privileged-access-review/pipeline.yaml)
+   (filter + any-of test).
+
+3. **Python escape hatch** — `test.py`, only for logic outside the no-code grammar
+   (row-pairwise windows, cross-column arithmetic, column-to-column comparisons across a
+   join). In this demo only `duplicate-payments`, `three-way-match`, and `vendor-master-sod`
+   need it.
+
+A `test.py` function takes `pop` (single-source) or `pop, sources` (multi-source) and
+**returns a list** of violation dicts (`item_key`, `description`, `severity`, `details`).
+See [`three-way-match/test.py`](controls/three-way-match/test.py) for a three-source example:
 
 ```python
-def test(pop: Population, sources: dict) -> dict:
-    """
-    Three-way match: payments must have:
-    1. A matching invoice in the invoices source
-    2. An approved purchase order linked by that invoice
-    3. Payment amount ±1% of the PO amount
-    """
-    payments = sources["payments"]
-    invoices = sources["invoices"]
-    purchase_orders = sources["purchase_orders"]
-    
+def test(pop, sources):
+    payments_df = pop.df
+    invoices_df = sources["invoices"].df
+    po_df = sources["purchase_orders"].df
+
     violations = []
-    for payment in payments:
-        # Find matching invoice, then PO, validate amount
+    for _, pmt in payments_df.iterrows():
+        # Find matching invoice, then PO, validate the amount is within 1%
         ...
-    
-    return {"violations": violations}
+        violations.append({
+            "item_key": str(pmt["payment_id"]),
+            "description": "Payment without a valid approved PO",
+            "severity": "high",
+            "details": {...},
+        })
+    return violations
 ```
 
 **For authoring controls**, refer to the [ControlFlow SDK README](../../README.md) for:
 - Control YAML structure (objective, narrative, framework_refs)
-- Test function signature and exception format
+- The no-code rule grammar and the `test()` signature / exception format
 - Execution environment (pandas, numpy, standard library)
 - Workpaper and HTML generation
 

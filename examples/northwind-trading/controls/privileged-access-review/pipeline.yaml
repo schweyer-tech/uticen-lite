@@ -1,0 +1,56 @@
+# Visual-pipeline (graph) authoring of this control.
+#
+# Reshapes the demo so the one-click demo showcases the no-code builder (#9/#25)
+# instead of the Python escape hatch. The importer stores this graph in the
+# store-only `pipeline` column and COMPILES it to the existing bundle artifact
+# (learning 0010). Because the terminal Test uses `any` logic behind a Filter, the
+# graph cannot flatten to a single rule_spec, so it compiles to a generated
+# test(pop, sources) — but it uses ZERO Custom Python: every step is a no-code
+# Filter/Test node. The bundle never learns the word "node". The companion test.py
+# stays as documentation but is not the executed artifact once this sidecar is present.
+#
+# Shape: Import access accounts -> Filter to PRIVILEGED accounts -> terminal Test
+# that flags any survivor missing an approver OR whose last review is stale.
+#
+# dtype note (learning 0011): `is_privileged` loads as boolean → matched with a real
+# bool; `last_review_date` loads as a datetime → the `lt` cutoff compares the column
+# against the ISO date '2025-12-31' (90 days before the fixed demo as-of date
+# 2026-03-31). pandas parses that scalar string to a Timestamp, so the comparison is
+# sound. Expected: 2 violations on the demo data (ACC-P01 stale, ACC-P02 no approver)
+# — the same result as the Python test it replaces.
+nodes:
+  - id: acc
+    type: import
+    source_id: access_accounts
+    narrative: System access accounts (primary population).
+  - id: privileged
+    type: filter
+    inputs: [acc]
+    narrative: Keep only privileged accounts.
+    config:
+      logic: all
+      conditions:
+        - column: is_privileged
+          op: eq
+          value: true
+  - id: flag
+    type: test
+    inputs: [privileged]
+    narrative: >-
+      Flag privileged accounts with no recorded approver or a review date older
+      than the 90-day cutoff (2025-12-31).
+    config:
+      logic: any
+      severity: high
+      item_key_column: account_id
+      description_template: >-
+        Privileged account '{account_id}' failed review: missing approver or
+        last review before cutoff '2025-12-31'
+      conditions:
+        - column: approved_by
+          op: is_empty
+        - column: last_review_date
+          op: is_empty
+        - column: last_review_date
+          op: lt
+          value: "2025-12-31"
