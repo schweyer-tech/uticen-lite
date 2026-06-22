@@ -46,12 +46,67 @@ class CompileResult:
     test_code: str | None = None
 
 
+@dataclass(frozen=True)
+class CompiledProcedure:
+    """One compiled artifact for a single terminal (procedure) in a pipeline.
+
+    For a multi-terminal pipeline, each terminal compiles independently via a
+    sub-pipeline that contains only that terminal's ancestors.
+    """
+
+    procedure_id: str
+    title: str
+    narrative: str
+    result: CompileResult
+
+
 def compile_pipeline(pipeline: Pipeline) -> CompileResult:
-    """Compile *pipeline* to a rule_spec dict or a ``test(pop, sources)`` string."""
+    """Compile *pipeline* to a rule_spec dict or a ``test(pop, sources)`` string.
+
+    For a single-terminal pipeline the output is byte-identical to the pre-multi
+    behaviour (rule_spec or a simple test() string). For ≥2 terminals the result
+    is always ``test_kind="python"`` with a union ``test()`` that computes the
+    shared trunk once then concatenates each terminal's violations.
+    """
     spec = _try_pure_rule_spec(pipeline)
     if spec is not None:
         return CompileResult(test_kind="rule", rule_spec=spec)
     return CompileResult(test_kind="python", test_code=_emit_python(pipeline))
+
+
+def _subpipeline_for(pipeline: Pipeline, terminal: Node) -> Pipeline:
+    """Extract the sub-pipeline that contains only *terminal* and its ancestors."""
+    keep: dict[str, Node] = {}
+
+    def visit(nid: str) -> None:
+        if nid in keep:
+            return
+        n = pipeline.node(nid)
+        keep[nid] = n
+        for src in n.inputs:
+            visit(src)
+
+    visit(terminal.id)
+    # preserve declared order for determinism
+    return Pipeline(nodes=[n for n in pipeline.nodes if n.id in keep])
+
+
+def compile_pipeline_procedures(pipeline: Pipeline) -> list[CompiledProcedure]:
+    """Compile each terminal in *pipeline* to its own :class:`CompiledProcedure`.
+
+    Returns one entry per terminal in ``pipeline.terminals`` order. Each procedure
+    is compiled independently from the sub-pipeline that contains only that
+    terminal and its ancestors — conditions from other branches never leak in.
+    """
+    out = []
+    for t in pipeline.terminals:
+        sub = _subpipeline_for(pipeline, t)
+        title = t.config.get("title") or f"Test {t.id}"
+        out.append(CompiledProcedure(
+            procedure_id=t.id, title=str(title), narrative=t.narrative,
+            result=compile_pipeline(sub),
+        ))
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -74,7 +129,12 @@ def _try_pure_rule_spec(pipeline: Pipeline) -> dict | None:
     otherwise bail to the Python path (the staged-semantics target). A
     filter-free Import → Test can still flatten under any logic (there is nothing
     to narrow first).
+
+    Multi-terminal pipelines always bail to the Python path — the union semantics
+    cannot be expressed as a single rule_spec.
     """
+    if len(pipeline.terminals) != 1:
+        return None
     if len(pipeline.import_source_ids()) != 1:
         return None
     # Pure means every node is Import/Filter/Test — no Join/Custom Python.
@@ -151,8 +211,15 @@ def _emit_python(pipeline: Pipeline) -> str:
     Module-level ``_node_<id>`` functions for Custom Python nodes come first,
     then ``test(pop, sources)`` which walks the DAG topologically: each node
     assigns its output frame, and the terminal Test returns the violations list.
+
+    For a single-terminal pipeline the output is byte-identical to the pre-multi
+    behaviour. For ≥2 terminals, all non-terminal frames are emitted once (the
+    shared trunk), then each terminal emits its violations into a uniquely-named
+    ``_out_<id>`` variable, and the function returns their concatenation.
     """
     order = pipeline.topological()
+    terminals = pipeline.terminals
+    terminal_ids = {t.id for t in terminals}
 
     # 1. Module-level Custom Python functions (starved: only `rows` in scope).
     helpers: list[str] = []
@@ -163,14 +230,18 @@ def _emit_python(pipeline: Pipeline) -> str:
     # 2. The orchestrating test(pop, sources).
     body: list[str] = ["def test(pop, sources):"]
     body.append("    " + _SAFEDICT.replace("\n", "\n    "))
-    terminal = pipeline.terminal
     import_ids = pipeline.import_source_ids()
     primary_source = import_ids[0] if import_ids else None
     for node in order:
-        if node.id == terminal.id:
+        if node.id in terminal_ids:
             continue
         body.extend("    " + ln for ln in _emit_node_lines(node, primary_source))
-    body.extend("    " + ln for ln in _emit_terminal(terminal, pipeline))
+    if len(terminals) == 1:
+        body.extend("    " + ln for ln in _emit_terminal(terminals[0], pipeline))
+    else:
+        for t in terminals:
+            body.extend("    " + ln for ln in _emit_terminal(t, pipeline, out_var=f"_out_{t.id}"))
+        body.append("    return " + " + ".join(f"_out_{t.id}" for t in terminals))
 
     parts = helpers + ["\n".join(body)]
     return "\n\n\n".join(parts) + "\n"
@@ -287,23 +358,34 @@ def _emit_custom_helper(node: Node) -> str:
     return "\n".join(header + indented)
 
 
-def _emit_terminal(node: Node, pipeline: Pipeline) -> list[str]:
+def _emit_terminal(node: Node, pipeline: Pipeline, out_var: str = "_out") -> list[str]:
     """Emit the terminal node → the violations list.
 
     Two cases: a Custom Python ``test``-flavor terminal returns its node fn's
     result directly (its module-level helper already returns violations); a
     rule-style Test emits the evaluate_rule-shaped loop over its input frame.
+
+    *out_var* names the list variable to populate. In the single-terminal path
+    (``out_var="_out"``) the function emits ``return _out`` at the end. In the
+    multi-terminal path the caller passes a unique name like ``_out_a`` and emits
+    the combined return itself, so no trailing ``return`` is appended here.
     """
     if node.type == "custom_python" and node.config.get("flavor") == "test":
         lines = _narrative_comment(node)
-        lines.append(f"return _node_{node.id}({_frame(node.inputs[0])})")
+        if out_var == "_out":
+            lines.append(f"return _node_{node.id}({_frame(node.inputs[0])})")
+        else:
+            lines.append(f"{out_var} = _node_{node.id}({_frame(node.inputs[0])})")
         return lines
 
     src = _frame(node.inputs[0])
     conds = _conditions(node.config.get("conditions", []))
     lines = _narrative_comment(node)
     if not conds:
-        lines.append("return []")
+        if out_var == "_out":
+            lines.append("return []")
+        else:
+            lines.append(f"{out_var} = []")
         return lines
     combine = " & " if node.config.get("logic", "all") == "all" else " | "
     mask = combine.join(_mask_expr(c, frame=src) for c in conds)
@@ -321,18 +403,19 @@ def _emit_terminal(node: Node, pipeline: Pipeline) -> list[str]:
         f"_ref_cols = {ref_cols!r}",
         f"_template = {template!r}",
         f"_severity = {severity!r}",
-        "_out = []",
+        f"{out_var} = []",
         "for _idx, _row in _df[_mask].iterrows():",
         "    _r = _row.to_dict()",
         "    _item_key = str(_r[_key_col]) if _key_col else str(_idx)",
         "    _description = _template.format_map(_SafeDict(_r)) if _template else ''",
         "    _details = {_c: _r[_c] for _c in _ref_cols if _c in _r}",
-        "    _out.append({",
+        f"    {out_var}.append({{",
         '        "item_key": _item_key,',
         '        "description": _description,',
         '        "severity": _severity,',
         '        "details": _details,',
         "    })",
-        "return _out",
     ])
+    if out_var == "_out":
+        lines.append("return _out")
     return lines
