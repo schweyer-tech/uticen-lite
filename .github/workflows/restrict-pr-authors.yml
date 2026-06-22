@@ -1,0 +1,39 @@
+# Enforce "only the maintainer and Dependabot may open PRs to main". GitHub
+# branch protection cannot restrict who *opens* a PR (only who pushes/merges),
+# so this workflow is the enforcement: any PR to main from another author is
+# closed immediately with an explanatory comment. Pair it with branch
+# protection in repo Settings (require a PR + required status checks + restrict
+# who can push to main) for full coverage of the merge path.
+#
+# pull_request_target runs with the base repo's token and does NOT check out the
+# PR's (untrusted) code — it only calls the GitHub API to comment and close, so
+# it is safe to run against fork PRs.
+#
+# Note: pull_request_target reads this workflow from the default branch (main),
+# so it takes effect once merged there.
+name: Restrict PR authors
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  guard:
+    # Allow the repo owner and Dependabot; close everyone else.
+    if: >
+      github.event.pull_request.user.login != github.repository_owner &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close unauthorized PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          gh pr comment "$PR_URL" --body "Thanks @${AUTHOR}, but this repository only accepts pull requests from the maintainer or Dependabot, so this PR is being closed automatically. If you'd like to propose a change, please open an issue to discuss it first."
+          gh pr close "$PR_URL"

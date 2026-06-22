@@ -1,0 +1,36 @@
+# Arm GitHub native auto-merge for the maintainer's own PRs so they merge once
+# CI goes green — the human-authored counterpart to dependabot-auto-merge.yml.
+# The required status checks (ruff + mypy + pytest on 3.11/3.12, required via
+# branch protection) are the gate; this just arms the merge. Zero token cost.
+#
+# Arming must happen while checks are still pending — native auto-merge only
+# engages on a PR whose checks haven't settled yet (arming a green PR is a
+# no-op; GitHub tells you to merge directly). So this runs at PR-open time.
+#
+# Note: pull_request_target reads this workflow from the default branch (main),
+# so it takes effect once merged there.
+name: Auto-merge maintainer PRs
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    # Only the repo owner's own, non-draft PRs. Dependabot PRs are armed by
+    # dependabot-auto-merge.yml; anything else is closed by restrict-pr-authors.yml.
+    if: >
+      github.event.pull_request.user.login == github.repository_owner &&
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable native auto-merge (squash)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge "$PR_URL" --auto --squash
