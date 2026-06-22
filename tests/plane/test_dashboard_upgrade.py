@@ -64,6 +64,14 @@ def test_upgrade_spawns_and_renders_upgrading(client, monkeypatch):
     assert "Upgrading" in resp.text
     assert spawned["commands"] == [["pip", "install", "-U", "controlflow-sdk"]]
     assert spawned["shutdown"] is True
+    # Re-run instructions: both the console-script and the module fallback, each
+    # copyable (a copy button carrying the exact command), wired to the engagement dir.
+    project = str(client.app.state.project_root)
+    assert f"controlplane --project {project}" in resp.text
+    assert f"python -m controlflow_sdk.plane --project {project}" in resp.text
+    assert resp.text.count('class="copy-btn"') == 2
+    assert 'data-copy="controlplane --project' in resp.text
+    assert 'data-copy="python -m controlflow_sdk.plane --project' in resp.text
 
 
 def test_upgrade_unknown_renders_instructions(client, monkeypatch):

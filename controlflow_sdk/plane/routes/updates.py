@@ -7,6 +7,7 @@ makes a network call while the toggle is OFF (zero-egress default — STRATEGY.m
 
 from __future__ import annotations
 
+import shlex
 import sqlite3
 from collections.abc import Callable, Generator
 from typing import Any
@@ -97,4 +98,9 @@ def register(
         commands = build_upgrade_command(method, source_dir=str(src) if src else None)
         spawn_detached_upgrade(request.app.state.project_root, commands, current=current)
         schedule_shutdown()
-        return templates.TemplateResponse(request, "upgrading.html", {"current": current})
+        # shlex.quote so the copyable re-run command is paste-and-run even when the
+        # engagement path contains spaces.
+        project_dir = shlex.quote(str(request.app.state.project_root))
+        return templates.TemplateResponse(
+            request, "upgrading.html", {"current": current, "project_dir": project_dir}
+        )

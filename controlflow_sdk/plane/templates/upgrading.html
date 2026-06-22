@@ -7,12 +7,70 @@
 <div class="card">
   <p class="lead">
     The upgrade is running in the background and this app is shutting down.
-    When it finishes, start it again:
+    When it finishes, start it again from a terminal:
   </p>
-  <pre class="mono"><code>controlplane --project &lt;your engagement dir&gt;</code></pre>
+
+  <div class="copy-row">
+    <code class="mono copy-cmd">controlplane --project {{ project_dir }}</code>
+    <button class="copy-btn" type="button"
+            data-copy="controlplane --project {{ project_dir }}"
+            aria-label="Copy command" title="Copy command">
+      <svg class="copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round"
+           stroke-linejoin="round" aria-hidden="true">
+        <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+      <svg class="copy-done" width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+           stroke-linejoin="round" aria-hidden="true">
+        <path d="M20 6 9 17l-5-5"></path>
+      </svg>
+    </button>
+  </div>
+
+  <p class="hint" style="margin-top:14px;">
+    No <code class="mono">controlplane</code> command on your PATH? Run the module form instead:
+  </p>
+  <div class="copy-row">
+    <code class="mono copy-cmd">python -m controlflow_sdk.plane --project {{ project_dir }}</code>
+    <button class="copy-btn" type="button"
+            data-copy="python -m controlflow_sdk.plane --project {{ project_dir }}"
+            aria-label="Copy command" title="Copy command">
+      <svg class="copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round"
+           stroke-linejoin="round" aria-hidden="true">
+        <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+      <svg class="copy-done" width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+           stroke-linejoin="round" aria-hidden="true">
+        <path d="M20 6 9 17l-5-5"></path>
+      </svg>
+    </button>
+  </div>
+
   <p class="hint">
     Progress is logged to <code class="mono">.controlplane-upgrade.log</code> in the
     engagement folder. You can close this tab.
   </p>
 </div>
+
+<script>
+  /* Copy the command's data-copy text to the clipboard, with a brief check-mark
+     confirmation. getAttribute returns the un-escaped attribute value, so the
+     exact command (incl. any shell quoting) reaches the clipboard. */
+  (function () {
+    document.querySelectorAll(".copy-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var text = btn.getAttribute("data-copy");
+        navigator.clipboard.writeText(text).then(function () {
+          btn.classList.add("copied");
+          setTimeout(function () { btn.classList.remove("copied"); }, 1400);
+        });
+      });
+    });
+  })();
+</script>
 {% endblock %}
