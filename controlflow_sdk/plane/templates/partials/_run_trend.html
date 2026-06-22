@@ -1,0 +1,80 @@
+{#- Inline-SVG run trend (no JS, no chart dep). `trend.points` is chronological
+    (oldest->newest, left-to-right). All colors route through var(--token) so the
+    light theme works automatically (learning 0005).
+
+    Layout: a fixed-coordinate viewBox sized by CSS (never `height="auto"`, which
+    is an invalid SVG presentation attribute — B1). A gridded plot area carries the
+    pass-rate line + per-run dots against a 0–100% Y scale; exception counts read as
+    short bars hanging from the plot floor. A legend above names both series. -#}
+{%- set pts = trend.points -%}
+{%- set n = pts | length -%}
+{#- plot geometry (user units; the SVG scales to fit via viewBox) -#}
+{%- set PAD_L = 34 -%}        {#- room for the Y-axis % labels -#}
+{%- set PAD_R = 10 -%}
+{%- set PLOT_TOP = 8 -%}
+{%- set PLOT_H = 70 -%}       {#- pass-rate plot band (0%..100%) -#}
+{%- set BAR_BAND = 22 -%}     {#- exception-bar band below the plot -#}
+{%- set AXIS_BAND = 14 -%}    {#- date labels sit below the bars, never over them -#}
+{%- set W = 360 -%}
+{%- set PLOT_W = W - PAD_L - PAD_R -%}
+{%- set PLOT_BOT = PLOT_TOP + PLOT_H -%}
+{%- set H = PLOT_BOT + BAR_BAND + AXIS_BAND -%}
+{%- set max_failed = trend.max_failed -%}
+{#- map a 0..100 pass-rate to a Y coordinate inside the plot band -#}
+{%- macro yof(rate) -%}{{ (PLOT_TOP + (1 - rate / 100) * PLOT_H) | round(2) }}{%- endmacro -%}
+{%- macro xof(i) -%}{{ (PAD_L + (i / (n - 1) * PLOT_W if n > 1 else PLOT_W / 2)) | round(2) }}{%- endmacro -%}
+
+<figure class="trend-figure">
+  <figcaption class="trend-legend" aria-hidden="true">
+    <span class="trend-key"><span class="trend-swatch trend-swatch-line"></span>Pass rate</span>
+    <span class="trend-key"><span class="trend-swatch trend-swatch-bar"></span>Exceptions{% if max_failed > 0 %} (peak {{ max_failed }}){% endif %}</span>
+  </figcaption>
+  <svg viewBox="0 0 {{ W }} {{ H }}" preserveAspectRatio="xMidYMid meet"
+       role="img" aria-label="Run trend over {{ n }} run{{ 's' if n != 1 else '' }}"
+       class="trend-svg">
+    {#- ── Y grid + axis labels at 0 / 50 / 100% ───────────────────────────── -#}
+    {%- for tick in [100, 50, 0] -%}
+    {%- set ty = yof(tick) -%}
+    <line class="trend-grid" x1="{{ PAD_L }}" y1="{{ ty }}" x2="{{ W - PAD_R }}" y2="{{ ty }}"
+          vector-effect="non-scaling-stroke"/>
+    <text class="trend-axis-label" x="{{ PAD_L - 6 }}" y="{{ ty }}"
+          text-anchor="end" dominant-baseline="middle">{{ tick }}%</text>
+    {%- endfor -%}
+
+    {#- ── pass-rate line ──────────────────────────────────────────────────── -#}
+    {%- if n > 1 -%}
+    <polyline class="trend-line" fill="none" vector-effect="non-scaling-stroke"
+              points="{% for p in pts %}{{ xof(loop.index0) }},{{ yof(p.pass_rate) }} {% endfor %}"/>
+    {%- endif -%}
+
+    {#- ── per-run markers + exception bars ────────────────────────────────── -#}
+    {%- for p in pts -%}
+      {%- set x = xof(loop.index0) | float -%}
+      {%- set y = yof(p.pass_rate) | float -%}
+      {%- set bar_h = (p.failed / max_failed * BAR_BAND) if max_failed > 0 else 0 -%}
+      {%- set bar_w = ([PLOT_W / n * 0.45, 14] | min) if n > 0 else 14 -%}
+      {%- if bar_h > 0 -%}
+      <rect class="trend-bar {% if p.failed >= max_failed %}trend-bar-peak{% endif %}"
+            x="{{ (x - bar_w / 2) | round(2) }}" y="{{ PLOT_BOT }}"
+            width="{{ bar_w | round(2) }}" height="{{ bar_h | round(2) }}" rx="1">
+        <title>{{ p.label }}</title>
+      </rect>
+      {%- endif -%}
+      <circle class="trend-dot {% if p.failed == 0 %}trend-dot-pass{% else %}trend-dot-fail{% endif %}{% if loop.last %} trend-dot-latest{% endif %}"
+              cx="{{ x | round(2) }}" cy="{{ y | round(2) }}" r="{% if loop.last %}4{% else %}3{% endif %}"
+              vector-effect="non-scaling-stroke">
+        <title>{{ p.label }}</title>
+      </circle>
+    {%- endfor -%}
+
+    {#- ── x-axis endpoints: first and last run timestamps for context ─────── -#}
+    {%- if n > 0 -%}
+    <text class="trend-axis-label" x="{{ PAD_L }}" y="{{ H - 1 }}"
+          text-anchor="start">{{ pts[0].x_label }}</text>
+    {%- if n > 1 -%}
+    <text class="trend-axis-label" x="{{ W - PAD_R }}" y="{{ H - 1 }}"
+          text-anchor="end">{{ pts[-1].x_label }}</text>
+    {%- endif -%}
+    {%- endif -%}
+  </svg>
+</figure>

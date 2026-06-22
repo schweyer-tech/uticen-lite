@@ -32,9 +32,29 @@ wheel.
   files (templates/static) are present. A green pyproject-parse test can sit on top of a wheel that
   does not build.
 
+### Corollary — shipping out-of-package data to pip users (the legitimate force-include case)
+
+To ship data that lives **outside** the package (e.g. `examples/` — the demo a
+pip-installed feature needs but which is not under `controlflow_sdk/`), force-include it
+INTO the package namespace and keep the original as the single source of truth:
+`[tool.hatch.build.targets.wheel.force-include]` → `"examples/x" = "controlflow_sdk/_demo/x"`.
+Map only the files the feature needs, not the whole dir.
+
+- **force-include runs for the BUILT wheel, not for editable/source installs.** So any
+  runtime code that reads the bundled data MUST resolve with a fallback: packaged location
+  first (`<pkg>/_demo/...`), repo path second (`<repo>/examples/...`). A resolver that only
+  looks in the packaged location works from a wheel but breaks in editable dev installs and
+  the test suite (which run from the source tree where `_demo/` does not exist).
+- After adding a force-include, prove BOTH paths: build the wheel and assert the mapped
+  files are inside it, AND `pip install` that wheel into a clean venv **outside the repo**
+  and exercise the runtime path — so the repo-path fallback can't mask a packaging gap.
+
 ## Reference
 
 - `pyproject.toml` (`[tool.hatch.build.targets.wheel] packages = ["controlflow_sdk"]` ships
-  `plane/templates` + `plane/static`; the duplicating `force-include` block was removed).
+  `plane/templates` + `plane/static`; a later `force-include` block maps
+  `examples/northwind-trading` → `controlflow_sdk/_demo/...` for the demo loader).
+- `controlflow_sdk/store/import_service.py` (`demo_source_dir()` — packaged-first, repo-path
+  fallback resolver).
 - `tests/plane/test_packaging.py` (asserts the `plane` extra + `controlplane` script — a
   pyproject-only check; pair it with a real `python -m build` when touching packaging).

@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — Logic: {{ control.title if control else control_id }}{% endblock %}
+{% block head %}
+<style>
+  /* ── stacked node cards ─────────────────────────────────────────────── */
+  .pipe-cards { display: flex; flex-direction: column; gap: 0; }
+  .pipe-card {
+    background: var(--bg-surface-1); border: 1px solid var(--border-default);
+    border-radius: var(--radius-card); padding: 14px 16px; position: relative;
+    box-shadow: var(--shadow-card);
+  }
+  .pipe-card.terminal { border-color: var(--accent-primary); }
+  .pipe-card.node-error { border-color: var(--status-critical); }
+  .pipe-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .pipe-kind {
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 2px 8px; border-radius: var(--radius-badge);
+    background: var(--accent-muted); color: var(--accent-primary);
+  }
+  .pipe-kind.k-import { background: var(--status-info-muted); color: var(--status-info); }
+  .pipe-kind.k-filter { background: var(--status-warning-muted); color: var(--status-warning); }
+  .pipe-kind.k-join { background: var(--accent-muted); color: var(--accent-primary); }
+  .pipe-kind.k-custom_python { background: var(--bg-surface-3); color: var(--text-secondary); }
+  .pipe-kind.k-test { background: var(--status-success-muted); color: var(--status-success); }
+  .pipe-id { font-family: var(--font-mono); font-size: 12px; color: var(--text-tertiary); }
+  .pipe-count {
+    margin-left: auto; font-family: var(--font-mono); font-size: 12px;
+    color: var(--text-secondary); white-space: nowrap;
+  }
+  .pipe-count strong { color: var(--text-primary); }
+  .pipe-connector {
+    width: 2px; height: 18px; background: var(--border-strong); margin: 0 auto;
+  }
+  .pipe-body { display: grid; gap: 8px; }
+  .pipe-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .pipe-row label { font-size: 12px; color: var(--text-secondary); min-width: 80px; }
+  .pipe-card select, .pipe-card input[type=text] {
+    font-size: 13px; padding: 5px 8px;
+    background: var(--bg-input); color: var(--text-primary);
+    border: 1px solid var(--border-default); border-radius: var(--radius-input);
+  }
+  .node-err-msg {
+    color: var(--status-critical); font-size: 12px; margin-top: 6px;
+    padding: 8px 10px; background: var(--status-critical-muted);
+    border-radius: var(--radius-input);
+  }
+  .pipe-cond { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .pipe-toolbar { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0; }
+
+  /* ── generated SVG flowchart ────────────────────────────────────────── */
+  .flowchart svg { max-width: 100%; height: auto; }
+  .fc-box rect { fill: var(--bg-surface-2); stroke: var(--border-strong); }
+  .fc-box.fc-terminal rect { stroke: var(--accent-primary); }
+  .fc-box text { fill: var(--text-primary); font-family: var(--font-sans); font-size: 12px; }
+  .fc-box .fc-count { fill: var(--text-secondary); font-family: var(--font-mono); font-size: 11px; }
+  .fc-edge { stroke: var(--border-strong); stroke-width: 2; fill: none; }
+
+  .gen-python pre {
+    background: var(--bg-input); color: var(--text-primary);
+    border: 1px solid var(--border-default); border-radius: var(--radius-input);
+    padding: 12px; overflow-x: auto; font-family: var(--font-mono); font-size: 12px;
+    line-height: 1.5; white-space: pre;
+  }
+</style>
+{% endblock %}
+{% block body %}
+<a class="crumb" href="/controls/{{ control_id }}">← {{ control.title if control else control_id }}</a>
+<div class="page-head">
+  <h1>Logic</h1>
+  <p class="muted mono">{{ control_id }}</p>
+</div>
+{% if control %}{% include "_control_tabs.html" %}{% endif %}
+{% if logic_tab is defined %}{% include "partials/_logic_tabs.html" %}{% endif %}
+
+<p class="lead">Build the control as a flow of typed steps. Data enters only through
+  <strong>Import</strong> nodes; the row-count after each step is your sanity check
+  (a step dropping to 0 is the tell).</p>
+
+{% if save_errors %}
+<div class="banner banner-error" role="alert">
+  <strong>This pipeline wasn't saved.</strong>
+  <ul>{% for err in save_errors %}<li>{{ err }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+{% if parse_error %}
+<div class="banner banner-error" role="alert">{{ parse_error }}</div>
+{% endif %}
+
+<form method="post" action="/controls/{{ control_id }}/logic/builder" id="pipeline-form">
+  <input type="hidden" name="pipeline_json" id="pipeline-json" value="">
+
+  <div class="card">
+    <div class="card-head"><h2>Steps</h2></div>
+    <div class="pipe-cards" id="pipe-cards">
+      {% for node in nodes %}
+        {% if not loop.first %}<div class="pipe-connector"></div>{% endif %}
+        {% include "partials/_pipe_node.html" %}
+      {% else %}
+      <p class="muted">No steps yet. Add an Import node to bind your first source.</p>
+      {% endfor %}
+    </div>
+
+    <div class="pipe-toolbar">
+      <button class="btn btn-sm btn-add" type="button" data-add="import">+ Import</button>
+      <button class="btn btn-sm btn-add" type="button" data-add="filter">+ Filter</button>
+      <button class="btn btn-sm btn-add" type="button" data-add="join">+ Join</button>
+      <button class="btn btn-sm btn-add" type="button" data-add="custom_python">+ Custom Python</button>
+      <button class="btn btn-sm btn-add" type="button" data-add="test">+ Test (terminal)</button>
+    </div>
+
+    <div class="page-actions">
+      <button class="btn btn-primary" type="submit">Save pipeline</button>
+    </div>
+  </div>
+</form>
+
+{% if diagram %}
+<div class="card">
+  <div class="card-head"><h2>Flowchart</h2></div>
+  <div class="flowchart">{% include "partials/_pipe_diagram.html" %}</div>
+</div>
+{% endif %}
+
+{% if generated_python %}
+<div class="card">
+  <div class="card-head">
+    <h2>Generated Python</h2>
+    <div class="spacer"></div>
+    <form method="post" action="/controls/{{ control_id }}/logic/convert"
+          onsubmit="return confirm('Convert this pipeline into a full Python test? This is a one-way door — the visual steps become editable Python and the graph is replaced.');">
+      <button class="btn btn-sm btn-ghost" type="submit">Convert to Python test →</button>
+    </form>
+  </div>
+  <p class="lead">The glass-box — exactly what runs. Generated blocks are read-only;
+    convert to a Python test to edit by hand.</p>
+  <div class="gen-python"><pre>{{ generated_python }}</pre></div>
+</div>
+{% endif %}
+
+<!-- The whole graph as JSON; the editor script mutates it and the cards read it. -->
+<script id="graph-data" type="application/json">{{ graph_json | safe }}</script>
+<script>
+  (function () {
+    var graph = JSON.parse(document.getElementById('graph-data').textContent || '{"nodes":[]}');
+    var jsonField = document.getElementById('pipeline-json');
+
+    function serialize() {
+      // Read every card's controls back into the graph before submit/add/remove.
+      var nodes = [];
+      document.querySelectorAll('[data-node]').forEach(function (card) {
+        var id = card.getAttribute('data-node');
+        var type = card.getAttribute('data-type');
+        var node = { id: id, type: type, narrative: '', config: {}, inputs: [] };
+        var narr = card.querySelector('[data-narrative]');
+        if (narr) { node.narrative = narr.value; }
+        if (type === 'import') {
+          var s = card.querySelector('[data-source]');
+          node.source_id = s ? s.value : null;
+        } else {
+          card.querySelectorAll('[data-input]').forEach(function (sel) {
+            if (sel.value) { node.inputs.push(sel.value); }
+          });
+        }
+        if (type === 'filter' || type === 'test') {
+          if (type === 'test') {
+            node.config.severity = (card.querySelector('[data-severity]') || {}).value || 'medium';
+            node.config.description_template = (card.querySelector('[data-desc]') || {}).value || '';
+            node.config.item_key_column = (card.querySelector('[data-itemkey]') || {}).value || null;
+          }
+          node.config.logic = (card.querySelector('[data-logic]') || {}).value || 'all';
+          node.config.conditions = [];
+          card.querySelectorAll('[data-cond]').forEach(function (row) {
+            var col = (row.querySelector('[data-cond-col]') || {}).value || '';
+            var free = (row.querySelector('[data-cond-col-free]') || {}).value || '';
+            if (col === '__other__' && free) { col = free; }
+            var op = (row.querySelector('[data-cond-op]') || {}).value || 'eq';
+            var raw = (row.querySelector('[data-cond-val]') || {}).value;
+            if (!col) { return; }
+            var cond = { column: col, op: op };
+            if (['is_empty', 'not_empty', 'is_duplicate'].indexOf(op) === -1) {
+              if (op === 'in' || op === 'not_in') {
+                cond.value = raw.split('|').map(function (p) { return typed(p.trim()); })
+                                .filter(function (p) { return p !== ''; });
+              } else {
+                cond.value = typed(raw);
+              }
+            }
+            node.config.conditions.push(cond);
+          });
+        } else if (type === 'join') {
+          node.config.mode = (card.querySelector('[data-join-mode]') || {}).value || 'inner';
+          node.config.left_key = (card.querySelector('[data-join-lk]') || {}).value || '';
+          node.config.right_key = (card.querySelector('[data-join-rk]') || {}).value || '';
+        } else if (type === 'custom_python') {
+          node.config.flavor = (card.querySelector('[data-flavor]') || {}).value || 'transform';
+          node.config.code = (card.querySelector('[data-code]') || {}).value || '';
+        }
+        nodes.push(node);
+      });
+      graph.nodes = nodes;
+    }
+
+    function typed(v) {
+      if (v === '') { return ''; }
+      var low = v.toLowerCase();
+      if (low === 'true') { return true; }
+      if (low === 'false') { return false; }
+      var n = Number(v);
+      return isNaN(n) ? v : n;
+    }
+
+    function genId(type) {
+      var base = type.slice(0, 3);
+      var i = 1;
+      while (graph.nodes.some(function (n) { return n.id === base + i; })) { i++; }
+      return base + i;
+    }
+
+    function reload() {
+      serialize();
+      jsonField.value = JSON.stringify(graph);
+      // Re-render server-side so cards/diagram/counts reflect the new graph.
+      document.getElementById('pipeline-form').submit();
+    }
+
+    document.querySelectorAll('[data-add]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        serialize();
+        var type = btn.getAttribute('data-add');
+        var node = { id: genId(type), type: type, narrative: '', config: {}, inputs: [] };
+        if (type === 'import') { node.source_id = null; }
+        if (type === 'custom_python') { node.config.flavor = 'transform'; node.config.code = 'rows = rows'; }
+        if (type === 'filter' || type === 'test') { node.config.logic = 'all'; node.config.conditions = []; }
+        if (type === 'join') { node.config.mode = 'inner'; }
+        graph.nodes.push(node);
+        jsonField.value = JSON.stringify(graph);
+        document.getElementById('pipeline-form').submit();
+      });
+    });
+
+    document.querySelectorAll('[data-remove]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        serialize();
+        var id = btn.getAttribute('data-remove');
+        graph.nodes = graph.nodes.filter(function (n) { return n.id !== id; });
+        graph.nodes.forEach(function (n) {
+          n.inputs = (n.inputs || []).filter(function (i) { return i !== id; });
+        });
+        jsonField.value = JSON.stringify(graph);
+        document.getElementById('pipeline-form').submit();
+      });
+    });
+
+    document.getElementById('pipeline-form').addEventListener('submit', function () {
+      serialize();
+      jsonField.value = JSON.stringify(graph);
+    });
+
+    // Reveal the free-text column box when "Other" is picked (mirrors the rule builder).
+    function syncCond(row) {
+      var sel = row.querySelector('[data-cond-col]');
+      var free = row.querySelector('[data-cond-col-free]');
+      if (sel && free) { free.style.display = (sel.value === '__other__') ? '' : 'none'; }
+    }
+    document.querySelectorAll('[data-cond]').forEach(function (row) {
+      var sel = row.querySelector('[data-cond-col]');
+      if (sel) { sel.addEventListener('change', function () { syncCond(row); }); }
+      syncCond(row);
+    });
+    // Add-condition within a Filter/Test card.
+    document.querySelectorAll('[data-add-cond]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        serialize();
+        var card = btn.closest('[data-node]');
+        var node = graph.nodes.filter(function (n) { return n.id === card.getAttribute('data-node'); })[0];
+        if (node) {
+          node.config.conditions = node.config.conditions || [];
+          node.config.conditions.push({ column: '', op: 'eq', value: '' });
+          jsonField.value = JSON.stringify(graph);
+          document.getElementById('pipeline-form').submit();
+        }
+      });
+    });
+  })();
+</script>
+{% endblock %}

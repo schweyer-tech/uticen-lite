@@ -1,14 +1,31 @@
 {% extends "base.html" %}
-{% block title %}{{ project.name }} — Edit Source: {{ source.id }}{% endblock %}
+{% block title %}{{ project.name }} — Edit Source: {{ source.title or source.id }}{% endblock %}
 {% block body %}
 <a class="crumb" href="/sources">← Sources</a>
 <div class="page-head">
-  <h1>Edit source</h1>
+  <h1>{{ source.title or "Edit source" }}</h1>
   <p class="muted mono">{{ source.id }}</p>
 </div>
+{% include "_source_tabs.html" %}
 
 <form method="post" action="/sources/{{ source.id }}">
   <div class="card">
+    <h2>Metadata</h2>
+    <div class="field">
+      <label for="s-title">Title</label>
+      <span class="hint">A human-friendly name shown wherever this source appears.</span>
+      <input id="s-title" type="text" name="title" value="{{ source.title or '' }}"
+             placeholder="e.g. Vendor Invoice Register">
+    </div>
+    <div class="field">
+      <label for="s-desc">Description</label>
+      <span class="hint">One line on what this extract is.</span>
+      <textarea id="s-desc" name="description" rows="2">{{ source.description or '' }}</textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Key columns</h2>
     <div class="field">
       <label for="key-cols">Key columns</label>
       <span class="hint">Comma-separated original names that uniquely identify a row.</span>

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — {{ source.title or source.id }} · Data{% endblock %}
+{% block body %}
+<a class="crumb" href="/sources">← Sources</a>
+<div class="page-head">
+  <h1>{{ source.title or "Edit source" }}</h1>
+  <p class="muted mono">{{ source.id }}</p>
+</div>
+{% include "_source_tabs.html" %}
+
+<div class="card">
+  <h2>Current file</h2>
+  {% if current %}
+  <p class="muted">
+    <span class="mono">{{ current.original_name }}</span> ·
+    {{ total }} record{{ '' if total == 1 else 's' }}
+  </p>
+  <form method="post" action="/sources/{{ source.id }}/data/asof" class="inline-asof">
+    <label for="d-asof">Data as-of date</label>
+    <input id="d-asof" type="date" name="as_of_date" value="{{ current.as_of_date or '' }}">
+    <button class="btn btn-sm" type="submit">Save date</button>
+  </form>
+  {% else %}
+  <p class="muted">No file uploaded yet.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Refresh data</h2>
+  <p class="hint">Upload a newer extract. You'll review any column changes before it replaces the current file — and the previous file is always kept.</p>
+  <form method="post" action="/sources/{{ source.id }}/refresh" enctype="multipart/form-data">
+    <div class="field">
+      <label for="d-file">File</label>
+      <input id="d-file" type="file" name="file" accept=".csv" required>
+    </div>
+    <div class="field">
+      <label for="d-newasof">As-of date for this file</label>
+      <input id="d-newasof" type="date" name="as_of_date" required>
+    </div>
+    <button class="btn btn-primary" type="submit">Upload new file…</button>
+  </form>
+</div>
+
+{% set flagged = coercion | selectattr('all_bad') | list %}
+{% if flagged %}
+<div class="card callout-warn">
+  <h2>Mapping check</h2>
+  <p class="hint">These columns are declared as a non-text type but no value parsed. Fix the data type on the
+     <a href="/sources/{{ source.id }}">Definition</a> tab, or correct the data.</p>
+  <ul>
+    {% for col in flagged %}
+    <li><span class="mono">{{ col.display_name }}</span> — declared <strong>{{ col.data_type }}</strong>,
+        but all {{ col.total }} non-empty value(s) failed to parse.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if header %}
+<h2>Preview <span class="muted">— records {{ (page - 1) * page_size + 1 }}–{{ (page - 1) * page_size + rows|length }} of {{ total }}</span></h2>
+<div class="table-wrap">
+  <table>
+    <thead><tr>{% for h in header %}<th class="mono">{{ h }}</th>{% endfor %}</tr></thead>
+    <tbody>
+      {% for r in rows %}<tr>{% for cell in r %}<td>{{ cell }}</td>{% endfor %}</tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if page_count > 1 %}
+<div class="pager">
+  {% if page > 1 %}<a class="btn btn-sm" href="/sources/{{ source.id }}/data?page={{ page - 1 }}">← Prev</a>{% endif %}
+  <span class="muted">Page {{ page }} of {{ page_count }}</span>
+  {% if page < page_count %}<a class="btn btn-sm" href="/sources/{{ source.id }}/data?page={{ page + 1 }}">Next →</a>{% endif %}
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

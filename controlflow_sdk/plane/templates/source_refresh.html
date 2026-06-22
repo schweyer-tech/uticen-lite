@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — Refresh {{ source.title or source.id }}{% endblock %}
+{% block body %}
+<a class="crumb" href="/sources/{{ source.id }}">← Back to source</a>
+<div class="page-head">
+  <h1>Review data refresh</h1>
+  <p class="lead">Confirm the new file for <strong>{{ source.title or source.id }}</strong> <span class="mono muted">({{ source.id }})</span>.</p>
+</div>
+
+<div class="card">
+  <h2>New file</h2>
+  <p class="muted">Staged: <span class="mono">{{ pending }}</span> — {{ new_headers | length }} column(s).</p>
+
+  {% if not added and not removed %}
+  <p><span class="badge">No column changes</span></p>
+  <p class="muted">Your existing column mapping is preserved. Only the data is replaced; the current file is archived first.</p>
+  {% else %}
+  {% if added %}
+  <h3>Added columns</h3>
+  <ul class="diff-list">
+    {% for c in added %}<li><span class="mono">{{ c }}</span> <span class="muted">— new, defaults applied</span></li>{% endfor %}
+  </ul>
+  {% endif %}
+  {% if removed %}
+  <h3>Removed columns</h3>
+  <ul class="diff-list">
+    {% for c in removed %}<li><span class="mono">{{ c }}</span> <span class="muted">— no longer in the file, will be dropped</span></li>{% endfor %}
+  </ul>
+  {% endif %}
+  <p class="muted">Mappings for unchanged columns are preserved. The current file is archived before it is replaced.</p>
+  {% endif %}
+
+  <div class="page-actions">
+    <form method="post" action="/sources/{{ source.id }}/refresh/confirm" style="display:inline;">
+      <input type="hidden" name="pending" value="{{ pending }}">
+      <input type="hidden" name="as_of_date" value="{{ as_of_date or '' }}">
+      <button class="btn btn-primary" type="submit">Confirm refresh</button>
+    </form>
+    <form method="post" action="/sources/{{ source.id }}/refresh/cancel" style="display:inline;">
+      <input type="hidden" name="pending" value="{{ pending }}">
+      <input type="hidden" name="as_of_date" value="{{ as_of_date or '' }}">
+      <button class="btn btn-ghost" type="submit">Cancel</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

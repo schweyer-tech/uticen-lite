@@ -25,17 +25,20 @@
         <span class="brand-mark">ControlFlow</span>
         <span class="brand-sub">Control Plane</span>
       </a>
+      {% if project and project.name %}
       <nav class="app-nav">
         <a class="nav-link {% if path == '/' or path.startswith('/controls') %}active{% endif %}" href="/">Controls</a>
         <a class="nav-link {% if path.startswith('/sources') %}active{% endif %}" href="/sources">Sources</a>
         <a class="nav-link {% if path.startswith('/export') %}active{% endif %}" href="/export">Export</a>
+        <a class="nav-link {% if path.startswith('/settings') %}active{% endif %}" href="/settings">Settings</a>
       </nav>
+      {% endif %}
       <div class="app-header-tools">
         <button type="button" class="theme-toggle" id="theme-toggle"
                 aria-label="Toggle light and dark theme" title="Toggle light/dark">
           <span class="theme-icon-dark">☾</span><span class="theme-icon-light">☀</span>
         </button>
-        <span class="chip">{{ project.name }}</span>
+        {% if project and project.name %}<span class="chip">{{ project.name }}</span>{% endif %}
       </div>
     </div>
   </header>

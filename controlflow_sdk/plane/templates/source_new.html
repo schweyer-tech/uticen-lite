@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — Add source{% endblock %}
+{% block body %}
+<a class="crumb" href="/sources">← Sources</a>
+<div class="page-head">
+  <h1>Add a data source</h1>
+  <p class="lead">Upload a CSV population. We'll detect its columns so you can map and describe them on the next screen. Source data stays local — it is never written to the export bundle.</p>
+</div>
+
+<div class="card">
+  <form method="post" action="/sources" enctype="multipart/form-data">
+    <div class="field">
+      <label for="s-id">Source ID</label>
+      <span class="hint">The code-facing variable name, e.g. <span class="mono">invoices</span>.</span>
+      <input id="s-id" type="text" name="source_id" placeholder="e.g. invoices" required>
+    </div>
+    <div class="field">
+      <label for="s-fmt">Format</label>
+      <select id="s-fmt" name="format">
+        <option value="csv">CSV</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="s-file">File</label>
+      <input id="s-file" type="file" name="file" accept=".csv" required>
+    </div>
+    <div class="field">
+      <label for="s-asof">Data as-of date</label>
+      <span class="hint">The date this extract is current as of.</span>
+      <input id="s-asof" type="date" name="as_of_date" required>
+    </div>
+    <div class="page-actions">
+      <button class="btn btn-primary" type="submit">Upload &amp; continue</button>
+      <a class="btn btn-ghost" href="/sources">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

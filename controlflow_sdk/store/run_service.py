@@ -10,8 +10,7 @@ from controlflow_sdk.model.run import RunRecord
 from controlflow_sdk.model.workpaper import Workpaper
 from controlflow_sdk.render.html import render_html
 from controlflow_sdk.render.markdown import render_markdown
-from controlflow_sdk.rules.render_rule import rule_to_text
-from controlflow_sdk.rules.spec import parse_rule_spec
+from controlflow_sdk.rules.resolve import resolve_test_code
 from controlflow_sdk.runner.execute import collect_data_samples, run_control
 from controlflow_sdk.store import repo
 from controlflow_sdk.store.loader import load_project_from_store
@@ -50,15 +49,17 @@ def run_control_in_store(
 
     samples = collect_data_samples(control, project.sources, root)
 
-    # Resolve the test code shown in the workpaper.  Rule controls have no .py
-    # file, so we render the rule spec to human-readable text instead.  For
-    # inline-python controls we pass test_code directly so assemble skips the
-    # disk read.  File-based controls pass None → assemble reads test_path.
+    # Resolve the test code shown in the workpaper.  Inline-python controls
+    # already carry test_code; rule controls have no .py file so we render the
+    # rule to readable text.  File-based controls (test_code is None) keep None
+    # here so Workpaper.assemble defers the disk read to assemble time.
     resolved_test_code: str | None
-    if control.test_kind == "rule" and control.rule_spec is not None:
-        resolved_test_code = rule_to_text(parse_rule_spec(control.rule_spec))
+    if control.test_code is not None:
+        resolved_test_code = control.test_code
+    elif control.rule_spec is not None:
+        resolved_test_code = resolve_test_code(control)  # renders rule → text
     else:
-        resolved_test_code = control.test_code  # str | None — None → assemble reads test_path
+        resolved_test_code = None  # file-based — Workpaper.assemble reads test_path
 
     wp = Workpaper.assemble(
         control,

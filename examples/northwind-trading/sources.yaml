@@ -1,6 +1,7 @@
 sources:
   - id: journal_entries
     type: file
+    title: Journal Entry Register
     description: General-ledger journal entry register for the period.
     completeness_accuracy: Extracted directly from the GL; total entry count reconciled to the trial-balance posting count.
     extract_date: "2026-03-31"
@@ -47,6 +48,7 @@ sources:
 
   - id: closed_periods
     type: file
+    title: Accounting Period Calendar
     description: Accounting calendar listing each fiscal period and its open/closed status.
     completeness_accuracy: Pulled from the period-close control table; status confirmed against the month-end close checklist for every period in scope.
     extract_date: "2026-03-31"
@@ -69,6 +71,7 @@ sources:
 
   - id: purchase_orders
     type: file
+    title: Purchase Order Register
     description: Purchase order register covering all POs raised in the period.
     completeness_accuracy: Exported from the procurement system; PO count and total value reconciled to the open/closed PO aging report.
     extract_date: "2026-03-31"
@@ -103,6 +106,7 @@ sources:
 
   - id: invoices
     type: file
+    title: Vendor Invoice Register
     description: Vendor invoice register for goods and services received in the period.
     completeness_accuracy: Extracted from accounts payable; invoice count and total reconciled to the AP subledger control account.
     extract_date: "2026-03-31"
@@ -137,6 +141,7 @@ sources:
 
   - id: payments
     type: file
+    title: Vendor Payment Register
     description: Disbursement register of all vendor payments made in the period.
     completeness_accuracy: Drawn from the cash disbursements journal; payment count and total tied to the bank statement clearings for the period.
     extract_date: "2026-03-31"
@@ -179,6 +184,7 @@ sources:
 
   - id: employees
     type: file
+    title: Employee Master Roster
     description: HR master roster of active and terminated employees for the period.
     completeness_accuracy: Sourced from the HRIS system of record; headcount reconciled to the payroll register for the period.
     extract_date: "2026-03-31"
@@ -213,6 +219,7 @@ sources:
 
   - id: access_accounts
     type: file
+    title: System Access Accounts
     description: System access account listing with role, privilege, and MFA attributes.
     completeness_accuracy: Generated from the identity provider's full account export; account count reconciled to the IAM directory total at extract time.
     extract_date: "2026-03-31"
@@ -263,6 +270,7 @@ sources:
 
   - id: vendor_master
     type: file
+    title: Vendor Master File
     description: Vendor master file of all approved suppliers and their maintenance attributes.
     completeness_accuracy: Extracted from the vendor master in full; record count reconciled to the approved-vendor list maintained by procurement.
     extract_date: "2026-03-31"

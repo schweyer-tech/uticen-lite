@@ -27,6 +27,22 @@ from controlflow_sdk.cli.build_cmd import build_cmd
 from controlflow_sdk.cli.import_cmd import import_cmd
 from controlflow_sdk.cli.run_cmd import run_cmd
 
+
+def _version() -> str:
+    """Return the installed ``controlflow-sdk`` version, or ``"unknown"``.
+
+    Reads the distribution metadata so the reported version always matches what
+    pip installed. Falls back gracefully when the package isn't installed as a
+    distribution (e.g. run straight from a source checkout).
+    """
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return version("controlflow-sdk")
+    except PackageNotFoundError:
+        return "unknown"
+
+
 # ---------------------------------------------------------------------------
 # Subcommand handlers
 # ---------------------------------------------------------------------------
@@ -51,6 +67,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="cflow",
         description="ControlFlow SDK command-line interface.",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {_version()}",
+        help="Show the installed controlflow-sdk version and exit.",
     )
     sub = parser.add_subparsers(dest="command", metavar="<command>")
 

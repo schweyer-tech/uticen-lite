@@ -186,7 +186,9 @@ def run_control(
         from controlflow_sdk.rules.evaluate import evaluate_rule
         from controlflow_sdk.rules.spec import parse_rule_spec
 
-        raw_result: Any = evaluate_rule(parse_rule_spec(control.rule_spec), primary)
+        raw_result: Any = evaluate_rule(
+            parse_rule_spec(control.rule_spec), primary, sources_by_id
+        )
     else:
         test_fn = load_test_callable(control)
 

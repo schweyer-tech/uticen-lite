@@ -22,6 +22,10 @@ def register(
         conn: sqlite3.Connection = Depends(get_conn),
     ) -> Any:
         project = repo.get_project(conn) or {"name": ""}
+        # First run: no engagement name yet → show the onboarding screen instead of
+        # an empty dashboard (issue #11).
+        if not project.get("name"):
+            return templates.TemplateResponse(request, "setup.html", {"project": project})
         controls = repo.list_controls(conn)
         rows = []
         for c in controls:

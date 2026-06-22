@@ -8,3 +8,9 @@ dist/
 .venv/
 import-bundle.zip
 *.zip
+.ruff_cache/
+.compound/
+.claude/worktrees/
+
+# Subagent-driven-development scratch (briefs, reports, ledger, diffs)
+.superpowers/

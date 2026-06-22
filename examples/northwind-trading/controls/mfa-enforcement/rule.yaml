@@ -1,0 +1,24 @@
+# No-code rule (rule_spec) authoring of this control.
+#
+# This sidecar reshapes the demo so the control plane's one-click demo showcases
+# the flagship no-code rule builder (#9), not only the Python escape hatch. The
+# importer compiles this rule_spec into the control's bundle artifact; the CLI and
+# web runner both evaluate it via rules.evaluate.evaluate_rule. The companion
+# test.py stays in the repo as documentation but is NOT the executed artifact once
+# this sidecar is present.
+#
+# Logic: flag an ACTIVE account whose MFA is not enabled. Both is_active and
+# mfa_enabled load as the source's `boolean` data_type (see sources.yaml), so the
+# condition values are real booleans — matching the column's loaded dtype keeps
+# the comparison sound (learning 0011). Expected: 0 violations on the demo data.
+logic: all
+severity: high
+item_key_column: account_id
+description_template: "Active account '{account_id}' does not have MFA enabled"
+conditions:
+  - column: is_active
+    op: eq
+    value: true
+  - column: mfa_enabled
+    op: eq
+    value: false

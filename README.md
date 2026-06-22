@@ -32,6 +32,41 @@ For CSV/Parquet/Excel adapter support, add `adapters`:
 pip install 'controlflow-sdk[plane,adapters]'
 ```
 
+[pipx](https://pipx.pypa.io/) works too if you want the commands isolated on your PATH:
+`pipx install 'controlflow-sdk[plane]'`.
+
+**Corporate / offline install.** Behind a firewall, air-gapped, or on an internal package index?
+See **[docs/INSTALL.md](docs/INSTALL.md)** for pipx, internal-index (`--index-url`/`--extra-index-url`),
+and pinned-wheel flows.
+
+## Quick start — launch and first run
+
+After installing, start the control plane in any directory (it's created if missing):
+
+```bash
+controlplane --project my-audit
+# → opens http://127.0.0.1:8765
+```
+
+`controlplane` is a console command pip installs for you. If you'd rather not rely on a
+script on your PATH, the exact equivalent is to run the module:
+
+```bash
+python -m controlflow_sdk.plane --project my-audit
+```
+
+Both accept the same flags: `--project <dir>` (engagement directory, default `.`),
+`--host`, `--port` (default `8765`), and `--no-browser` (don't auto-open a browser).
+
+**First run.** A brand-new engagement opens to a setup screen. You can either:
+
+- **Name your engagement** (and optionally pick a framework) to start authoring from a
+  blank slate, or
+- click **Load the Northwind demo** to populate a fully runnable 8-control example in
+  one click — no repo checkout or CSV wrangling required.
+
+Once named, the engagement name shows in the header and the dashboard takes over.
+
 ## See it in action — the Northwind demo
 
 The repo ships a complete, runnable engagement under
@@ -86,7 +121,8 @@ See the [Northwind catalog README](examples/northwind-trading/README.md) for wha
 
 ## Authoring with the web app
 
-Start the control plane in any engagement directory (or a fresh one):
+Start the control plane in any engagement directory (or a fresh one) — via the
+`controlplane` command or the equivalent `python -m controlflow_sdk.plane`:
 
 ```bash
 controlplane --project my-audit

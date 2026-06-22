@@ -32,6 +32,7 @@ def _binding(src: dict) -> SourceBinding:
         description=src.get("description"),
         completeness_accuracy=src.get("completeness_accuracy"),
         extract_date=src.get("extract_date"),
+        title=src.get("title"),
     )
 
 

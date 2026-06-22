@@ -113,6 +113,11 @@ class SourceBinding:
     (the date the data is current as of). It surfaces as the Extract Date in the
     rendered workpaper's Data Sources section; when absent the renderer falls
     back to the run's execution/as-of date.
+
+    ``title`` is the optional author-facing display name for the source, shown in
+    the control-plane source picker, the sources list, and the source editor. It
+    is display/UI metadata only and is NOT carried into the export bundle (it is
+    deliberately absent from ``to_data_source()``).
     """
 
     id: str
@@ -123,6 +128,7 @@ class SourceBinding:
     description: str | None = None
     completeness_accuracy: str | None = None
     extract_date: str | None = None
+    title: str | None = None
 
     def to_data_source(self) -> dict[str, Any]:
         """Return the app ``data_sources`` shape (type + key_config + column_mappings only)."""

@@ -4,6 +4,12 @@ name: Release
 # The publish step ONLY runs when a human explicitly triggers workflow_dispatch
 # and the PYPI_API_TOKEN secret is available — it NEVER publishes on a plain
 # push or tag push alone.
+#
+# RECOMMENDATION (future round, out of scope here): migrate the publish job to PyPI
+# trusted publishing (OIDC) once the project owner creates the PyPI project + a
+# pending publisher. That removes the long-lived PYPI_API_TOKEN: add
+# `permissions: id-token: write` to the publish job and drop the `password:` input
+# below. Flagged only — no change is made here.
 
 on:
   push:
@@ -92,11 +98,24 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install build + twine
-        run: pip install --upgrade build twine
+      - name: Tag matches package version
+        # version is duplicated in pyproject.toml + __init__.py; this guard fails
+        # the publish before upload so a future release can't ship a mislabeled wheel.
+        run: |
+          PKG=$(python -c "import tomllib,pathlib;print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")
+          TAG="${GITHUB_REF_NAME#v}"
+          [ "$PKG" = "$TAG" ] || { echo "::error::tag v$TAG != pyproject version $PKG"; exit 1; }
 
-      - name: Rebuild wheel and sdist
-        run: python -m build
+      - name: Install twine
+        run: pip install --upgrade twine
+
+      # Reuse the exact dist that build-and-check already built + twine-checked, so
+      # the published bytes ARE the verified bytes (no second-build drift).
+      - name: Download verified dist
+        uses: actions/download-artifact@v7
+        with:
+          name: dist-${{ github.ref_name }}
+          path: dist/
 
       - name: Verify distribution
         run: twine check dist/*

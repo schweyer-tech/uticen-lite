@@ -158,3 +158,33 @@ class TestBuildAtDefault:
         out_zip = tmp_path / "bundle.zip"
         rc = main(["build", str(root), "--out", str(out_zip)])
         assert rc == 0
+
+
+# ---------------------------------------------------------------------------
+# Missing / empty engagement store → friendly error, non-zero exit
+# ---------------------------------------------------------------------------
+
+
+class TestBuildMissingStore:
+    def test_build_on_dir_without_store_exits_1(self, tmp_path: Path) -> None:
+        """A directory that was never imported has no store — build must exit 1,
+        not die with a cryptic 'no such table: project'."""
+        empty = tmp_path / "no-store"
+        empty.mkdir()
+        out_zip = tmp_path / "bundle.zip"
+        rc = main(["build", str(empty), "--out", str(out_zip), "--at", FIXED_AT])
+        assert rc == 1
+
+    def test_build_on_dir_without_store_prints_actionable_message(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture
+    ) -> None:
+        """The error must name the dir and point the user at `cflow import`,
+        not leak the raw sqlite3 'no such table' text."""
+        empty = tmp_path / "no-store"
+        empty.mkdir()
+        out_zip = tmp_path / "bundle.zip"
+        main(["build", str(empty), "--out", str(out_zip), "--at", FIXED_AT])
+        err = capsys.readouterr().err
+        assert "No engagement store found" in err
+        assert "cflow import" in err
+        assert "no such table" not in err

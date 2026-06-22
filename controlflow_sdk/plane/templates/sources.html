@@ -4,41 +4,24 @@
 <div class="page-head">
   <h1>Data sources</h1>
   <p class="lead">Upload the populations your controls test against. Source data stays local — it is never written to the export bundle.</p>
-</div>
-
-<div class="card">
-  <h2>Upload a source</h2>
-  <form method="post" action="/sources" enctype="multipart/form-data">
-    <div class="field">
-      <label for="s-id">Source ID</label>
-      <input id="s-id" type="text" name="source_id" placeholder="e.g. invoices" required>
-    </div>
-    <div class="field">
-      <label for="s-fmt">Format</label>
-      <select id="s-fmt" name="format">
-        <option value="csv">CSV</option>
-      </select>
-    </div>
-    <div class="field">
-      <label for="s-file">File</label>
-      <input id="s-file" type="file" name="file" accept=".csv" required>
-    </div>
-    <button class="btn btn-primary" type="submit">Upload</button>
-  </form>
+  <div class="page-actions"><a class="btn btn-primary" href="/sources/new">Add source</a></div>
 </div>
 
 {% if sources %}
 <h2>Existing sources</h2>
 <div class="table-wrap">
   <table>
-    <thead><tr><th>ID</th><th>Format</th><th>Path</th><th class="shrink"></th></tr></thead>
+    <thead><tr><th>Source</th><th>Format</th><th>Path</th><th class="shrink"></th></tr></thead>
     <tbody>
     {% for src in sources %}
       <tr>
-        <td><a class="mono" href="/sources/{{ src.id }}">{{ src.id }}</a></td>
+        <td>
+          <a href="/sources/{{ src.id }}">{{ src.title or src.id }}</a>
+          {% if src.title %}<span class="mono muted">{{ src.id }}</span>{% endif %}
+        </td>
         <td><span class="badge">{{ src.format }}</span></td>
         <td class="mono muted">{{ src.path }}</td>
-        <td class="shrink"><a class="btn btn-sm btn-ghost" href="/sources/{{ src.id }}">Edit columns</a></td>
+        <td class="shrink"><a class="btn btn-sm btn-ghost" href="/sources/{{ src.id }}">Edit</a></td>
       </tr>
     {% endfor %}
     </tbody>
@@ -47,7 +30,7 @@
 {% else %}
 <div class="empty-state">
   <h3>No sources yet</h3>
-  <p>Upload a CSV above to get started.</p>
+  <p>Click <a href="/sources/new">Add source</a> to upload your first CSV.</p>
 </div>
 {% endif %}
 {% endblock %}

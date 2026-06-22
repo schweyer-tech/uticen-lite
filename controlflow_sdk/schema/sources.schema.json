@@ -17,6 +17,10 @@
             "type": "string",
             "description": "Unique source identifier matching references in control docs."
           },
+          "title": {
+            "type": "string",
+            "description": "Optional author-facing display name for the source, shown in the control-plane source picker, sources list, and source editor. Display/UI metadata only — not carried into the export bundle."
+          },
           "description": {
             "type": "string",
             "description": "Optional one-line description of the extract, shown in the workpaper's Data Sources section."

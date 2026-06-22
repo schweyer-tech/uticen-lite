@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 4
 
 # Forward-only, idempotent DDL. Index = target user_version.
 _STEPS: list[str] = [
@@ -75,6 +75,45 @@ _STEPS: list[str] = [
         severity      TEXT NOT NULL DEFAULT 'medium',
         details       TEXT NOT NULL DEFAULT '{}'  -- JSON
     );
+    """,
+    # --- step 2 -> user_version 2 -------------------------------------------
+    # Author-facing display title for a source (shown in the source picker, the
+    # sources list, and the source editor). Display/UI metadata only — it is NOT
+    # carried into the export bundle (see SourceBinding.to_data_source()).
+    """
+    ALTER TABLE sources ADD COLUMN title TEXT;
+    """,
+    # --- step 3 -> user_version 3 -------------------------------------------
+    # Per-file data lineage: one row per uploaded file version. is_current=1 is the
+    # live file (its stored_path == sources.path); archived versions point under
+    # data/.versions/<id>/. as_of_date is the file's data-as-of. Store/UI only — the
+    # bundle path reads sources.extract_date (kept in sync with the current row).
+    # Backfill one current row per existing source so single-file sources show history.
+    """
+    CREATE TABLE IF NOT EXISTS source_files (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_id     TEXT NOT NULL,
+        stored_path   TEXT NOT NULL,
+        original_name TEXT NOT NULL,
+        as_of_date    TEXT,
+        row_count     INTEGER,
+        uploaded_at   TEXT NOT NULL DEFAULT '',
+        is_current    INTEGER NOT NULL DEFAULT 0
+    );
+    INSERT INTO source_files
+        (source_id, stored_path, original_name, as_of_date, uploaded_at, is_current)
+    SELECT id, path, replace(path, 'data/', ''), extract_date, created_at, 1
+    FROM sources;
+    """,
+    # --- step 4 -> user_version 4 -------------------------------------------
+    # Store-only visual-pipeline graph for test_kind='pipeline' controls (issue
+    # #25). The graph is authoring state in controlplane.db; it COMPILES to the
+    # existing rule_spec/test_code at run/build time, so the bundle contract
+    # (contract/bundle.schema.json) never learns the word "node" (learning 0001).
+    # This bumps the internal STORE schema version only — NOT the bundle
+    # schema_version. The column is NULL for rule/python controls.
+    """
+    ALTER TABLE controls ADD COLUMN pipeline TEXT;
     """,
 ]
 

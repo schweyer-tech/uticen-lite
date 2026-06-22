@@ -1,34 +1,22 @@
 {% extends "base.html" %}
 {% block title %}{{ project.name }} — {% if control %}Edit: {{ control.title }}{% else %}New Control{% endif %}{% endblock %}
-{% block head %}
-<link rel="stylesheet" href="/static/codemirror.min.css">
-<style>
-  /* Dark CodeMirror theme to match the control-plane palette. Loaded after
-     codemirror.min.css so these win. */
-  .CodeMirror {
-    background: var(--bg-input); color: var(--text-primary);
-    border: 1px solid var(--border-default); border-radius: var(--radius-input);
-    font-family: var(--font-mono); font-size: 12px; height: auto;
-  }
-  .CodeMirror-gutters { background: var(--bg-surface-1); border-right: 1px solid var(--border-default); }
-  .CodeMirror-linenumber { color: var(--text-tertiary); }
-  .CodeMirror-cursor { border-left: 1px solid var(--text-primary); }
-  .CodeMirror-selected { background: var(--accent-muted) !important; }
-  .cm-s-default .cm-keyword { color: var(--cm-keyword); }
-  .cm-s-default .cm-def, .cm-s-default .cm-variable { color: var(--text-primary); }
-  .cm-s-default .cm-string { color: var(--cm-string); }
-  .cm-s-default .cm-number { color: var(--cm-number); }
-  .cm-s-default .cm-comment { color: var(--text-tertiary); }
-  .cm-s-default .cm-builtin, .cm-s-default .cm-atom { color: var(--cm-builtin); }
-  .cm-s-default .cm-operator { color: var(--text-secondary); }
-</style>
-{% endblock %}
+{% block head %}{% endblock %}
 {% block body %}
 <a class="crumb" href="/">← Controls</a>
 <div class="page-head">
   <h1>{% if control %}{{ control.title }}{% else %}New control{% endif %}</h1>
   {% if control %}<p class="muted mono">{{ control.id }}</p>{% endif %}
 </div>
+{% if control %}{% set active = 'definition' %}{% include "_control_tabs.html" %}{% endif %}
+
+{% if save_errors %}
+<div class="banner banner-error" role="alert">
+  <strong>This control wasn't saved.</strong>
+  <ul>
+    {% for err in save_errors %}<li>{{ err }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
 
 <form method="post" action="{% if control %}/controls/{{ control.id }}{% else %}/controls{% endif %}">
   <div class="card">
@@ -78,11 +66,16 @@
     {% if sources %}
     <div class="check-list">
       {% for source in sources %}
-      <label>
-        <input type="checkbox" name="source_ids" value="{{ source.id }}"
-               {% if control and source.id in control.source_ids %}checked{% endif %}>
-        <span class="mono">{{ source.id }}</span>
-      </label>
+      <div class="check-row">
+        <label>
+          <input type="checkbox" name="source_ids" value="{{ source.id }}"
+                 {% if control and source.id in control.source_ids %}checked{% endif %}>
+          <span class="src-name">{{ source.title or source.id }}</span>
+          {% if source.title %}<span class="mono muted">({{ source.id }})</span>{% endif %}
+        </label>
+        <a class="btn btn-sm btn-ghost" href="/sources/{{ source.id }}"
+           target="_blank" rel="noopener">View ↗</a>
+      </div>
       {% endfor %}
     </div>
     {% else %}
@@ -90,58 +83,9 @@
     {% endif %}
   </div>
 
-  <div class="card">
-    <div class="card-head">
-      <h2>Test logic</h2>
-      <div class="spacer"></div>
-      <div class="radio-row">
-        <label><input type="radio" name="test_kind" value="rule" data-test-toggle
-                      {% if not control or control.test_kind == 'rule' %}checked{% endif %}> No-code rule</label>
-        <label><input type="radio" name="test_kind" value="python" data-test-toggle
-                      {% if control and control.test_kind == 'python' %}checked{% endif %}> Python</label>
-      </div>
-    </div>
-
-    <div data-pane="rule">
-      {% include "partials/rule_builder.html" %}
-    </div>
-
-    <div data-pane="python">
-      <p class="lead">Escape hatch — return violations from a Python <code class="mono">test()</code> function.</p>
-      <textarea name="test_code" rows="15">{{ control.test_code if control and control.test_code else '' }}</textarea>
-    </div>
-  </div>
-
   <div class="page-actions">
     <button class="btn btn-primary" type="submit">{% if control %}Save changes{% else %}Create control{% endif %}</button>
     <a class="btn btn-ghost" href="/">Cancel</a>
   </div>
 </form>
-
-<script src="/static/codemirror.min.js"></script>
-<script src="/static/codemirror-python.min.js"></script>
-<script>
-  (function () {
-    var cm = null;
-    var textarea = document.querySelector('textarea[name="test_code"]');
-    if (textarea && typeof window.CodeMirror !== "undefined") {
-      cm = window.CodeMirror.fromTextArea(textarea, {
-        mode: "python", lineNumbers: true, indentUnit: 4, matchBrackets: true
-      });
-    }
-
-    function syncPanes() {
-      var kind = document.querySelector('input[name="test_kind"]:checked');
-      kind = kind ? kind.value : "rule";
-      document.querySelectorAll('[data-pane]').forEach(function (pane) {
-        pane.style.display = pane.getAttribute('data-pane') === kind ? "" : "none";
-      });
-      if (cm && kind === "python") { cm.refresh(); }
-    }
-    document.querySelectorAll('[data-test-toggle]').forEach(function (el) {
-      el.addEventListener('change', syncPanes);
-    });
-    syncPanes();
-  })();
-</script>
 {% endblock %}
