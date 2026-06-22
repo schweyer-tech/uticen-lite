@@ -1,10 +1,36 @@
-{# Re-renderable cards fragment — inner content of #pipe-cards.
-   HTMX swaps this into #pipe-cards when the AI apply endpoint succeeds.
-   Context vars: nodes, sources, op_choices, join_mode_choices.
-#}
+{# Re-renderable cards fragment — the inner content of #pipe-cards.
+
+   Renders the stacked node cards with an INSERT affordance at every gap: before
+   the first card, between each pair, and after the last. Each "+" opens a small
+   menu of node types and splices the new step into the chain at that position
+   (auto-wired up→new→down), so a step can be added anywhere without scrolling to
+   a bottom toolbar.
+
+   HTMX swaps this fragment into #pipe-cards when the AI-apply endpoint succeeds,
+   so the insert / remove / add-condition handlers are bound by DELEGATION on the
+   persistent #pipe-cards element (they survive the swap).
+
+   Context vars: nodes, sources, op_choices, join_mode_choices. #}
+{% macro insert_zone(up, down, pos) %}
+<div class="pipe-insert pipe-insert-{{ pos }}">
+  <button type="button" class="pipe-insert-toggle" data-insert-toggle
+          aria-label="Insert a step here" title="Insert a step here">+</button>
+  <div class="pipe-insert-menu">
+    <span class="pipe-insert-hint">Insert step</span>
+    {% for t, lbl in [('import', 'Import'), ('filter', 'Filter'), ('join', 'Join'),
+                      ('custom_python', 'Custom Python'), ('test', 'Test')] %}
+    <button type="button" class="btn btn-sm btn-add" data-insert
+            data-type="{{ t }}" data-up="{{ up }}" data-down="{{ down }}">{{ lbl }}</button>
+    {% endfor %}
+  </div>
+</div>
+{% endmacro %}
 {% for node in nodes %}
-  {% if not loop.first %}<div class="pipe-connector"></div>{% endif %}
+  {{ insert_zone(loop.previtem.id if not loop.first else '', node.id,
+                 'start' if loop.first else 'mid') }}
   {% include "partials/_pipe_node.html" %}
 {% else %}
-<p class="muted">No steps yet. Add an Import node to bind your first source.</p>
+<p class="muted">No steps yet — insert your first step below (start with an
+  <strong>Import</strong> to bind a source).</p>
 {% endfor %}
+{% if nodes %}{{ insert_zone((nodes | last).id, '', 'end') }}{% else %}{{ insert_zone('', '', 'empty') }}{% endif %}

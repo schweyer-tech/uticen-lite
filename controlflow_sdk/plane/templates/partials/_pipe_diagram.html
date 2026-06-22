@@ -7,7 +7,11 @@
    branches read as two columns meeting at the Join box rather than a single chain.
    Colors route through design tokens via the .fc-* classes (light/dark parity). #}
 {% set box_w = 240 %}
-{% set box_h = 48 %}
+{# Grow the box to fit a third line only when at least one node has a narrative —
+   keeps narrative-less (derived/rule_spec) pipelines compact. Uniform height
+   preserves the row math below. #}
+{% set has_narrative = (diagram.boxes | selectattr('narrative') | list | length) > 0 %}
+{% set box_h = 66 if has_narrative else 48 %}
 {% set gap_y = 34 %}
 {% set pad = 16 %}
 {% set lane_gap = 56 %}
@@ -36,9 +40,12 @@
     {% set x = pad + (box.lane * lane_pitch) %}
     {% set y = pad + (box.row * (box_h + gap_y)) %}
     <g class="fc-box{% if box.terminal %} fc-terminal{% endif %}">
+      {# Full narrative on hover (the truncated <text> below shows only its start). #}
+      {% if box.narrative %}<title>{{ box.narrative }}</title>{% endif %}
       <rect x="{{ x }}" y="{{ y }}" width="{{ box_w }}" height="{{ box_h }}" rx="8" />
       <text x="{{ x + 12 }}" y="{{ y + 20 }}">{{ box.label }}</text>
       <text class="fc-count" x="{{ x + 12 }}" y="{{ y + 37 }}">{{ box.id }} · rows: {% if box.count is not none %}{{ "{:,}".format(box.count) }}{% else %}—{% endif %}</text>
+      {% if box.narrative %}<text class="fc-narr" x="{{ x + 12 }}" y="{{ y + 56 }}">{{ box.narrative | truncate(34, True, '…', 0) }}</text>{% endif %}
     </g>
   {% endfor %}
 </svg>

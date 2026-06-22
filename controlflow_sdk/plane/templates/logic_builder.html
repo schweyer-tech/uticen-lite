@@ -28,9 +28,6 @@
     color: var(--text-secondary); white-space: nowrap;
   }
   .pipe-count strong { color: var(--text-primary); }
-  .pipe-connector {
-    width: 2px; height: 18px; background: var(--border-strong); margin: 0 auto;
-  }
   .pipe-body { display: grid; gap: 8px; }
   .pipe-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .pipe-row label { font-size: 12px; color: var(--text-secondary); min-width: 80px; }
@@ -45,7 +42,53 @@
     border-radius: var(--radius-input);
   }
   .pipe-cond { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .pipe-toolbar { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0; }
+
+  /* ── inter-step insert affordances ──────────────────────────────────────
+     A "+" hub sits at every gap (start, between each card, end). It's always
+     visible (discoverable); clicking it opens an inline type menu and splices a
+     new step into the chain at that position. The mid zones also draw the
+     connector spine the old .pipe-connector used to. */
+  .pipe-insert {
+    position: relative; display: flex; flex-direction: column; align-items: center;
+    padding: 4px 0;
+  }
+  .pipe-insert.pipe-insert-mid { padding: 7px 0; }
+  .pipe-insert.pipe-insert-mid::before {
+    content: ""; position: absolute; top: 0; bottom: 0; left: 50%;
+    width: 2px; margin-left: -1px; background: var(--border-strong);
+  }
+  .pipe-insert-toggle {
+    position: relative; z-index: 1; width: 22px; height: 22px; padding: 0;
+    border-radius: 50%; border: 1px solid var(--border-strong);
+    background: var(--bg-surface-1); color: var(--text-tertiary);
+    font-size: 16px; line-height: 1; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: color .12s, border-color .12s, background .12s, transform .12s;
+  }
+  .pipe-insert-toggle:hover {
+    color: var(--accent-primary); border-color: var(--accent-primary);
+    background: var(--bg-surface-2);
+  }
+  .pipe-insert.open .pipe-insert-toggle {
+    background: var(--accent-muted); color: var(--accent-primary);
+    border-color: var(--accent-primary); transform: rotate(45deg);
+  }
+  .pipe-insert-menu {
+    display: none; align-items: center; justify-content: center;
+    gap: 6px; flex-wrap: wrap; margin-top: 8px;
+    padding: 8px 10px; background: var(--bg-surface-1);
+    border: 1px solid var(--border-default); border-radius: var(--radius-card);
+  }
+  .pipe-insert.open .pipe-insert-menu { display: flex; }
+  .pipe-insert-hint {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--text-tertiary); margin-right: 2px;
+  }
+  .pipe-insert-cue {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--border-strong);
+    color: var(--text-tertiary); font-size: 12px; line-height: 1; vertical-align: -3px;
+  }
 
   /* ── raw-python notice ──────────────────────────────────────────────── */
   .raw-python-notice {
@@ -93,22 +136,15 @@
   <input type="hidden" name="pipeline_json" id="pipeline-json" value="">
 
   <div class="card">
-    <div class="card-head"><h2>Steps</h2></div>
-    <div class="pipe-cards" id="pipe-cards">
-      {% for node in nodes %}
-        {% if not loop.first %}<div class="pipe-connector"></div>{% endif %}
-        {% include "partials/_pipe_node.html" %}
-      {% else %}
-      <p class="muted">No steps yet. Add an Import node to bind your first source.</p>
-      {% endfor %}
+    <div class="card-head"><h2>Steps</h2>
+      <div class="spacer"></div>
+      <span class="muted" style="font-size:12px;">Click a <span class="pipe-insert-cue">+</span>
+        between steps to insert one there</span>
     </div>
-
-    <div class="pipe-toolbar">
-      <button class="btn btn-sm btn-add" type="button" data-add="import">+ Import</button>
-      <button class="btn btn-sm btn-add" type="button" data-add="filter">+ Filter</button>
-      <button class="btn btn-sm btn-add" type="button" data-add="join">+ Join</button>
-      <button class="btn btn-sm btn-add" type="button" data-add="custom_python">+ Custom Python</button>
-      <button class="btn btn-sm btn-add" type="button" data-add="test">+ Test (terminal)</button>
+    {# Cards + per-gap insert affordances. Shared with the AI-apply HTMX swap so
+       inserting stays available after a draft is applied (handlers delegated). #}
+    <div class="pipe-cards" id="pipe-cards">
+      {% include "partials/_pipe_cards.html" %}
     </div>
 
     <div class="page-actions">
@@ -256,19 +292,54 @@
       document.getElementById('pipeline-form').submit();
     }
 
-    document.querySelectorAll('[data-add]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        serialize();
-        var type = btn.getAttribute('data-add');
-        var node = { id: genId(type), type: type, narrative: '', config: {}, inputs: [] };
-        if (type === 'import') { node.source_id = null; }
-        if (type === 'custom_python') { node.config.flavor = 'transform'; node.config.code = 'rows = rows'; }
-        if (type === 'filter' || type === 'test') { node.config.logic = 'all'; node.config.conditions = []; }
-        if (type === 'join') { node.config.mode = 'inner'; }
-        graph.nodes.push(node);
-        jsonField.value = JSON.stringify(graph);
-        document.getElementById('pipeline-form').submit();
-      });
+    function newNode(type) {
+      var node = { id: genId(type), type: type, narrative: '', config: {}, inputs: [] };
+      if (type === 'import') { node.source_id = null; }
+      if (type === 'custom_python') { node.config.flavor = 'transform'; node.config.code = 'rows = rows'; }
+      if (type === 'filter' || type === 'test') { node.config.logic = 'all'; node.config.conditions = []; }
+      if (type === 'join') { node.config.mode = 'inner'; }
+      return node;
+    }
+
+    // Insert a step at a gap. `upId`/`downId` are the cards above/below the gap
+    // ('' at the very top/bottom). For non-import steps we wire up→new and then
+    // re-point the downstream card from up→new, so the new step lands *between*
+    // them (a clean splice). An import is a new root, so it's never spliced.
+    function insertStep(upId, downId, type) {
+      serialize();
+      var node = newNode(type);
+      var splice = (type !== 'import');
+      if (splice && upId) { node.inputs = [upId]; }
+      graph.nodes.push(node);
+      if (splice && upId && downId) {
+        graph.nodes.forEach(function (n) {
+          if (n.id !== downId) { return; }
+          n.inputs = (n.inputs || []).map(function (i) { return i === upId ? node.id : i; });
+        });
+      }
+      jsonField.value = JSON.stringify(graph);
+      document.getElementById('pipeline-form').submit();
+    }
+
+    // Insert affordances are delegated on #pipe-cards so they keep working after
+    // the AI-apply HTMX swap replaces the cards fragment.
+    var cardsEl = document.getElementById('pipe-cards');
+    cardsEl.addEventListener('click', function (e) {
+      var toggle = e.target.closest('[data-insert-toggle]');
+      if (toggle) {
+        var zone = toggle.closest('.pipe-insert');
+        var wasOpen = zone.classList.contains('open');
+        cardsEl.querySelectorAll('.pipe-insert.open').forEach(function (z) {
+          z.classList.remove('open');
+        });
+        if (!wasOpen) { zone.classList.add('open'); }
+        return;
+      }
+      var ins = e.target.closest('[data-insert]');
+      if (ins) {
+        insertStep(ins.getAttribute('data-up'), ins.getAttribute('data-down'),
+                   ins.getAttribute('data-type'));
+      }
     });
 
     document.getElementById('pipeline-form').addEventListener('submit', function () {

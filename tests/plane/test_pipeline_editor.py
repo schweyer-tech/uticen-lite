@@ -995,3 +995,71 @@ def test_single_terminal_back_compat(client):
     diagram = _diagram(pipeline, counts={})
     terminal_boxes = [b for b in diagram["boxes"] if b["terminal"]]
     assert len(terminal_boxes) == 1 and terminal_boxes[0]["id"] == "tst"
+# --- Logic UX polish: flowchart narrative + per-gap insert affordances -------
+
+def test_diagram_boxes_carry_node_narrative():
+    """Each flowchart box exposes its node's narrative so the SVG can show the
+    beginning of it (truncated) with the full text on hover."""
+    from controlflow_sdk.pipeline.model import parse_pipeline
+    from controlflow_sdk.plane.routes.pipeline import _diagram
+
+    diagram = _diagram(parse_pipeline(_terminated_access_graph()), counts={})
+    narr = {b["id"]: b["narrative"] for b in diagram["boxes"]}
+    assert narr["acc"] == "All access accounts"
+    assert narr["join"] == "Active accounts of terminated employees"
+    # A node with no narrative carries an empty string (never KeyErrors / None).
+    assert narr["tst"] == ""
+
+
+def test_flowchart_shows_narrative_truncated_with_full_text_on_hover(client):
+    _seed_terminated_access(client)
+    _make_control(client, "C1")
+    long_narr = (
+        "Keep only posted invoices above the materiality threshold so immaterial "
+        "noise is excluded from the exception population auditors review"
+    )
+    graph = {"nodes": [
+        {"id": "src", "type": "import", "source_id": "access_accounts",
+         "narrative": long_narr},
+        {"id": "tst", "type": "test", "inputs": ["src"], "narrative": "Short note",
+         "config": {"logic": "all", "severity": "low",
+                    "conditions": [{"column": "account_id", "op": "not_empty"}]}},
+    ]}
+    assert _save_pipeline(client, "C1", graph).status_code in (302, 303)
+
+    body = client.get("/controls/C1/logic/flowchart").text
+    # Full narrative is available on hover via a <title> element.
+    assert f"<title>{long_narr}</title>" in body
+    # The visible label is truncated with an ellipsis (the author sees the start).
+    assert 'class="fc-narr"' in body
+    assert "…" in body
+    # The beginning of the long narrative is shown inline …
+    assert "Keep only posted invoices" in body
+    # … but the full long text never appears as a visible <text> run (only in <title>).
+    assert f'class="fc-narr">{long_narr}<' not in body
+    # A short narrative is shown verbatim (no truncation).
+    assert "Short note" in body
+
+
+def test_builder_has_per_gap_insert_affordances_not_only_bottom_toolbar(client):
+    """Steps can be inserted at any position: an insert control sits at every gap
+    (top, between each pair of cards, bottom), each carrying the up/down node ids
+    it splices between — replacing the old single bottom-only add toolbar."""
+    _seed_terminated_access(client)
+    _make_control(client, "C1")
+    assert _save_pipeline(client, "C1", _terminated_access_graph()).status_code in (302, 303)
+
+    body = client.get("/controls/C1/logic/builder").text
+    # The old single bottom toolbar is gone.
+    assert 'class="pipe-toolbar"' not in body
+    # Insert affordances exist, positioned by up/down ids.
+    assert "data-insert-toggle" in body
+    assert "data-insert" in body
+    # One insert zone per gap: N cards → N+1 zones (top + between + bottom).
+    # Count zone elements by class (the substring "data-insert-toggle" also
+    # appears once in the page's delegation JS, so don't substring-count that).
+    n_nodes = len(_terminated_access_graph()["nodes"])
+    assert len(re.findall(r'class="pipe-insert pipe-insert-', body)) == n_nodes + 1
+    # Each node type is offerable from an insert menu.
+    for t in ("import", "filter", "join", "custom_python", "test"):
+        assert f'data-type="{t}"' in body

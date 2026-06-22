@@ -165,6 +165,7 @@ def _diagram(pipeline: Pipeline, counts: dict[str, int]) -> dict[str, Any]:
             "id": n.id,
             "type": n.type,
             "label": _node_label(n),
+            "narrative": n.narrative or "",
             "count": counts.get(n.id),
             "row": i,
             "lane": lanes[n.id],
