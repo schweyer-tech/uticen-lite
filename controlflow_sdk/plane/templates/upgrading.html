@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Upgrading…{% endblock %}
+{% block body %}
+<div class="page-head">
+  <h1>Upgrading…</h1>
+</div>
+<div class="card">
+  <p class="lead">
+    The upgrade is running in the background and this app is shutting down.
+    When it finishes, start it again:
+  </p>
+  <pre class="mono"><code>controlplane --project &lt;your engagement dir&gt;</code></pre>
+  <p class="hint">
+    Progress is logged to <code class="mono">.controlplane-upgrade.log</code> in the
+    engagement folder. You can close this tab.
+  </p>
+</div>
+{% endblock %}

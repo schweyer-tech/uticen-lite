@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — Updates{% endblock %}
+{% block body %}
+<a class="crumb" href="/settings">← Settings</a>
+<div class="page-head">
+  <h1>Updates</h1>
+</div>
+
+<div class="card">
+  <h2>Version</h2>
+  <p class="lead">
+    Installed version <code class="mono">{{ current }}</code>
+    <span class="muted">({{ method }} install)</span>.
+  </p>
+
+  <form method="post" action="/settings/updates/toggle">
+    <div class="field">
+      <label style="display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" name="check_on_launch" {% if check_on_launch %}checked{% endif %}>
+        <span class="src-name">Check for updates when the app starts</span>
+      </label>
+      <span class="hint">
+        Off by default — keeps the control plane's zero network egress. When on, the
+        app asks your configured package index for the latest version on launch.
+      </span>
+    </div>
+    <div class="page-actions">
+      <button class="btn btn-primary" type="submit">Save</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Check now</h2>
+  <p class="lead">A one-off check — runs whether or not the launch check is on.</p>
+  <div class="page-actions">
+    <button class="btn" hx-post="/settings/updates/check"
+            hx-target="#check-result" hx-swap="innerHTML">Check for updates</button>
+  </div>
+  <div id="check-result"></div>
+</div>
+{% endblock %}

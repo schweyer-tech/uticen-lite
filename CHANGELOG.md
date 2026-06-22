@@ -9,6 +9,18 @@ For details on versioning and compatibility policy, see [docs/CONTRACT.md](docs/
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Upgrade & update-awareness.** The control plane detects how it was installed and can upgrade
+  itself in one click — git checkout → `git pull --ff-only` + editable reinstall · pipx →
+  `pipx upgrade` · pip → `pip install -U`. The same routine is available headless as
+  `cflow upgrade [--check] [--yes]`. An **opt-in** "check for updates on launch" toggle
+  (Settings ▸ Updates, **off by default**) preserves the control plane's zero-egress default.
+
+---
+
 ## [0.1.0] — 2026-06-16
 
 ### Initial Release
@@ -97,12 +109,6 @@ None (initial release).
 
 ---
 
-## Unreleased
-
-(No changes yet. New features and fixes will be documented here.)
-
----
-
 ## Notes
 
 ### How to Update This File
@@ -111,7 +117,7 @@ None (initial release).
 2. **Group changes**: Use subheadings (`Added`, `Changed`, `Fixed`, `Deprecated`, `Removed`, `Security`)
 3. **Note schema changes**: If `schema_version` is incremented, explicitly call it out with migration details
 4. **Coordinate with app**: If schema changes, ensure ControlFlow docs are updated in sync
-5. **Keep unreleased section**: Always maintain an `## Unreleased` section for in-flight work
+5. **Keep unreleased section**: Always maintain an `## [Unreleased]` section for in-flight work
 
 ### Schema Version History
 

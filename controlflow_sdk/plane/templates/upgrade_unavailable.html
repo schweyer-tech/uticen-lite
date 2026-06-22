@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Upgrade{% endblock %}
+{% block body %}
+<a class="crumb" href="/settings/updates">← Updates</a>
+<div class="page-head">
+  <h1>Manual upgrade</h1>
+</div>
+<div class="card">
+  <p class="lead">
+    Automatic upgrade isn't available for this install (installed version
+    <code class="mono">{{ current }}</code>). Upgrade from a terminal:
+  </p>
+  <pre class="mono"><code>pipx upgrade controlflow-sdk        # if installed with pipx
+pip install -U controlflow-sdk     # if installed with pip</code></pre>
+  <p class="hint">See <code class="mono">docs/INSTALL.md</code> for offline / air-gapped upgrades.</p>
+</div>
+{% endblock %}

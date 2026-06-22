@@ -135,6 +135,30 @@ ls /tmp/cfsdk-venv/bin/cflow /tmp/cfsdk-venv/bin/controlplane  # console scripts
 > dev-only dependency and is absent from a clean `[plane]` install, so `TestClient` won't import
 > there.
 
+## Upgrading
+
+The control plane is **install-aware** — it upgrades itself the right way for how you installed it.
+
+**From the app.** Open **Settings ▸ Updates**. Turn on *"Check for updates when the app starts"*
+(off by default — leaving it off keeps the zero-egress default) to get a banner when a newer version
+is available, or click **Check for updates** any time. Click **Update now** to upgrade: the app runs
+the upgrade in a detached helper and shuts down — re-run `controlplane` when it finishes (progress is
+logged to `.controlplane-upgrade.log` in the engagement folder).
+
+**From the terminal.** The same routine is available headless:
+
+```bash
+cflow upgrade --check     # report installed vs latest, change nothing
+cflow upgrade             # detect the install method and upgrade (asks to confirm)
+cflow upgrade --yes       # upgrade without the prompt
+```
+
+`cflow upgrade` picks the command for your install: a git checkout does
+`git pull --ff-only` + an editable reinstall; a `pipx` install does `pipx upgrade controlflow-sdk`;
+a `pip` install does `pip install -U controlflow-sdk` (honouring your configured index). Air-gapped /
+pinned-wheel installs can't self-upgrade — re-run the [pinned-wheel](#option-3--pinned-wheel-air-gapped--no-index-reachable)
+steps with the new wheel.
+
 ## Launching
 
 Once installed, start the control plane in any engagement directory (created if missing):
@@ -144,6 +168,7 @@ controlplane --project my-audit
 # → opens http://127.0.0.1:8765
 ```
 
-The control plane is **localhost-only with zero network egress** — it listens on `127.0.0.1:8765`
-and never makes outbound connections, so client data never leaves the machine (see the
+The control plane is **localhost-only with zero network egress by default** — it listens on
+`127.0.0.1:8765` and makes no outbound connections except an **opt-in** update check (off by default;
+see [Upgrading](#upgrading)), so client data never leaves the machine (see the
 [README](../README.md#design-principles)).

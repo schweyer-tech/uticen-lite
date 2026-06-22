@@ -149,6 +149,22 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Bundle timestamp in ISO-8601 format (default: current UTC time).",
     )
 
+    # -- upgrade -------------------------------------------------------------
+    upgrade_p = sub.add_parser(
+        "upgrade",
+        help="Check for and install controlflow-sdk updates (install-aware).",
+    )
+    upgrade_p.add_argument(
+        "--check",
+        action="store_true",
+        help="Report installed vs latest and exit without installing.",
+    )
+    upgrade_p.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip the confirmation prompt and install.",
+    )
+
     return parser
 
 
@@ -186,6 +202,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.at is None:
             args.at = datetime.now(UTC).isoformat()
         return build_cmd(args)
+
+    if args.command == "upgrade":
+        from controlflow_sdk.cli.upgrade_cmd import upgrade_cmd
+
+        return upgrade_cmd(args)
 
     parser.print_help()
     return 2

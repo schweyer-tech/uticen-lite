@@ -1,6 +1,18 @@
 {% extends "base.html" %}
 {% block title %}{{ project.name }} — Controls{% endblock %}
 {% block body %}
+{% if upgrade_notice %}
+<div class="card {{ 'pass' if upgrade_notice.ok else 'fail' }}" style="margin-bottom:18px;">
+  <p class="lead" style="margin:0;">
+    {% if upgrade_notice.ok %}
+      ✓ Upgraded from version {{ upgrade_notice.from }}. You're now on the latest installed code.
+    {% else %}
+      ⚠ Upgrade failed — see <code class="mono">.controlplane-upgrade.log</code> in the engagement folder.
+    {% endif %}
+  </p>
+</div>
+{% endif %}
+<div hx-get="/updates/badge" hx-trigger="load" hx-swap="outerHTML"></div>
 <div class="page-head">
   <div class="card-head" style="border:none;padding:0;margin:0;">
     <h1>Controls</h1>
