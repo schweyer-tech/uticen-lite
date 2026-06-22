@@ -187,3 +187,17 @@ Each unit has one job and is independently testable:
   the button still works (the upgrade delegates to pip/pipx regardless).
 - **Editable reinstall extras** — `pip install -e .` drops previously-selected extras; the git path
   reinstalls plain `-e .`. Acceptable for the maintainer loop; documented.
+
+## Manual verification (one-time, by hand)
+
+Self-upgrade mutates the environment, so it is verified manually, not in CI:
+
+1. **pip path** — in a throwaway venv, `pip install -e '.[plane]'` is detected as `git-editable`;
+   confirm `cflow upgrade --check` reports the version + method. (For a true `pip` test, install a
+   built wheel into a plain venv and confirm `pip install -U` is the chosen command.)
+2. **Web button** — launch `controlplane`, enable the launch check, force the badge (or use
+   "Check now" with a fake newer version), click **Update now**: the app shows the "Upgrading…"
+   page and exits; `.controlplane-upgrade.log` records the command; re-running `controlplane`
+   shows the one-shot "Upgraded from …" notice, which clears on the next load.
+3. **Air-gapped** — with no index reachable, "Check now" degrades to "couldn't check" and the
+   dashboard never blocks; `UNKNOWN` installs show manual instructions, never a dead button.
