@@ -9,6 +9,18 @@ For details on versioning and compatibility policy, see [docs/CONTRACT.md](docs/
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Upgrade & update-awareness.** The control plane detects how it was installed and can upgrade
+  itself in one click — git checkout → `git pull --ff-only` + editable reinstall · pipx →
+  `pipx upgrade` · pip → `pip install -U`. The same routine is available headless as
+  `cflow upgrade [--check] [--yes]`. An **opt-in** "check for updates on launch" toggle
+  (Settings ▸ Updates, **off by default**) preserves the control plane's zero-egress default.
+
+---
+
 ## [0.1.0] — 2026-06-16
 
 ### Initial Release
@@ -94,12 +106,6 @@ None (initial release).
 ### Deprecations
 
 None (initial release).
-
----
-
-## Unreleased
-
-(No changes yet. New features and fixes will be documented here.)
 
 ---
 
