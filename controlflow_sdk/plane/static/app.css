@@ -243,6 +243,21 @@ legend {
 .tabs .tab:hover { color: var(--text-primary); }
 .tabs .tab.active { color: var(--accent-primary); border-bottom-color: var(--accent-primary); }
 
+/* Subtabs (e.g. Logic ▸ Builder / Flowchart / Python): a segmented pill control
+   nested below the underline tabs, so the sub-level reads as its own tab group
+   distinct from the parent. All colors route through tokens (learning 0005). */
+.subtabs {
+  display: inline-flex; gap: 2px; margin: -8px 0 22px; padding: 3px;
+  background: var(--bg-surface-1); border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+}
+.subtabs .tab {
+  padding: 6px 14px; font-size: 12px; font-weight: 600; line-height: 1;
+  color: var(--text-secondary); text-decoration: none; border-radius: var(--radius-input);
+}
+.subtabs .tab:hover { color: var(--text-primary); background: var(--bg-surface-2); }
+.subtabs .tab.active { color: var(--accent-primary); background: var(--accent-muted); }
+
 /* ── run trend (history) ──────────────────────────────────────────────────── */
 .trend-figure { margin: 4px 0 2px; max-width: 520px; }
 /* size the SVG via CSS — `height` is set here, never as an SVG attribute (an SVG
