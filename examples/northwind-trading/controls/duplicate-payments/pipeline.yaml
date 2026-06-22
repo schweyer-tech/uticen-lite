@@ -1,0 +1,69 @@
+# Visual-pipeline (graph) authoring of this control.
+#
+# The escape hatch is a single NODE, not a whole script: the population is pulled
+# in with a built-in Import node, and only the irreducible step — a row-pairwise
+# 5-day window comparison the no-code grammar can't express — lives in one Custom
+# Python test node. The importer stores this graph in the store-only `pipeline`
+# column and COMPILES it to the bundle artifact (learning 0010); the node becomes a
+# starved module-level `_node_flag(rows)` that can see only `rows` (never `sources`).
+# The companion test.py stays as documentation but is not the executed artifact.
+#
+# dtype note (learning 0011): `paid_date` loads as datetime64 and `amount` as float,
+# so the node sorts/subtracts dates and compares amounts without re-parsing (no
+# pandas import — the allowlist forbids it; `rows` DataFrame methods suffice).
+# Expected: 2 violations (PMT-D1B, PMT-D2B) — the later payment of each duplicate
+# pair, same as the Python test it replaces.
+nodes:
+  - id: pmts
+    type: import
+    source_id: payments
+    narrative: Vendor payment register (primary population).
+  - id: flag
+    type: custom_python
+    inputs: [pmts]
+    narrative: >-
+      Flag the later payment in any pair sharing vendor + amount within a
+      five-calendar-day window (one violation per pair).
+    config:
+      flavor: test
+      code: |
+        df = rows.sort_values("paid_date")
+        records = df.to_dict("records")
+        flagged = set()
+        out = []
+        for i in range(len(records)):
+            a = records[i]
+            amt_a = a.get("amount")
+            date_a = a.get("paid_date")
+            pid_a = str(a.get("payment_id") or "").strip()
+            if pid_a in flagged or amt_a != amt_a or date_a != date_a:
+                continue
+            for j in range(i + 1, len(records)):
+                b = records[j]
+                date_b = b.get("paid_date")
+                if date_b != date_b:
+                    continue
+                delta_days = (date_b - date_a).days
+                if delta_days > 5:
+                    break
+                pid_b = str(b.get("payment_id") or "").strip()
+                if pid_b in flagged:
+                    continue
+                if str(b.get("vendor_id")) == str(a.get("vendor_id")) and b.get("amount") == amt_a:
+                    flagged.add(pid_b)
+                    out.append({
+                        "item_key": pid_b,
+                        "description": (
+                            "Payment '" + pid_b + "' appears to duplicate '" + pid_a
+                            + "' — same vendor and amount within " + str(delta_days)
+                            + " day(s)"
+                        ),
+                        "severity": "high",
+                        "details": {
+                            "vendor_id": str(b.get("vendor_id") or "").strip(),
+                            "amount": amt_a,
+                            "earlier_payment_id": pid_a,
+                            "days_apart": delta_days,
+                        },
+                    })
+        return out

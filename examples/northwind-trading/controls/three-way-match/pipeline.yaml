@@ -1,0 +1,129 @@
+# Visual-pipeline (graph) authoring of this control.
+#
+# The escape hatch is a single NODE, not a whole script: all three populations are
+# pulled in with built-in Import nodes and chained together with two built-in Joins
+# (payment -> invoice -> purchase order), so the only Python is the irreducible
+# step — a cascade of existence checks plus a 1% amount-variance ARITHMETIC the
+# no-code grammar can't express. The importer stores this graph in the store-only
+# `pipeline` column and COMPILES it to the bundle artifact (learning 0010): each
+# Join becomes a pandas merge and the node a starved module-level `_node_flag(rows)`
+# that sees only the merged `rows` (never `sources`). The companion test.py stays
+# as documentation but is not the executed artifact.
+#
+# Shape: payments LEFT join invoices on invoice_id (brings the invoice's po_id +
+# invoice_date) LEFT join purchase_orders on po_id (brings status + the PO amount,
+# which collides with the payment amount and so lands as `amount_joined`). Left
+# joins keep every payment so a missing invoice/PO is detectable as a null marker:
+# `invoice_date` null => invoice missing; null `po_id`/`status` => PO missing.
+# Expected: 4 violations (PMT-C3A missing invoice, PMT-C3B unapproved PO,
+# PMT-C3C >1% variance, PMT-C3D missing PO) — same as the Python test it replaces.
+nodes:
+  - id: pmts
+    type: import
+    source_id: payments
+    narrative: Vendor payment register (primary population).
+  - id: invs
+    type: import
+    source_id: invoices
+    narrative: Vendor invoice register.
+  - id: pos
+    type: import
+    source_id: purchase_orders
+    narrative: Purchase order register.
+  - id: pmt_inv
+    type: join
+    inputs: [pmts, invs]
+    narrative: Attach each payment's invoice (its PO reference + invoice date).
+    config:
+      mode: left
+      left_key: invoice_id
+      right_key: invoice_id
+      bring_columns: [po_id, invoice_date]
+  - id: pmt_inv_po
+    type: join
+    inputs: [pmt_inv, pos]
+    narrative: Attach the purchase order behind that invoice (status + PO amount).
+    config:
+      mode: left
+      left_key: po_id
+      right_key: po_id
+      bring_columns: [status, amount]
+  - id: flag
+    type: custom_python
+    inputs: [pmt_inv_po]
+    narrative: >-
+      Flag a payment with no matching invoice, no/unapproved PO, or an amount that
+      deviates from the approved PO amount by more than 1%.
+    config:
+      flavor: test
+      code: |
+        out = []
+        for _, row in rows.iterrows():
+            r = row.to_dict()
+            payment_id = str(r.get("payment_id") or "").strip()
+            invoice_id = str(r.get("invoice_id") or "").strip()
+            # Check 1: the invoice must exist (left-joined invoice_date is null otherwise).
+            invoice_date = r.get("invoice_date")
+            if invoice_date is None or invoice_date != invoice_date:
+                out.append({
+                    "item_key": payment_id,
+                    "description": (
+                        "Payment references invoice '" + invoice_id
+                        + "' which does not exist in the invoice register"
+                    ),
+                    "severity": "high",
+                    "details": {"invoice_id": invoice_id, "reason": "missing_invoice"},
+                })
+                continue
+            # Check 2: the PO must exist (no PO reference, or no matching PO row).
+            po_id = str(r.get("po_id") or "").strip()
+            status = r.get("status")
+            if not po_id or status is None or status != status:
+                out.append({
+                    "item_key": payment_id,
+                    "description": (
+                        "Invoice '" + invoice_id + "' references PO '" + po_id
+                        + "' which does not exist in the purchase order register"
+                    ),
+                    "severity": "high",
+                    "details": {"invoice_id": invoice_id, "po_id": po_id, "reason": "missing_po"},
+                })
+                continue
+            # Check 3: the PO must be approved.
+            status_l = str(status).strip().lower()
+            if status_l != "approved":
+                out.append({
+                    "item_key": payment_id,
+                    "description": (
+                        "PO '" + po_id + "' linked to invoice '" + invoice_id
+                        + "' has status '" + status_l + "' (expected 'approved')"
+                    ),
+                    "severity": "high",
+                    "details": {"po_id": po_id, "po_status": status_l, "reason": "unapproved_po"},
+                })
+                continue
+            # Check 4: the payment amount must be within 1% of the approved PO amount.
+            try:
+                pmt_amount = float(r.get("amount"))
+            except (TypeError, ValueError):
+                pmt_amount = 0.0
+            try:
+                po_amount = float(r.get("amount_joined"))
+            except (TypeError, ValueError):
+                po_amount = 0.0
+            if po_amount > 0 and abs(pmt_amount - po_amount) / po_amount > 0.01:
+                out.append({
+                    "item_key": payment_id,
+                    "description": (
+                        "Payment amount deviates from PO '" + po_id
+                        + "' amount by more than 1%"
+                    ),
+                    "severity": "high",
+                    "details": {
+                        "po_id": po_id,
+                        "payment_amount": pmt_amount,
+                        "po_amount": po_amount,
+                        "reason": "amount_variance",
+                    },
+                })
+        return out

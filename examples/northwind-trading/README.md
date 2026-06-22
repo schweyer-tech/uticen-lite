@@ -91,9 +91,9 @@ cd my-audit
 
 ### Authoring control logic
 
-Reach for the **no-code builder first** and drop to Python only when the logic genuinely
-needs it. Each control directory authors its test logic with exactly one of these
-sidecars (precedence: `rule.yaml` → `pipeline.yaml` → `test.py`):
+**Author everything in the no-code builder.** Every control in this demo is authored with a
+sidecar next to `control.yaml` (precedence: `rule.yaml` → `pipeline.yaml`), and the Python
+escape hatch appears only as a *single node* inside a pipeline — never as a whole script:
 
 1. **No-code rule** — `rule.yaml`. A declarative rule (AND/OR over typed conditions,
    severity, description template). Best for single-source checks. Match each condition
@@ -106,33 +106,44 @@ sidecars (precedence: `rule.yaml` → `pipeline.yaml` → `test.py`):
    (cross-source join) and [`privileged-access-review/pipeline.yaml`](controls/privileged-access-review/pipeline.yaml)
    (filter + any-of test).
 
-3. **Python escape hatch** — `test.py`, only for logic outside the no-code grammar
-   (row-pairwise windows, cross-column arithmetic, column-to-column comparisons across a
-   join). In this demo only `duplicate-payments`, `three-way-match`, and `vendor-master-sod`
-   need it.
+3. **Custom Python node** — a single `custom_python` node *inside* a pipeline, for the one
+   irreducible step the no-code grammar can't express (row-pairwise windows, cross-column
+   arithmetic, column-to-column comparisons). You still **import the data with Import nodes
+   and combine it with Join nodes**; only the hard transform is Python. The node is *starved*
+   — it receives just the incoming `rows` frame and can't reach other sources (pull those in
+   with Import/Join, never `sources[...]`), can't read files, and may import only
+   `re`/`datetime`/`decimal`. See [`three-way-match/pipeline.yaml`](controls/three-way-match/pipeline.yaml)
+   (two Joins feed a node that does the 1% variance check), plus `vendor-master-sod` and
+   `duplicate-payments`.
 
-A `test.py` function takes `pop` (single-source) or `pop, sources` (multi-source) and
-**returns a list** of violation dicts (`item_key`, `description`, `severity`, `details`).
-See [`three-way-match/test.py`](controls/three-way-match/test.py) for a three-source example:
+A `custom_python` `test`-flavor node receives `rows` and **returns a list** of violation
+dicts (`item_key`, `description`, `severity`, `details`):
 
-```python
-def test(pop, sources):
-    payments_df = pop.df
-    invoices_df = sources["invoices"].df
-    po_df = sources["purchase_orders"].df
-
-    violations = []
-    for _, pmt in payments_df.iterrows():
-        # Find matching invoice, then PO, validate the amount is within 1%
-        ...
-        violations.append({
-            "item_key": str(pmt["payment_id"]),
-            "description": "Payment without a valid approved PO",
-            "severity": "high",
-            "details": {...},
-        })
-    return violations
+```yaml
+- id: flag
+  type: custom_python
+  inputs: [pmt_inv_po]   # an upstream Join already brought the PO amount onto each row
+  config:
+    flavor: test
+    code: |
+      out = []
+      for _, row in rows.iterrows():
+          r = row.to_dict()
+          # ... the one step the grammar can't express (here: a 1% variance check) ...
+          out.append({
+              "item_key": str(r.get("payment_id")),
+              "description": "Payment amount deviates from the approved PO by >1%",
+              "severity": "high",
+              "details": {"reason": "amount_variance"},
+          })
+      return out
 ```
+
+> A standalone hand-written `test.py` (a full `test(pop, sources)` control) is still
+> supported by the engine for controls authored outside the builder, but the demo
+> deliberately doesn't use one — prefer Import/Join nodes + a Custom Python node so the
+> logic stays inspectable in the builder. The `test.py` files kept in each control directory
+> are documentation of the equivalent logic, not the executed artifact.
 
 **For authoring controls**, refer to the [ControlFlow SDK README](../../README.md) for:
 - Control YAML structure (objective, narrative, framework_refs)

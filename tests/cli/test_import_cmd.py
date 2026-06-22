@@ -17,15 +17,23 @@ def test_import_northwind(tmp_path: Path):
     assert len(controls) == 8
     assert len(sources) == 8
 
-    # The demo is authored as a MIX of modes (sidecar rule.yaml / pipeline.yaml
-    # next to control.yaml), so the loaded engagement showcases the no-code rule
-    # builder and the visual pipeline — not only the Python escape hatch.
+    # The demo is authored entirely no-code (sidecar rule.yaml / pipeline.yaml next
+    # to control.yaml): it showcases the no-code rule builder and the visual
+    # pipeline, and the Python escape hatch appears only as a Custom Python NODE
+    # inside a pipeline — never as a whole hand-written Python control.
     by_id = {c["id"]: c for c in controls}
     kinds = {cid: c["test_kind"] for cid, c in by_id.items()}
-    assert set(kinds.values()) == {"rule", "pipeline", "python"}, kinds
+    assert set(kinds.values()) == {"rule", "pipeline"}, kinds
     assert sum(k == "rule" for k in kinds.values()) >= 1
     assert sum(k == "pipeline" for k in kinds.values()) >= 1
-    assert sum(k == "python" for k in kinds.values()) >= 1
+
+    # At least one pipeline drops to a Custom Python node for an irreducible step
+    # (the escape hatch as a single node, not a standalone script).
+    pipelines = [c for c in controls if c["test_kind"] == "pipeline"]
+    assert any(
+        any(n.get("type") == "custom_python" for n in c["pipeline"]["nodes"])
+        for c in pipelines
+    ), "expected at least one pipeline to use a Custom Python node"
 
     for c in controls:
         assert c["source_ids"]

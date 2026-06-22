@@ -1,0 +1,74 @@
+# Visual-pipeline (graph) authoring of this control.
+#
+# The escape hatch is a single NODE, not a whole script: both populations are
+# pulled in with built-in Import nodes and brought together with a built-in Join,
+# so the only Python is the irreducible step — a column-to-column comparison
+# (approved_by vs the vendor's created_by / last_modified_by) the no-code grammar
+# can't express. The importer stores this graph in the store-only `pipeline`
+# column and COMPILES it to the bundle artifact (learning 0010): the Join becomes a
+# pandas merge and the node a starved module-level `_node_flag(rows)` that sees only
+# the merged `rows` (never `sources`). The companion test.py stays as documentation.
+#
+# Shape: Import payments + Import vendor_master -> inner Join on vendor_id (brings
+# the vendor's name + audit fields onto each payment; the Join's merge dedups the
+# vendor master by key) -> Custom Python test node that flags a payment whose
+# approver is also the creator/last-modifier of that vendor record.
+# Expected: 2 violations (PMT-S1, PMT-S2) — same as the Python test it replaces.
+nodes:
+  - id: pmts
+    type: import
+    source_id: payments
+    narrative: Vendor payment register (primary population).
+  - id: vendors
+    type: import
+    source_id: vendor_master
+    narrative: Vendor master file.
+  - id: with_vendor
+    type: join
+    inputs: [pmts, vendors]
+    narrative: Attach each vendor's name and audit fields to its payments.
+    config:
+      mode: inner
+      left_key: vendor_id
+      right_key: vendor_id
+      bring_columns: [vendor_name, created_by, last_modified_by]
+  - id: flag
+    type: custom_python
+    inputs: [with_vendor]
+    narrative: >-
+      Flag payments whose approver is also the creator or last-modifier of the
+      vendor master record (segregation-of-duties violation).
+    config:
+      flavor: test
+      code: |
+        out = []
+        for _, row in rows.iterrows():
+            r = row.to_dict()
+            approved_by = str(r.get("approved_by") or "").strip()
+            if not approved_by:
+                continue
+            created_by = str(r.get("created_by") or "").strip()
+            last_modified_by = str(r.get("last_modified_by") or "").strip()
+            sod_field = None
+            if approved_by == created_by:
+                sod_field = "created_by"
+            elif approved_by == last_modified_by:
+                sod_field = "last_modified_by"
+            if sod_field:
+                payment_id = str(r.get("payment_id") or "").strip()
+                vendor_name = str(r.get("vendor_name") or "").strip()
+                out.append({
+                    "item_key": payment_id,
+                    "description": (
+                        "Payment '" + payment_id + "' was approved by '" + approved_by
+                        + "' who is also the " + sod_field.replace("_", " ")
+                        + " of the vendor master record — segregation of duties violation"
+                    ),
+                    "severity": "high",
+                    "details": {
+                        "vendor_name": vendor_name,
+                        "approved_by": approved_by,
+                        "sod_field": sod_field,
+                    },
+                })
+        return out
