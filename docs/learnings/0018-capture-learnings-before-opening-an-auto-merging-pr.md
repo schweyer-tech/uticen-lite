@@ -36,8 +36,16 @@ them in a clean follow-up PR (cherry-picking only the learnings commit, since th
 `main`). Verify "fully merged" by a tree diff (`git diff main..branch` empty), not by `git cherry` —
 squash merges defeat patch-id matching.
 
+**Corollary — don't trust `Closes #N` to fire on a squash auto-merge.** After the PR lands, confirm
+each issue the PR claimed to close is actually closed (`gh issue list --state open`) and close any
+stragglers manually with a reference to the merged PR — do not assume the closing keywords took effect.
+On the #55–#64 review-cleanup cycle, PR #65 squash auto-merged to `main` with six `Closes #N` lines in
+its body, yet all six issues stayed **open**; they had to be closed by hand. Treat post-merge issue
+closure as a verified step, not an automatic side effect.
+
 ## Reference
 
 - Governance: PR #18 (auto-merge maintainer PRs on green) and the repo's `.github/workflows`.
 - This cycle: PR #47 (feature, squash-merged before learnings) + PR #48 (rescued learnings 0016/0017).
+- Closing-keyword miss: PR #65 (squash auto-merge; `Closes #55–#58,#61,#64` did not fire — closed manually).
 - Related captures: [[0016]], [[0017]].
