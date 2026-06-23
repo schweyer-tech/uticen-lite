@@ -4,10 +4,10 @@ from __future__ import annotations
 import io
 import json
 
+import pandas as pd
 import pytest
 
 from controlflow_sdk.plane.routes import pipeline as P
-
 
 # ---------------------------------------------------------------------------
 # Fixture helpers (follow the pattern in test_pipeline_editor.py)
@@ -144,10 +144,6 @@ def test_step_data_unknown_node_degrades(client):
 # xlsx export route tests
 # ---------------------------------------------------------------------------
 
-from io import BytesIO  # noqa: E402
-
-import pandas as pd  # noqa: E402
-
 _XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
@@ -156,12 +152,12 @@ def test_per_step_xlsx_downloads(client):
     r = c.get(f"/controls/{control_id}/logic/step/flt/export.xlsx")
     assert r.status_code == 200
     assert r.headers["content-type"].startswith(_XLSX)
-    pd.read_excel(BytesIO(r.content), engine="openpyxl")   # valid workbook
+    pd.read_excel(io.BytesIO(r.content), engine="openpyxl")   # valid workbook
 
 
 def test_workbook_xlsx_has_a_sheet_per_step(client):
     c, control_id = _seeded(client)
     r = c.get(f"/controls/{control_id}/logic/export-steps.xlsx")
     assert r.status_code == 200
-    names = pd.ExcelFile(BytesIO(r.content), engine="openpyxl").sheet_names
+    names = pd.ExcelFile(io.BytesIO(r.content), engine="openpyxl").sheet_names
     assert "Summary" in names and "About" in names
