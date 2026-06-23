@@ -61,10 +61,7 @@ def _serialise_sources(control: ControlDef) -> list[dict[str, Any]]:
 
 
 def _serialise_framework_refs(control: ControlDef) -> dict[str, Any]:
-    return {
-        "extra": {k: list(v) for k, v in control.framework_refs.extra.items()},
-        "nist": list(control.framework_refs.nist),
-    }
+    return control.framework_refs.to_dict()
 
 
 def _build_workpaper(

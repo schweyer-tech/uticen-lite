@@ -272,10 +272,7 @@ class Workpaper:
             test_code = pathlib.Path(control.test_path).read_text(encoding="utf-8")
 
         # Serialise FrameworkRefs to a plain dict (mirrors ControlDef.to_dict()).
-        framework_refs: dict[str, Any] = {
-            "nist": list(control.framework_refs.nist),
-            "extra": {k: list(v) for k, v in control.framework_refs.extra.items()},
-        }
+        framework_refs: dict[str, Any] = control.framework_refs.to_dict()
 
         procedure = Procedure(
             title=control.title,
@@ -320,10 +317,7 @@ class Workpaper:
         stays deterministic and testable.
         """
         # Serialise FrameworkRefs to a plain dict (mirrors ControlDef.to_dict()).
-        framework_refs: dict[str, Any] = {
-            "nist": list(control.framework_refs.nist),
-            "extra": {k: list(v) for k, v in control.framework_refs.extra.items()},
-        }
+        framework_refs: dict[str, Any] = control.framework_refs.to_dict()
 
         built: list[Procedure] = [
             Procedure(
