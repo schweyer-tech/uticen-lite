@@ -389,7 +389,7 @@ def _merge_draft_into_graph(
 
 def _ai_apply_error(
     templates: Jinja2Templates, request: Request, message: str
-) -> Any:
+) -> HTMLResponse:
     """Return an OOB error fragment that HTMX swaps into ``#ai-draft-panel``.
 
     The swap is out-of-band so the ``#pipe-cards`` target is left intact.
@@ -586,7 +586,7 @@ def register(
     # --- Logic sub-route redirects -------------------------------------------
 
     @app.get("/controls/{control_id}/logic")
-    def logic_redirect(control_id: str) -> Any:
+    def logic_redirect(control_id: str) -> RedirectResponse:
         return RedirectResponse(f"/controls/{control_id}/logic/builder", status_code=302)
 
     # --- Logic sub-route GETs ------------------------------------------------
@@ -596,7 +596,7 @@ def register(
         control_id: str,
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
-    ) -> Any:
+    ) -> HTMLResponse:
         root = request.app.state.project_root
         ctx = _editor_context(request, conn, root, control_id, for_builder=True)
         ctx["active"] = "logic"
@@ -608,7 +608,7 @@ def register(
         control_id: str,
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
-    ) -> Any:
+    ) -> HTMLResponse:
         root = request.app.state.project_root
         ctx = _editor_context(request, conn, root, control_id)
         ctx["active"] = "logic"
@@ -620,7 +620,7 @@ def register(
         control_id: str,
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
-    ) -> Any:
+    ) -> HTMLResponse:
         root = request.app.state.project_root
         ctx = _editor_context(request, conn, root, control_id)
         ctx["active"] = "logic"
@@ -630,7 +630,7 @@ def register(
     # --- Logic POST (save raw Python test_code) ------------------------------
 
     @app.post("/controls/{control_id}/logic/python")
-    async def save_python(control_id: str, request: Request) -> Any:
+    async def save_python(control_id: str, request: Request) -> RedirectResponse:
         """Save hand-written test_code for a raw-Python control.
 
         Guard: if the control already has a pipeline or rule_spec it is NOT a
@@ -670,8 +670,8 @@ def register(
 
     # --- Logic POST (save builder graph) -------------------------------------
 
-    @app.post("/controls/{control_id}/logic/builder")
-    async def save_pipeline(control_id: str, request: Request) -> Any:
+    @app.post("/controls/{control_id}/logic/builder", response_model=None)
+    async def save_pipeline(control_id: str, request: Request) -> HTMLResponse | RedirectResponse:
         from controlflow_sdk.plane.routes.controls import _save_pipeline_graph
 
         root = request.app.state.project_root
@@ -706,7 +706,7 @@ def register(
     # --- Logic POST (convert to Python) --------------------------------------
 
     @app.post("/controls/{control_id}/logic/convert")
-    async def convert_to_python(control_id: str, request: Request) -> Any:
+    async def convert_to_python(control_id: str, request: Request) -> RedirectResponse:
         """One-way door (§9): compile the pipeline → ``test(pop, sources)`` and
         switch the control to ``test_kind='python'``, dropping the author into the
         existing CodeMirror escape hatch pre-filled with the stitched code."""
@@ -748,7 +748,7 @@ def register(
     # --- Logic POST (AI draft → auto-apply into terminal Test node) ----------
 
     @app.post("/controls/{control_id}/logic/ai-apply", response_class=HTMLResponse)
-    async def ai_apply(control_id: str, request: Request) -> Any:
+    async def ai_apply(control_id: str, request: Request) -> HTMLResponse:
         """Draft a rule_spec via the AI backend and merge it into the terminal
         Test node of the builder graph.  Returns the re-rendered ``#pipe-cards``
         inner HTML so HTMX can swap the cards in place — the author reviews and
@@ -878,7 +878,7 @@ def register(
     # --- Legacy /pipeline GET redirect (301 permanent) -----------------------
 
     @app.get("/controls/{control_id}/pipeline")
-    def pipeline_redirect(control_id: str) -> Any:
+    def pipeline_redirect(control_id: str) -> RedirectResponse:
         return RedirectResponse(
             f"/controls/{control_id}/logic/builder", status_code=301
         )

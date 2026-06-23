@@ -3,7 +3,6 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Callable, Generator
 from datetime import UTC, datetime
-from typing import Any
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -20,7 +19,7 @@ def register(
     get_conn: Callable[..., Generator[sqlite3.Connection, None, None]],
 ) -> None:
     @app.post("/controls/{control_id}/run")
-    def run(control_id: str, request: Request) -> Any:
+    def run(control_id: str, request: Request) -> RedirectResponse:
         root = request.app.state.project_root
         executed_at = datetime.now(UTC).isoformat()
         conn = connect(root)
@@ -38,7 +37,7 @@ def register(
         run_id: str,
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
-    ) -> Any:
+    ) -> HTMLResponse:
         root = request.app.state.project_root
         run = repo.get_run(conn, run_id)
         wp_path = root / "target" / "workpapers" / f"{control_id}.html"
