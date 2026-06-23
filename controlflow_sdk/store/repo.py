@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Callable, Sequence
 from typing import Any
 
 from controlflow_sdk.model.run import RunRecord
@@ -10,6 +11,24 @@ from controlflow_sdk.model.run import RunRecord
 
 def _loads(value: str | None, fallback: Any) -> Any:
     return json.loads(value) if value else fallback
+
+
+def _list_by_getter(
+    conn: sqlite3.Connection,
+    query: str,
+    getter: Callable[[sqlite3.Connection, str], dict | None],
+    *,
+    id_column: str = "id",
+    params: Sequence[Any] = (),
+) -> list[dict]:
+    """Run ``query`` to collect ids, fetch each via ``getter``, drop None results."""
+    ids = [r[id_column] for r in conn.execute(query, params).fetchall()]
+    items = []
+    for item_id in ids:
+        item = getter(conn, item_id)
+        if item is not None:
+            items.append(item)
+    return items
 
 
 # ---- project ---------------------------------------------------------------
@@ -123,13 +142,7 @@ def get_source(conn: sqlite3.Connection, source_id: str) -> dict | None:
 
 
 def list_sources(conn: sqlite3.Connection) -> list[dict]:
-    ids = [r["id"] for r in conn.execute("SELECT id FROM sources ORDER BY id").fetchall()]
-    sources = []
-    for sid in ids:
-        src = get_source(conn, sid)
-        if src is not None:
-            sources.append(src)
-    return sources
+    return _list_by_getter(conn, "SELECT id FROM sources ORDER BY id", get_source)
 
 
 # ---- source files (per-file data lineage) ----------------------------------
@@ -318,13 +331,7 @@ def get_control(conn: sqlite3.Connection, control_id: str) -> dict | None:
 
 
 def list_controls(conn: sqlite3.Connection) -> list[dict]:
-    ids = [r["id"] for r in conn.execute("SELECT id FROM controls ORDER BY id").fetchall()]
-    controls = []
-    for cid in ids:
-        ctrl = get_control(conn, cid)
-        if ctrl is not None:
-            controls.append(ctrl)
-    return controls
+    return _list_by_getter(conn, "SELECT id FROM controls ORDER BY id", get_control)
 
 
 # ---- runs + violations -----------------------------------------------------
@@ -374,19 +381,14 @@ def get_run(conn: sqlite3.Connection, run_id: str) -> dict | None:
 
 
 def list_runs_for(conn: sqlite3.Connection, control_id: str) -> list[dict]:
-    ids = [
-        r["run_id"]
-        for r in conn.execute(
-            "SELECT run_id FROM runs WHERE control_id = ? "
-            "ORDER BY executed_at DESC, created_at DESC", (control_id,)
-        ).fetchall()
-    ]
-    result = []
-    for rid in ids:
-        run = get_run(conn, rid)
-        if run is not None:
-            result.append(run)
-    return result
+    return _list_by_getter(
+        conn,
+        "SELECT run_id FROM runs WHERE control_id = ? "
+        "ORDER BY executed_at DESC, created_at DESC",
+        get_run,
+        id_column="run_id",
+        params=(control_id,),
+    )
 
 
 def latest_run(conn: sqlite3.Connection, control_id: str) -> dict | None:
