@@ -1,5 +1,7 @@
 """Live row-counts at every joint of a control pipeline (spec §4, §5).
 
+Now delegates to :mod:`controlflow_sdk.pipeline.materialize`.
+
 With no AI to ask "is this right?", the **count surviving each node** is how a
 non-developer sees a mistake — a node dropping to 0 is the tell. This is the
 offline feedback loop the spec calls for: ``1,204 → Filter: 88 → Join: 88 →
@@ -21,110 +23,25 @@ from __future__ import annotations
 
 from typing import Any
 
-from controlflow_sdk.pipeline.compile import (
-    _conditions,
-    _emit_node_lines,
-    _frame,
-)
 from controlflow_sdk.pipeline.model import Pipeline
-from controlflow_sdk.rules.render_rule import _mask_expr
 
 
 class RowCountError(RuntimeError):
     """A pipeline's row-count probe failed to evaluate over the sample frames."""
 
 
-def _emit_counts_body(pipeline: Pipeline) -> str:
-    """Emit a ``_probe(frames)`` function that returns ``{node_id: surviving}``.
-
-    ``frames`` maps an Import node's ``source_id`` to its loaded DataFrame. Each
-    non-terminal node assigns ``_f_<id>`` exactly as the compiler does, then the
-    body records ``len(_f_<id>)``. Each terminal node records its violation count:
-    the masked length for a rule-style Test, or ``len`` of the custom helper's
-    output for a custom-python test-flavor terminal.
-
-    For a multi-terminal pipeline, all terminals are skipped in the trunk loop and
-    each emits its own count — mirroring the compile.py ``_emit_python`` pattern.
-    The single-terminal output is byte-identical to the original behaviour.
-    """
-    order = pipeline.topological()
-    terminals = pipeline.terminals
-    terminal_ids = {t.id for t in terminals}
-
-    lines: list[str] = ["def _probe(frames, _node_fns):", "    _counts = {}"]
-    for node in order:
-        if node.id in terminal_ids:
-            continue
-        if node.type == "import":
-            # Read the bound source frame directly (no pop/sources split here —
-            # the caller supplies every Import's frame by source_id).
-            lines.append(f"    {_frame(node.id)} = frames[{node.source_id!r}]")
-        elif node.type == "custom_python":
-            src = _frame(node.inputs[0])
-            lines.append(f"    {_frame(node.id)} = _node_fns[{node.id!r}]({src})")
-        else:
-            for ln in _emit_node_lines(node, primary_source=None):
-                if ln.startswith("#"):
-                    continue
-                lines.append(f"    {ln}")
-        lines.append(f"    _counts[{node.id!r}] = len({_frame(node.id)})")
-
-    for terminal in terminals:
-        lines.extend("    " + ln for ln in _emit_terminal_count(terminal, pipeline))
-    lines.append("    return _counts")
-    return "\n".join(lines)
-
-
-def _emit_terminal_count(node: Any, pipeline: Pipeline) -> list[str]:
-    """Lines recording the terminal node's surviving (violation) count."""
-    if node.type == "custom_python" and node.config.get("flavor") == "test":
-        src = _frame(node.inputs[0])
-        return [
-            f"_term = _node_fns[{node.id!r}]({src})",
-            f"_counts[{node.id!r}] = len(_term)",
-        ]
-    src = _frame(node.inputs[0])
-    conds = _conditions(node.config.get("conditions", []))
-    if not conds:
-        return [f"_counts[{node.id!r}] = 0"]
-    combine = " & " if node.config.get("logic", "all") == "all" else " | "
-    mask = combine.join(_mask_expr(c, frame=src) for c in conds)
-    return [f"_counts[{node.id!r}] = int(({mask}).sum())"]
-
-
-def compute_row_counts(
-    pipeline: Pipeline, frames: dict[str, Any]
-) -> dict[str, int]:
+def compute_row_counts(pipeline: Pipeline, frames: dict[str, Any]) -> dict[str, int]:
     """Return ``{node_id: rows surviving}`` for *pipeline* over *frames*.
 
-    ``frames`` maps each Import node's ``source_id`` to a loaded pandas
-    DataFrame (e.g. a capped sample). Custom Python nodes are compiled to the
-    same module-level ``_node_<id>(rows)`` helpers the runner uses, so the
-    counts reflect exactly what the compiled ``test()`` would compute.
-
-    Returns ``{}`` (rather than raising) when the pipeline references a source
-    not present in ``frames`` — the editor can then show "—" for every node
-    until all Import sources have a loaded sample.
+    Now a thin ``len()`` over :func:`controlflow_sdk.pipeline.materialize.materialize_steps`
+    so the count and the inspectable data are the *same* computation. Returns ``{}`` when a
+    source is missing; raises :class:`RowCountError` on an evaluation failure.
     """
-    needed = set(pipeline.import_source_ids())
-    if not needed.issubset(frames.keys()):
-        return {}
+    from controlflow_sdk.pipeline.materialize import MaterializeError, materialize_steps
+    from controlflow_sdk.rules.spec import RuleSpecError
 
-    from controlflow_sdk.pipeline.compile import _emit_custom_helper
-
-    namespace: dict[str, Any] = {}
-    # Custom-python helpers first (module-level, starved of `sources`).
-    node_fns: dict[str, Any] = {}
-    helper_src_parts: list[str] = []
-    for node in pipeline.nodes:
-        if node.type == "custom_python":
-            helper_src_parts.append(_emit_custom_helper(node))
-    probe_src = "\n\n\n".join([*helper_src_parts, _emit_counts_body(pipeline)])
     try:
-        exec(probe_src, namespace)  # noqa: S102 — author code, guardrailed by lint
-        for node in pipeline.nodes:
-            if node.type == "custom_python":
-                node_fns[node.id] = namespace[f"_node_{node.id}"]
-        return namespace["_probe"](frames, node_fns)
-    except Exception as exc:  # noqa: BLE001 — surface as a typed, contained error
+        steps = materialize_steps(pipeline, frames)
+    except (MaterializeError, RuleSpecError) as exc:
         raise RowCountError(str(exc)) from exc
+    return {nid: len(df) for nid, df in steps.items()}
