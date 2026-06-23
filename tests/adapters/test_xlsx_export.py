@@ -86,6 +86,21 @@ def test_single_step_truncation_keeps_data_sheet(monkeypatch):
     assert names[0] != names[1]               # distinct sheet names
 
 
+def test_step_label_summary_does_not_collide_with_summary_sheet():
+    """A step labelled 'Summary' must not overwrite the fixed Summary sheet."""
+    steps = [("Summary", pd.DataFrame({"x": [1, 2, 3]}))]
+    book = X.write_step_workbook(steps, {"control": "C-1"})
+    xf = pd.ExcelFile(BytesIO(book), engine="openpyxl")
+    names = xf.sheet_names
+    # All sheet names must be unique.
+    assert len(names) == len(set(names)), f"duplicate sheet names: {names}"
+    # The fixed Summary sheet must still exist.
+    assert "Summary" in names, f"Summary sheet missing: {names}"
+    # The step data sheet must also exist (deduped to a different name).
+    data_sheets = [n for n in names if n not in ("Summary", "About")]
+    assert len(data_sheets) == 1, f"expected exactly 1 data sheet, got {names}"
+
+
 def test_missing_openpyxl_raises_adapters_unavailable(monkeypatch):
     from controlflow_sdk.plane.ingest import AdaptersUnavailable
 

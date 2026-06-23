@@ -125,4 +125,4 @@ def test_cache_is_bounded():
     for i in range(_CACHE_MAX + 20):
         materialize_steps(parse_pipeline(_graph()), _frames(),
                           source_versions={"invoices": f"v{i}"}, cache=cache)
-    assert len(cache) <= _CACHE_MAX
+    assert 0 < len(cache) <= _CACHE_MAX

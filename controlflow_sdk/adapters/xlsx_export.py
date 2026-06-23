@@ -105,7 +105,7 @@ def write_step_workbook(steps: list[tuple[str, pd.DataFrame]], meta: dict[str, s
     (control id, generation timestamp, etc.).
     """
     _require_writer()
-    used: set[str] = set()
+    used: set[str] = {"summary", "about"}
     prepared: list[tuple[str, pd.DataFrame]] = []
     summary_rows: list[dict[str, Any]] = []
     for i, (label, frame) in enumerate(steps, start=1):
