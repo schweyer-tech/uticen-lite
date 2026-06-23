@@ -162,7 +162,6 @@ class CsvSource(Source):
 
     def __init__(self, binding: SourceBinding, root: Path) -> None:
         self._binding = binding
-        self._root = root
         self._path: Path = root / binding.config["path"]
         # Populated by load(); provenance() falls back to parsing if not yet set.
         self._row_count: int | None = None
@@ -227,7 +226,6 @@ class ParquetSource(Source):
 
     def __init__(self, binding: SourceBinding, root: Path) -> None:
         self._binding = binding
-        self._root = root
         self._path: Path = root / binding.config["path"]
         self._row_count: int | None = None
 
@@ -282,7 +280,6 @@ class XlsxSource(Source):
 
     def __init__(self, binding: SourceBinding, root: Path) -> None:
         self._binding = binding
-        self._root = root
         self._path: Path = root / binding.config["path"]
         self._sheet: str | int = binding.config.get("sheet", 0)
         self._row_count: int | None = None

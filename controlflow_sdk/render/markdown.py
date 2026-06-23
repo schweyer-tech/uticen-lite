@@ -19,7 +19,7 @@ from controlflow_sdk.render.dates import format_display_date
 if TYPE_CHECKING:
     from controlflow_sdk.model.run import SourceProvenance
     from controlflow_sdk.model.violation import Violation
-    from controlflow_sdk.model.workpaper import DataSample, Workpaper
+    from controlflow_sdk.model.workpaper import DataSample, Determination, Workpaper
 
 # Rows shown in the Markdown static preview table per data source.
 _MD_PREVIEW_ROWS = 10
@@ -96,14 +96,38 @@ def render_markdown(
     extra: dict[str, list[str]] = wp.framework_refs.get("extra", {})
     run_executed_at = wp.procedures[0].result.executed_at if wp.procedures else ""
 
-    # ── Header ────────────────────────────────────────────────────────────────
+    _render_header(lines, wp, generated_display)
+    _render_results(lines, records_tested, total_passed, exceptions, pass_rate, verdict)
+    _render_objective(lines, wp)
+    _render_control(lines, wp, nist_refs, extra)
+    _render_data_sources(
+        lines, sources, samples_by_id, run_executed_at, date_format=date_format, tz=tz
+    )
+    _render_procedures(lines, wp)
+    _render_exceptions(lines, violations)
+    _render_conclusion(lines, determination)
+
+    return "\n".join(lines)
+
+
+def _render_header(lines: list[str], wp: Workpaper, generated_display: str) -> None:
+    """── Header ──"""
     lines.append(f"# {wp.title}")
     lines.append("")
     lines.append(f"**Control ID:** {wp.control_id}")
     lines.append(f"**Generated:** {generated_display}")
     lines.append("")
 
-    # ── Results (Records Tested · Passed · Exceptions; no Failed) ──────────────
+
+def _render_results(
+    lines: list[str],
+    records_tested: int,
+    total_passed: int,
+    exceptions: int,
+    pass_rate: float,
+    verdict: str,
+) -> None:
+    """── Results (Records Tested · Passed · Exceptions; no Failed) ──"""
     lines.append("## Results")
     lines.append("")
     lines.append(
@@ -118,13 +142,22 @@ def render_markdown(
     lines.append(f"| Pass Rate | {pass_rate}% |")
     lines.append("")
 
-    # ── Objective & Scope ─────────────────────────────────────────────────────
+
+def _render_objective(lines: list[str], wp: Workpaper) -> None:
+    """── Objective & Scope ──"""
     lines.append("## Objective & Scope")
     lines.append("")
     lines.append(wp.objective)
     lines.append("")
 
-    # ── Control (framework refs fold in here) ─────────────────────────────────
+
+def _render_control(
+    lines: list[str],
+    wp: Workpaper,
+    nist_refs: list[str],
+    extra: dict[str, list[str]],
+) -> None:
+    """── Control (framework refs fold in here) ──"""
     lines.append("## Control")
     lines.append("")
     lines.append(f"**Control ID:** {wp.control_id}")
@@ -143,7 +176,17 @@ def render_markdown(
         lines.append("None")
     lines.append("")
 
-    # ── Data Sources ──────────────────────────────────────────────────────────
+
+def _render_data_sources(
+    lines: list[str],
+    sources: list[SourceProvenance],
+    samples_by_id: dict[str, DataSample],
+    run_executed_at: str,
+    *,
+    date_format: str,
+    tz: str,
+) -> None:
+    """── Data Sources ──"""
     lines.append("## Data Sources")
     lines.append("")
     if sources:
@@ -169,7 +212,9 @@ def render_markdown(
         lines.append("No data sources recorded.")
     lines.append("")
 
-    # ── Procedures ────────────────────────────────────────────────────────────
+
+def _render_procedures(lines: list[str], wp: Workpaper) -> None:
+    """── Procedures ──"""
     lines.append("## Procedures")
     lines.append("")
     for i, proc in enumerate(wp.procedures, start=1):
@@ -208,7 +253,9 @@ def render_markdown(
                 lines.append(f"| {key} | {sev} | {desc} |")
             lines.append("")
 
-    # ── Exceptions ────────────────────────────────────────────────────────────
+
+def _render_exceptions(lines: list[str], violations: list[Violation]) -> None:
+    """── Exceptions ──"""
     lines.append("## Exceptions")
     lines.append("")
     if violations:
@@ -223,7 +270,9 @@ def render_markdown(
         lines.append("No exceptions — control operated without deviations.")
     lines.append("")
 
-    # ── Conclusion (threshold determination) ──────────────────────────────────
+
+def _render_conclusion(lines: list[str], determination: Determination) -> None:
+    """── Conclusion (threshold determination) ──"""
     lines.append("## Conclusion")
     lines.append("")
     threshold_text, result_text = determination.conclusion_text()
@@ -231,8 +280,6 @@ def render_markdown(
     lines.append("")
     lines.append(f"**{result_text}**")
     lines.append("")
-
-    return "\n".join(lines)
 
 
 def _completeness_accuracy_text(

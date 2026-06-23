@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import sqlite3
 from collections.abc import Callable, Generator
-from typing import Any
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -37,7 +36,7 @@ def register(
     def settings_home(
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
-    ) -> Any:
+    ) -> HTMLResponse:
         return templates.TemplateResponse(
             request,
             "settings.html",

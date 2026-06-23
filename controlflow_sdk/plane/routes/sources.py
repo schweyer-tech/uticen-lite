@@ -13,7 +13,12 @@ from fastapi.templating import Jinja2Templates
 
 from controlflow_sdk.plane import fetch as fetchmod
 from controlflow_sdk.plane.coercion_check import coercion_report
-from controlflow_sdk.plane.ingest import AdaptersUnavailable, TableParseError, extract_table
+from controlflow_sdk.plane.ingest import (
+    AdaptersUnavailable,
+    ExtractedTable,
+    TableParseError,
+    extract_table,
+)
 from controlflow_sdk.store import repo
 from controlflow_sdk.store.db import connect
 
@@ -35,7 +40,7 @@ def _pending_dir(root: Path, sid: str) -> Path:
     return root / "data" / ".pending" / sid
 
 
-def _table_of(raw: bytes, fmt: str, sheet: str | None = None) -> Any:
+def _table_of(raw: bytes, fmt: str, sheet: str | None = None) -> ExtractedTable:
     return extract_table(raw, fmt, sheet=sheet)
 
 
@@ -78,6 +83,18 @@ def _reconcile_columns(
     return reconciled, added, removed
 
 
+def _coerce_date(val: str) -> str | None:
+    """Normalise a posted as-of date: trimmed string, or None when blank."""
+    return val.strip() or None
+
+
+def _set_extract_date(conn: sqlite3.Connection, source_id: str, as_of_date: str) -> None:
+    """Stamp the source's extract_date from a posted as-of date (no-op when blank)."""
+    if (stripped := as_of_date.strip()):
+        conn.execute("UPDATE sources SET extract_date = ? WHERE id = ?", (stripped, source_id))
+        conn.commit()
+
+
 def register(
     app: FastAPI,
     templates: Jinja2Templates,
@@ -87,7 +104,7 @@ def register(
     def list_sources(
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
-    ) -> Any:
+    ) -> HTMLResponse:
         return templates.TemplateResponse(
             request,
             "sources.html",
@@ -98,27 +115,27 @@ def register(
     def new_source(
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
-    ) -> Any:
+    ) -> HTMLResponse:
         return templates.TemplateResponse(
             request,
             "source_new.html",
             {"project": repo.get_project(conn) or {"name": ""}},
         )
 
-    @app.post("/sources")
+    @app.post("/sources", response_model=None)
     async def create_source(
         request: Request,
         source_id: str = Form(...),
         as_of_date: str = Form(""),
         sheet: str = Form(""),
         file: UploadFile = File(...),
-    ) -> Any:
+    ) -> HTMLResponse | RedirectResponse:
         root = request.app.state.project_root
         filename = file.filename or f"{source_id}.csv"
         fmt = _fmt_from_name(filename)
         raw = await file.read()
 
-        def _err(msg: str) -> Any:
+        def _err(msg: str) -> HTMLResponse:
             return templates.TemplateResponse(
                 request, "source_new.html",
                 {"project": {"name": ""}, "error": msg}, status_code=200,
@@ -150,13 +167,10 @@ def register(
             ])
             repo.set_initial_file(
                 conn, source_id=source_id, stored_path=f"data/{dest.name}",
-                original_name=dest.name, as_of_date=as_of_date.strip() or None,
+                original_name=dest.name, as_of_date=_coerce_date(as_of_date),
                 row_count=len(table.rows), uploaded_at=_stamp(),
             )
-            if as_of_date.strip():
-                conn.execute("UPDATE sources SET extract_date = ? WHERE id = ?",
-                             (as_of_date.strip(), source_id))
-                conn.commit()
+            _set_extract_date(conn, source_id, as_of_date)
         finally:
             conn.close()
         return RedirectResponse(f"/sources/{source_id}", status_code=303)
@@ -181,12 +195,12 @@ def register(
         return {str(k): str(v) for k, v in parsed.items()}
 
     @app.get("/sources/from-url", response_class=HTMLResponse)
-    def new_source_from_url(request: Request) -> Any:
+    def new_source_from_url(request: Request) -> HTMLResponse:
         return templates.TemplateResponse(
             request, "source_new.html", {"project": {"name": ""}, "mode": "url"},
         )
 
-    @app.post("/sources/from-url")
+    @app.post("/sources/from-url", response_model=None)
     async def create_source_from_url(
         request: Request,
         source_id: str = Form(...),
@@ -194,10 +208,10 @@ def register(
         headers: str = Form(""),
         record_path: str = Form(""),
         as_of_date: str = Form(""),
-    ) -> Any:
+    ) -> HTMLResponse | RedirectResponse:
         root = request.app.state.project_root
 
-        def _err(msg: str) -> Any:
+        def _err(msg: str) -> HTMLResponse:
             return templates.TemplateResponse(
                 request, "source_new.html",
                 {"project": {"name": ""}, "mode": "url", "error": msg,
@@ -225,16 +239,13 @@ def register(
             ])
             repo.set_initial_file(
                 conn, source_id=source_id, stored_path=f"data/{dest.name}",
-                original_name=dest.name, as_of_date=as_of_date.strip() or None,
+                original_name=dest.name, as_of_date=_coerce_date(as_of_date),
                 row_count=len(table.rows), uploaded_at=_stamp(),
             )
             repo.upsert_source_fetch(conn, source_id=source_id, url=snap.source_url,
                                      headers=hdrs, record_path=record_path.strip() or None,
                                      last_fetched_at=snap.fetched_at)
-            if as_of_date.strip():
-                conn.execute("UPDATE sources SET extract_date = ? WHERE id = ?",
-                             (as_of_date.strip(), source_id))
-                conn.commit()
+            _set_extract_date(conn, source_id, as_of_date)
         finally:
             conn.close()
         return RedirectResponse(f"/sources/{source_id}", status_code=303)
@@ -244,7 +255,7 @@ def register(
         source_id: str,
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
-    ) -> Any:
+    ) -> HTMLResponse:
         return templates.TemplateResponse(
             request,
             "source_edit.html",
@@ -259,7 +270,7 @@ def register(
         request: Request,
         page: int = 1,
         conn: sqlite3.Connection = Depends(get_conn),
-    ) -> Any:
+    ) -> HTMLResponse:
         root = request.app.state.project_root
         source = repo.get_source(conn, source_id)
         current = repo.get_current_file(conn, source_id)
@@ -306,7 +317,7 @@ def register(
         source_id: str,
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
-    ) -> Any:
+    ) -> HTMLResponse:
         files = repo.list_source_files(conn, source_id)
         for f in files:
             f["uploaded"] = _fmt_stamp(f["uploaded_at"]) if f["uploaded_at"] else ""
@@ -323,11 +334,11 @@ def register(
         source_id: str,
         request: Request,
         as_of_date: str = Form(""),
-    ) -> Any:
+    ) -> RedirectResponse:
         root = request.app.state.project_root
         conn = connect(root)
         try:
-            repo.set_current_file_asof(conn, source_id, as_of_date.strip() or None)
+            repo.set_current_file_asof(conn, source_id, _coerce_date(as_of_date))
             return RedirectResponse(f"/sources/{source_id}/data", status_code=303)
         finally:
             conn.close()
@@ -336,7 +347,7 @@ def register(
     async def save_source(
         source_id: str,
         request: Request,
-    ) -> Any:
+    ) -> RedirectResponse:
         root = request.app.state.project_root
         conn = connect(root)
         try:
@@ -385,13 +396,13 @@ def register(
             conn.close()
         return RedirectResponse("/sources", status_code=303)
 
-    @app.post("/sources/{source_id}/refresh")
+    @app.post("/sources/{source_id}/refresh", response_model=None)
     async def refresh_source(
         source_id: str,
         request: Request,
         file: UploadFile = File(...),
         as_of_date: str = Form(""),
-    ) -> Any:
+    ) -> HTMLResponse | RedirectResponse:
         """Stage a new data file and show a confirm page with the column diff."""
         root = request.app.state.project_root
         conn = connect(root)
@@ -432,7 +443,7 @@ def register(
         request: Request,
         pending: str = Form(...),
         as_of_date: str = Form(""),
-    ) -> Any:
+    ) -> RedirectResponse:
         """Archive the current file, promote the staged file, reconcile columns."""
         root = request.app.state.project_root
         conn = connect(root)
@@ -477,7 +488,7 @@ def register(
             repo.record_current_file(
                 conn, source_id=source_id, stored_path=existing["path"],
                 original_name=Path(pending).name,
-                as_of_date=as_of_date.strip() or None,
+                as_of_date=_coerce_date(as_of_date),
                 row_count=_row_count(new_bytes, existing["format"], existing.get("sheet")),
                 uploaded_at=stamp,
             )
@@ -500,7 +511,7 @@ def register(
         source_id: str,
         request: Request,
         pending: str = Form(""),
-    ) -> Any:
+    ) -> RedirectResponse:
         """Discard a staged file without touching the current data."""
         root = request.app.state.project_root
         if pending:
@@ -509,8 +520,8 @@ def register(
                 p.unlink()
         return RedirectResponse(f"/sources/{source_id}", status_code=303)
 
-    @app.post("/sources/{source_id}/refetch")
-    async def refetch_source(source_id: str, request: Request) -> Any:
+    @app.post("/sources/{source_id}/refetch", response_model=None)
+    async def refetch_source(source_id: str, request: Request) -> HTMLResponse | RedirectResponse:
         """Re-run the stored URL fetch and route through the refresh-confirm diff."""
         root = request.app.state.project_root
         conn = connect(root)

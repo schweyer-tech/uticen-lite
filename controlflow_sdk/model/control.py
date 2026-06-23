@@ -13,6 +13,12 @@ class FrameworkRefs:
     nist: list[str] = field(default_factory=list)
     extra: dict[str, list[str]] = field(default_factory=dict)
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "nist": list(self.nist),
+            "extra": {k: list(v) for k, v in self.extra.items()},
+        }
+
 
 @dataclass(frozen=True)
 class Threshold:
@@ -177,10 +183,7 @@ class ControlDef:
             "title": self.title,
             "objective": self.objective,
             "narrative": self.narrative,
-            "framework_refs": {
-                "nist": list(self.framework_refs.nist),
-                "extra": {k: list(v) for k, v in self.framework_refs.extra.items()},
-            },
+            "framework_refs": self.framework_refs.to_dict(),
             "risk": (
                 {
                     "name": self.risk.name,

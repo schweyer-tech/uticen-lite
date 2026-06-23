@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from controlflow_sdk.store import repo
@@ -95,7 +95,7 @@ def register(
     def ai_settings(
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
-    ) -> Any:
+    ) -> HTMLResponse:
         from controlflow_sdk.ai.providers import available_providers
 
         cfg = _ai_config(conn)
@@ -111,7 +111,7 @@ def register(
         )
 
     @app.post("/settings/ai")
-    async def save_ai_settings(request: Request) -> Any:
+    async def save_ai_settings(request: Request) -> RedirectResponse:
         root = request.app.state.project_root
         conn = connect(root)  # per-handler conn (0002)
         try:
@@ -133,12 +133,10 @@ def register(
             )
         finally:
             conn.close()
-        from fastapi.responses import RedirectResponse
-
         return RedirectResponse("/settings/ai", status_code=303)
 
     @app.post("/controls/ai/draft", response_class=HTMLResponse)
-    async def draft_rule(request: Request) -> Any:
+    async def draft_rule(request: Request) -> HTMLResponse:
         root = request.app.state.project_root
         conn = connect(root)  # per-handler conn (0002)
         try:
@@ -208,7 +206,7 @@ def register(
             conn.close()
 
 
-def _error(templates: Jinja2Templates, request: Request, message: str) -> Any:
+def _error(templates: Jinja2Templates, request: Request, message: str) -> HTMLResponse:
     return templates.TemplateResponse(
         request, "partials/ai_draft_error.html", {"message": message}
     )

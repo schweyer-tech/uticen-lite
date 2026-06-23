@@ -133,18 +133,45 @@ def _try_pure_rule_spec(pipeline: Pipeline) -> dict | None:
     Multi-terminal pipelines always bail to the Python path — the union semantics
     cannot be expressed as a single rule_spec.
     """
-    if len(pipeline.terminals) != 1:
-        return None
-    if len(pipeline.import_source_ids()) != 1:
-        return None
-    # Pure means every node is Import/Filter/Test — no Join/Custom Python.
-    if any(n.type not in ("import", "filter", "test") for n in pipeline.nodes):
+    if not _is_pure_single_source(pipeline):
         return None
 
     terminal = pipeline.terminal
     test_logic = terminal.config.get("logic", "all")
 
-    # Walk the single linear chain from the terminal back to the Import.
+    filters = _walk_linear_filter_chain(pipeline, terminal, test_logic)
+    if filters is None:
+        return None
+
+    # A Filter narrows conjunctively; flattening it into the Test spec is only
+    # sound under all-AND. Under any-OR, bail to the staged Python path.
+    if filters and test_logic != "all":
+        return None
+
+    return _build_flat_spec(terminal, filters, test_logic)
+
+
+def _is_pure_single_source(pipeline: Pipeline) -> bool:
+    """Pure & single-source: one terminal, one Import, only Import/Filter/Test nodes."""
+    if len(pipeline.terminals) != 1:
+        return False
+    if len(pipeline.import_source_ids()) != 1:
+        return False
+    # Pure means every node is Import/Filter/Test — no Join/Custom Python.
+    if any(n.type not in ("import", "filter", "test") for n in pipeline.nodes):
+        return False
+    return True
+
+
+def _walk_linear_filter_chain(
+    pipeline: Pipeline, terminal: Node, test_logic: str
+) -> list[Node] | None:
+    """Walk the single linear chain terminal → Import, collecting Filter nodes.
+
+    Returns the Filter nodes (terminal-order) on success, or ``None`` if the shape
+    is not a pure linear chain (fan-in, a cycle, or a Filter whose all/any logic
+    differs from the terminal's so it can't flatten safely).
+    """
     filters: list[Node] = []
     cursor = terminal
     seen: set[str] = set()
@@ -164,12 +191,17 @@ def _try_pure_rule_spec(pipeline: Pipeline) -> dict | None:
         else:  # pragma: no cover (only filter/import remain by here)
             return None
         cursor = parent
+    return filters
 
-    # A Filter narrows conjunctively; flattening it into the Test spec is only
-    # sound under all-AND. Under any-OR, bail to the staged Python path.
-    if filters and test_logic != "all":
-        return None
 
+def _build_flat_spec(
+    terminal: Node, filters: list[Node], test_logic: str
+) -> dict | None:
+    """Flatten the Filter + Test conditions into a single rule_spec dict.
+
+    Filter conditions come first (Import-order narrowing) then the Test's own
+    conditions. Returns ``None`` when there are no conditions at all.
+    """
     conditions: list[dict] = []
     for flt in reversed(filters):  # Import-order narrowing first
         conditions.extend(flt.config.get("conditions", []))
@@ -364,6 +396,7 @@ def _emit_terminal(node: Node, pipeline: Pipeline, out_var: str = "_out") -> lis
     Two cases: a Custom Python ``test``-flavor terminal returns its node fn's
     result directly (its module-level helper already returns violations); a
     rule-style Test emits the evaluate_rule-shaped loop over its input frame.
+    This is a thin router that dispatches to the matching emitter.
 
     *out_var* names the list variable to populate. In the single-terminal path
     (``out_var="_out"``) the function emits ``return _out`` at the end. In the
@@ -371,13 +404,26 @@ def _emit_terminal(node: Node, pipeline: Pipeline, out_var: str = "_out") -> lis
     the combined return itself, so no trailing ``return`` is appended here.
     """
     if node.type == "custom_python" and node.config.get("flavor") == "test":
-        lines = _narrative_comment(node)
-        if out_var == "_out":
-            lines.append(f"return _node_{node.id}({_frame(node.inputs[0])})")
-        else:
-            lines.append(f"{out_var} = _node_{node.id}({_frame(node.inputs[0])})")
-        return lines
+        return _emit_terminal_python(node, out_var)
+    return _emit_terminal_rule(node, out_var)
 
+
+def _emit_terminal_python(node: Node, out_var: str) -> list[str]:
+    """Emit a Custom Python ``test``-flavor terminal → the violations list.
+
+    The node's module-level helper already returns violations, so the terminal
+    just binds (or returns) the call result.
+    """
+    lines = _narrative_comment(node)
+    if out_var == "_out":
+        lines.append(f"return _node_{node.id}({_frame(node.inputs[0])})")
+    else:
+        lines.append(f"{out_var} = _node_{node.id}({_frame(node.inputs[0])})")
+    return lines
+
+
+def _emit_terminal_rule(node: Node, out_var: str) -> list[str]:
+    """Emit a rule-style Test terminal → the evaluate_rule-shaped violations loop."""
     src = _frame(node.inputs[0])
     conds = _conditions(node.config.get("conditions", []))
     lines = _narrative_comment(node)

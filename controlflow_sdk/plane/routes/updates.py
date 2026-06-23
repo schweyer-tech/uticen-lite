@@ -10,7 +10,6 @@ from __future__ import annotations
 import shlex
 import sqlite3
 from collections.abc import Callable, Generator
-from typing import Any
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -33,7 +32,7 @@ def register(
     def updates_home(
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
-    ) -> Any:
+    ) -> HTMLResponse:
         method = detect_install()
         return templates.TemplateResponse(
             request,
@@ -60,7 +59,7 @@ def register(
         return RedirectResponse(url="/settings/updates", status_code=303)
 
     @app.post("/settings/updates/check", response_class=HTMLResponse)
-    def check_now(request: Request) -> Any:
+    def check_now(request: Request) -> HTMLResponse:
         method = detect_install()
         info = check_for_update(method)
         request.app.state.update_check = info  # cache for the dashboard badge
@@ -72,7 +71,7 @@ def register(
     def update_badge(
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
-    ) -> Any:
+    ) -> HTMLResponse:
         # OFF → zero egress, no badge.
         if not repo.get_check_updates_on_launch(conn):
             return HTMLResponse("")
@@ -87,7 +86,7 @@ def register(
         )
 
     @app.post("/upgrade", response_class=HTMLResponse)
-    def do_upgrade(request: Request) -> Any:
+    def do_upgrade(request: Request) -> HTMLResponse:
         method = detect_install()
         current = current_version()
         if method is InstallMethod.UNKNOWN:

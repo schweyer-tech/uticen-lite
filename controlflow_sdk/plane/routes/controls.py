@@ -374,7 +374,7 @@ def register(
         request: Request,
         source_id: str = "",
         conn: sqlite3.Connection = Depends(get_conn),
-    ) -> Any:
+    ) -> HTMLResponse:
         cols = _primary_columns(conn, [source_id]) if source_id else []
         return templates.TemplateResponse(
             request, "partials/rule_condition.html",
@@ -385,7 +385,7 @@ def register(
     def conditions_refresh(
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
-    ) -> Any:
+    ) -> HTMLResponse:
         """Re-render the condition rows for the currently-checked sources (U1).
 
         Fired by ``hx-trigger`` when a data-source checkbox toggles. The request
@@ -411,7 +411,7 @@ def register(
     def new_control(
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
-    ) -> Any:
+    ) -> HTMLResponse:
         from controlflow_sdk.plane.routes.ai import _ai_configured
 
         return templates.TemplateResponse(
@@ -434,7 +434,7 @@ def register(
         control_id: str,
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
-    ) -> Any:
+    ) -> HTMLResponse:
         control = repo.get_control(conn, control_id)
         runs = repo.list_runs_for(conn, control_id)  # newest-first (0004)
         for r in runs:
@@ -457,7 +457,7 @@ def register(
         control_id: str,
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
-    ) -> Any:
+    ) -> HTMLResponse:
         from controlflow_sdk.plane.routes.ai import _ai_configured
 
         control = repo.get_control(conn, control_id)
@@ -477,7 +477,7 @@ def register(
     def _rerender_with_error(
         request: Request, conn: sqlite3.Connection, control_id: str | None,
         errors: list[str],
-    ) -> Any:
+    ) -> HTMLResponse:
         """Re-render the edit form with an inline error banner (HTTP 422).
 
         Used when a pipeline save is REFUSED by the §8 allowlist deny-scan: the
@@ -502,8 +502,8 @@ def register(
             status_code=422,
         )
 
-    @app.post("/controls")
-    async def create_control(request: Request) -> Any:
+    @app.post("/controls", response_model=None)
+    async def create_control(request: Request) -> HTMLResponse | RedirectResponse:
         from controlflow_sdk.pipeline.lint import LintError
         from controlflow_sdk.pipeline.model import PipelineError
 
@@ -521,8 +521,8 @@ def register(
         finally:
             conn.close()
 
-    @app.post("/controls/{control_id}")
-    async def update_control(control_id: str, request: Request) -> Any:
+    @app.post("/controls/{control_id}", response_model=None)
+    async def update_control(control_id: str, request: Request) -> HTMLResponse | RedirectResponse:
         from controlflow_sdk.pipeline.lint import LintError
         from controlflow_sdk.pipeline.model import PipelineError
 
