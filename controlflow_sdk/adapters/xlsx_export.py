@@ -49,6 +49,8 @@ def _coerce_for_excel(frame: pd.DataFrame) -> pd.DataFrame:
     import numpy as np
 
     def cell(v: Any) -> Any:
+        if v is None or v is pd.NaT or v is pd.NA:
+            return None
         if isinstance(v, pd.Timestamp):
             return None if pd.isna(v) else v.to_pydatetime()
         if isinstance(v, (list, dict, set, tuple)):
@@ -65,7 +67,9 @@ def _coerce_for_excel(frame: pd.DataFrame) -> pd.DataFrame:
 
     out = frame.copy()
     for col in out.columns:
-        out[col] = out[col].map(cell)   # Series.map — never DataFrame.applymap (deprecated)
+        # Use a list comprehension + object dtype so None cells are preserved as None
+        # (Series.map on typed columns — e.g. datetime64 — would re-cast None back to NaT).
+        out[col] = pd.Series([cell(v) for v in out[col]], dtype=object, index=out.index)
     return out
 
 
@@ -81,13 +85,16 @@ def write_single_step(frame: pd.DataFrame, label: str) -> bytes:
     """A one-sheet workbook of *frame* (the data at one step)."""
     _require_writer()
     coerced, truncated, total = _prep(frame)
+    used: set[str] = set()
     buf = BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as xw:
-        coerced.to_excel(xw, sheet_name=_sanitize_sheet_name(label, set()), index=False)
+        sheet = _sanitize_sheet_name(label, used)
+        coerced.to_excel(xw, sheet_name=sheet, index=False)
         if truncated:
+            note_sheet = _sanitize_sheet_name("Truncated", used)
             pd.DataFrame({"note": [
                 f"Truncated to {EXCEL_MAX_DATA_ROWS:,} of {total:,} rows (Excel limit)."
-            ]}).to_excel(xw, sheet_name="Truncated", index=False)
+            ]}).to_excel(xw, sheet_name=note_sheet, index=False)
     return buf.getvalue()
 
 

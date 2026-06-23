@@ -64,6 +64,28 @@ def test_truncation_note_when_over_excel_limit(monkeypatch):
     assert len(_read(book, data_sheet)) == 3             # capped
 
 
+def test_nat_and_na_coerce_to_none():
+    frame = pd.DataFrame({
+        "d": [pd.Timestamp("2026-01-01"), pd.NaT],
+        "a": pd.array([1, pd.NA], dtype="Int64"),
+    })
+    out = X._coerce_for_excel(frame)
+    assert out["d"].iloc[1] is None
+    assert out["a"].iloc[1] is None
+
+
+def test_single_step_truncation_keeps_data_sheet(monkeypatch):
+    monkeypatch.setattr(X, "EXCEL_MAX_DATA_ROWS", 2)
+    frame = pd.DataFrame({"x": list(range(5))})
+    buf = X.write_single_step(frame, "Truncated")
+    xf = pd.ExcelFile(BytesIO(buf), engine="openpyxl")
+    names = xf.sheet_names
+    assert len(names) == 2, f"expected 2 sheets, got {names}"
+    data_sheet = names[0]
+    assert len(_read(buf, data_sheet)) == 2   # capped rows present
+    assert names[0] != names[1]               # distinct sheet names
+
+
 def test_missing_openpyxl_raises_adapters_unavailable(monkeypatch):
     from controlflow_sdk.plane.ingest import AdaptersUnavailable
 
