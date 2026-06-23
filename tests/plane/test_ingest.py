@@ -35,3 +35,25 @@ def test_extract_table_missing_adapters_is_friendly(monkeypatch):
     with pytest.raises(ingest.AdaptersUnavailable) as exc:
         ingest.extract_table(b"\x00\x01", "xlsx")
     assert "controlflow-sdk[adapters]" in str(exc.value)
+
+
+# ---------------------------------------------------------------------------
+# Fix 2 unit tests: corrupt files raise TableParseError
+# ---------------------------------------------------------------------------
+
+def test_corrupt_xlsx_raises_table_parse_error():
+    """Passing invalid xlsx bytes must raise TableParseError, not an unhandled exception."""
+    with pytest.raises(ingest.TableParseError):
+        ingest.extract_table(b"not xlsx", "xlsx")
+
+
+def test_corrupt_parquet_raises_table_parse_error():
+    """Passing invalid parquet bytes must raise TableParseError, not an unhandled exception."""
+    with pytest.raises(ingest.TableParseError):
+        ingest.extract_table(b"garbage parquet", "parquet")
+
+
+def test_invalid_utf8_csv_raises_table_parse_error():
+    """Non-UTF-8 CSV bytes must raise TableParseError, not UnicodeDecodeError."""
+    with pytest.raises(ingest.TableParseError):
+        ingest.extract_table(b"\xff\xfe\x00garbage binary", "csv")

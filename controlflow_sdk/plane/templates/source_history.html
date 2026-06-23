@@ -7,6 +7,12 @@
   <p class="muted mono">{{ source.id }}</p>
 </div>
 {% include "_source_tabs.html" %}
+{% if fetch %}
+<div class="callout callout-warn">
+  ⚠ This source was fetched from <span class="mono">{{ fetch.url }}</span>. Stored
+  credentials are kept <strong>plaintext</strong> in <span class="mono">controlplane.db</span>.
+</div>
+{% endif %}
 
 <div class="card">
   <h2>File history</h2>

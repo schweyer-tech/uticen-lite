@@ -13,7 +13,7 @@ from fastapi.templating import Jinja2Templates
 
 from controlflow_sdk.plane import fetch as fetchmod
 from controlflow_sdk.plane.coercion_check import coercion_report
-from controlflow_sdk.plane.ingest import AdaptersUnavailable, extract_table
+from controlflow_sdk.plane.ingest import AdaptersUnavailable, TableParseError, extract_table
 from controlflow_sdk.store import repo
 from controlflow_sdk.store.db import connect
 
@@ -132,7 +132,7 @@ def register(
         sheet_val = sheet.strip() or None
         try:
             table = extract_table(raw, fmt, sheet=sheet_val)
-        except AdaptersUnavailable as e:
+        except (AdaptersUnavailable, TableParseError) as e:
             return _err(str(e))
 
         conn = connect(root)
@@ -208,7 +208,7 @@ def register(
             hdrs = _parse_headers(headers)
             snap = _do_fetch(request, url, hdrs, record_path.strip())
             table = extract_table(snap.raw, snap.fmt)
-        except (fetchmod.FetchError, AdaptersUnavailable) as e:
+        except (fetchmod.FetchError, AdaptersUnavailable, TableParseError) as e:
             return _err(str(e))
 
         conn = connect(root)
@@ -282,7 +282,7 @@ def register(
                     page = max(1, page)
                     start = (page - 1) * PAGE_SIZE
                     rows = data_rows[start:start + PAGE_SIZE]
-                except AdaptersUnavailable as e:
+                except (AdaptersUnavailable, TableParseError) as e:
                     adapters_error = str(e)
         page_count = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
         # Coercion-health verdict computed over the FULL file (not the paginated
@@ -314,7 +314,8 @@ def register(
             request, "source_history.html",
             {"project": repo.get_project(conn) or {"name": ""},
              "source": repo.get_source(conn, source_id),
-             "files": files, "active": "history"},
+             "files": files, "active": "history",
+             "fetch": repo.get_source_fetch(conn, source_id)},
         )
 
     @app.post("/sources/{source_id}/data/asof")
@@ -378,6 +379,7 @@ def register(
                 # Not exposed in the editor form — preserve the imported value.
                 completeness_accuracy=existing.get("completeness_accuracy"),
                 extract_date=existing.get("extract_date"),
+                sheet=existing.get("sheet"),
             )
         finally:
             conn.close()
@@ -402,7 +404,16 @@ def register(
             pdir.mkdir(parents=True, exist_ok=True)
             pending_name = Path(file.filename or f"{source_id}.csv").name
             (pdir / pending_name).write_bytes(raw)
-            new_headers = _header_of(raw, existing["format"], existing.get("sheet"))
+            try:
+                new_headers = _header_of(raw, existing["format"], existing.get("sheet"))
+            except (AdaptersUnavailable, TableParseError) as e:
+                (pdir / pending_name).unlink(missing_ok=True)
+                return templates.TemplateResponse(
+                    request, "source_edit.html",
+                    {"project": repo.get_project(conn) or {"name": ""},
+                     "source": existing, "active": "definition", "error": str(e)},
+                    status_code=200,
+                )
             _, added, removed = _reconcile_columns(existing["columns"], new_headers)
             return templates.TemplateResponse(
                 request,
@@ -478,6 +489,7 @@ def register(
                 title=existing.get("title"), description=existing.get("description"),
                 completeness_accuracy=existing.get("completeness_accuracy"),
                 extract_date=new_extract_date,
+                sheet=existing.get("sheet"),
             )
             return RedirectResponse(f"/sources/{source_id}", status_code=303)
         finally:
@@ -511,7 +523,7 @@ def register(
                 snap = _do_fetch(request, fetch_row["url"], fetch_row["headers"],
                                  fetch_row.get("record_path"))
                 new_headers = extract_table(snap.raw, snap.fmt).header
-            except (fetchmod.FetchError, AdaptersUnavailable) as e:
+            except (fetchmod.FetchError, AdaptersUnavailable, TableParseError) as e:
                 return templates.TemplateResponse(
                     request, "source_data.html",
                     {"project": repo.get_project(conn) or {"name": ""},

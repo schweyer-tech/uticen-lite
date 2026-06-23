@@ -16,6 +16,10 @@ class AdaptersUnavailable(RuntimeError):
     """xlsx/parquet ingest needs the optional ``[adapters]`` extra, which is absent."""
 
 
+class TableParseError(ValueError):
+    """The file bytes could not be parsed — corrupt or wrong format."""
+
+
 @dataclass(frozen=True)
 class ExtractedTable:
     header: list[str]
@@ -33,7 +37,13 @@ def extract_table(raw: bytes, fmt: str, *, sheet: str | int | None = None) -> Ex
 
 
 def _csv_table(raw: bytes) -> ExtractedTable:
-    all_rows = list(csvmod.reader(io.StringIO(raw.decode("utf-8-sig"))))
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError as e:
+        raise TableParseError(
+            "This file could not be read as CSV — it may be corrupt or not valid UTF-8 text."
+        ) from e
+    all_rows = list(csvmod.reader(io.StringIO(text)))
     if not all_rows:
         return ExtractedTable(header=[], rows=[])
     return ExtractedTable(header=all_rows[0], rows=all_rows[1:])
@@ -51,6 +61,10 @@ def _adapters_table(raw: bytes, fmt: str, sheet: str | int | None) -> ExtractedT
         raise AdaptersUnavailable(
             "Excel/Parquet support needs the optional dependencies: "
             "pip install 'controlflow-sdk[adapters]'"
+        ) from e
+    except Exception as e:  # corrupt or malformed file (BadZipFile, ArrowInvalid, etc.)
+        raise TableParseError(
+            f"This file could not be read as {fmt} — it may be corrupt or not a valid {fmt} file."
         ) from e
 
     header = [str(c) for c in df.columns]
