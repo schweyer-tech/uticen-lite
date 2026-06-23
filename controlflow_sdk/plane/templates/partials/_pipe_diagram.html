@@ -39,13 +39,15 @@
   {% for box in diagram.boxes %}
     {% set x = pad + (box.lane * lane_pitch) %}
     {% set y = pad + (box.row * (box_h + gap_y)) %}
+    <a hx-get="/controls/{{ control_id }}/logic/step/{{ box.id }}/data"
+       hx-target="#step-drawer" hx-swap="innerHTML" style="cursor:pointer;">
     <g class="fc-box{% if box.terminal %} fc-terminal{% endif %}">
-      {# Full narrative on hover (the truncated <text> below shows only its start). #}
       {% if box.narrative %}<title>{{ box.narrative }}</title>{% endif %}
       <rect x="{{ x }}" y="{{ y }}" width="{{ box_w }}" height="{{ box_h }}" rx="8" />
       <text x="{{ x + 12 }}" y="{{ y + 20 }}">{{ box.label }}</text>
       <text class="fc-count" x="{{ x + 12 }}" y="{{ y + 37 }}">{{ box.id }} · rows: {% if box.count is not none %}{{ "{:,}".format(box.count) }}{% else %}—{% endif %}</text>
       {% if box.narrative %}<text class="fc-narr" x="{{ x + 12 }}" y="{{ y + 56 }}">{{ box.narrative | truncate(34, True, '…', 0) }}</text>{% endif %}
     </g>
+    </a>
   {% endfor %}
 </svg>

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import json
 
 import pytest
 
@@ -81,3 +82,59 @@ def test_source_versions_returns_nonempty_token(seeded_client):
     # The token should encode enough to detect file changes (contains the stored path).
     token = versions["invoices"]
     assert isinstance(token, str) and len(token) > 0
+
+
+# ---------------------------------------------------------------------------
+# Helpers for step-inspector tests
+# ---------------------------------------------------------------------------
+
+def _make_control(client, cid="C1"):
+    client.post("/controls", data={
+        "id": cid, "title": "Step Inspector Test", "objective": "o", "narrative": "n",
+    }, follow_redirects=False)
+
+
+def _save_pipeline(client, cid, graph):
+    return client.post(f"/controls/{cid}/logic/builder",
+                       data={"pipeline_json": json.dumps(graph)},
+                       follow_redirects=False)
+
+
+def _seeded(client):
+    """Upload a source + create a control with a pipeline containing a 'flt' filter node.
+
+    Returns (client, control_id).
+    """
+    _make_source(client, "invoices", _INVOICES_CSV)
+    cid = "CI1"
+    _make_control(client, cid)
+    graph = {"nodes": [
+        {"id": "src1", "type": "import", "source_id": "invoices",
+         "narrative": "", "config": {}, "inputs": []},
+        {"id": "flt", "type": "filter", "inputs": ["src1"],
+         "narrative": "Keep all rows",
+         "config": {"logic": "all", "conditions": []}},
+        {"id": "tst", "type": "test", "inputs": ["flt"],
+         "narrative": "",
+         "config": {"logic": "all", "conditions": []}},
+    ]}
+    _save_pipeline(client, cid, graph)
+    return client, cid
+
+
+# ---------------------------------------------------------------------------
+# Step inspector route tests
+# ---------------------------------------------------------------------------
+
+def test_step_data_route_paginates(client):
+    c, control_id = _seeded(client)
+    r = c.get(f"/controls/{control_id}/logic/step/flt/data")
+    assert r.status_code == 200
+    assert "records" in r.text and "of" in r.text          # "records X–Y of Z"
+
+
+def test_step_data_unknown_node_degrades(client):
+    c, control_id = _seeded(client)
+    r = c.get(f"/controls/{control_id}/logic/step/does-not-exist/data")
+    assert r.status_code == 200                              # never 500
+    assert "isn't computable" in r.text or "not computable" in r.text

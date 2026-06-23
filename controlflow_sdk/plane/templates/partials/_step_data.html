@@ -1,0 +1,37 @@
+{# Step inspector drawer body — swapped into #step-drawer by HTMX. #}
+<div class="step-panel card">
+  <div class="step-panel-head">
+    <strong>{{ step_label or "Step" }}</strong>
+    <span class="muted mono">{{ node_id }}</span>
+    {% if frame_available %}
+    <span class="muted">— records {{ start1 }}–{{ end1 }} of {{ total }}</span>
+    <a class="btn btn-sm" href="/controls/{{ control_id }}/logic/step/{{ node_id }}/export.xlsx">
+      Download this step (.xlsx)</a>
+    {% endif %}
+    <button class="btn btn-sm btn-ghost" type="button"
+            onclick="document.getElementById('step-drawer').innerHTML='';">Close</button>
+  </div>
+  {% if not frame_available %}
+  <p class="muted">{{ reason }}</p>
+  {% else %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr>{% for h in header %}<th class="mono">{{ h }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for r in rows %}<tr>{% for c in r %}<td>{{ c }}</td>{% endfor %}</tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if page_count > 1 %}
+  <div class="pager">
+    {% if page > 1 %}
+    <button class="btn btn-sm" hx-get="/controls/{{ control_id }}/logic/step/{{ node_id }}/data?page={{ page - 1 }}"
+            hx-target="#step-drawer" hx-swap="innerHTML">← Prev</button>{% endif %}
+    <span class="muted">Page {{ page }} of {{ page_count }}</span>
+    {% if page < page_count %}
+    <button class="btn btn-sm" hx-get="/controls/{{ control_id }}/logic/step/{{ node_id }}/data?page={{ page + 1 }}"
+            hx-target="#step-drawer" hx-swap="innerHTML">Next →</button>{% endif %}
+  </div>
+  {% endif %}
+  {% endif %}
+</div>

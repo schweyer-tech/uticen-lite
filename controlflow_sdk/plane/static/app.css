@@ -442,3 +442,10 @@ legend {
 .copy-btn.copied { color: var(--status-success); border-color: var(--status-success); }
 .copy-btn.copied .copy-icon { display: none; }
 .copy-btn.copied .copy-done { display: inline-flex; }
+
+/* ── Step inspector drawer ──────────────────────────────────────────────── */
+.pipe-count-btn { cursor: pointer; background: none; border: 0; font: inherit; color: inherit; padding: 0; }
+.pipe-count-btn:hover strong { text-decoration: underline; }
+.step-drawer:empty { display: none; }
+.step-drawer .step-panel { margin-top: 12px; }
+.step-panel-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }

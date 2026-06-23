@@ -319,6 +319,33 @@ def _row_counts(
     return {nid: len(df) for nid, df in _materialize_full(conn, root, pipeline).items()}
 
 
+def pd_isna(v: Any) -> bool:
+    """NaN/NaT-safe truthiness for display (avoids importing pandas at module top)."""
+    try:
+        import pandas as pd
+        return bool(pd.isna(v))
+    except (TypeError, ValueError):
+        return False
+
+
+def _pipeline_for_view(control: dict | None) -> Pipeline | None:
+    """The parsed pipeline the Builder cards/counts are rendered from.
+
+    Mirrors ``_editor_context(for_builder=True)``: a raw-Python control has none; otherwise
+    use the derived builder graph (so rule_spec/empty controls still show their scaffold).
+    """
+    if control is None or is_raw_python(control):
+        return None
+    graph = derive_builder_graph(control, list(control.get("source_ids") or [])) \
+        or _graph_of(control)
+    if not graph.get("nodes"):
+        return None
+    try:
+        return parse_pipeline(graph)
+    except PipelineError:
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Generated-Python glass-box
 # ---------------------------------------------------------------------------
@@ -611,6 +638,52 @@ def register(
     def logic_redirect(control_id: str) -> RedirectResponse:
         return RedirectResponse(f"/controls/{control_id}/logic/builder", status_code=302)
 
+    # --- Step inspector route ------------------------------------------------
+
+    _STEP_PAGE = 100
+
+    @app.get("/controls/{control_id}/logic/step/{node_id}/data", response_class=HTMLResponse)
+    def step_data(
+        control_id: str,
+        node_id: str,
+        request: Request,
+        page: int = 1,
+        conn: sqlite3.Connection = Depends(get_conn),
+    ) -> HTMLResponse:
+        root = request.app.state.project_root
+        control = repo.get_control(conn, control_id)
+        pipeline = _pipeline_for_view(control)
+        ctx: dict[str, Any] = {
+            "control_id": control_id, "node_id": node_id,
+            "frame_available": False, "reason": "This step is not computable yet.",
+        }
+        if pipeline is not None:
+            try:
+                node = pipeline.node(node_id)
+                ctx["step_label"] = _node_label(node)
+            except KeyError:
+                node = None
+            steps = _materialize_full(conn, root, pipeline)
+            frame = steps.get(node_id)
+            if frame is not None:
+                total = len(frame)
+                page = max(1, page)
+                page_count = max(1, (total + _STEP_PAGE - 1) // _STEP_PAGE)
+                page = min(page, page_count)
+                start = (page - 1) * _STEP_PAGE
+                window = frame.iloc[start:start + _STEP_PAGE]
+                ctx.update({
+                    "frame_available": True,
+                    "header": [str(c) for c in frame.columns],
+                    "rows": [[("" if pd_isna(v) else str(v)) for v in row]
+                             for row in window.itertuples(index=False, name=None)],
+                    "total": total, "page": page, "page_count": page_count,
+                    "start1": start + 1, "end1": start + len(window),
+                })
+            elif not pipeline.import_source_ids() or node is not None:
+                ctx["reason"] = "Bind a data source (and complete this step) to inspect it."
+        return templates.TemplateResponse(request, "partials/_step_data.html", ctx)
+
     # --- Logic sub-route GETs ------------------------------------------------
 
     @app.get("/controls/{control_id}/logic/builder", response_class=HTMLResponse)
@@ -884,6 +957,7 @@ def register(
                 request,
                 "partials/_pipe_cards.html",
                 {
+                    "control_id": control_id,
                     "nodes": ordered_nodes,
                     "sources": sources,
                     "op_choices": OP_CHOICES,
