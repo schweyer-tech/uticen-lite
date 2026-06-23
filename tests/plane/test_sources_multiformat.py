@@ -58,6 +58,28 @@ def test_xlsx_sheet_selection_persisted(client):
     conn.close()
 
 
+def test_data_preview_degrades_when_adapters_unavailable(client, monkeypatch):
+    """GET /sources/{id}/data must not 500 if [adapters] is gone post-create."""
+    raw = _xlsx({"Sheet1": pd.DataFrame({"user_id": ["U1"], "amount": [5]})})
+    client.post("/sources",
+                data={"source_id": "gone", "as_of_date": "2026-01-01"},
+                files={"file": ("gone.xlsx", io.BytesIO(raw),
+                       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+                follow_redirects=False)
+    # Now simulate the [adapters] extra being absent for the preview read.
+    from controlflow_sdk.plane.ingest import AdaptersUnavailable
+    msg = ("Excel/Parquet support needs the optional dependencies: "
+           "pip install 'controlflow-sdk[adapters]'")
+
+    def _raise(*a, **k):
+        raise AdaptersUnavailable(msg)
+
+    monkeypatch.setattr("controlflow_sdk.plane.routes.sources.extract_table", _raise)
+    resp = client.get("/sources/gone/data")
+    assert resp.status_code == 200  # friendly degrade, never a 500
+    assert "controlflow-sdk[adapters]" in resp.text
+
+
 def test_unsupported_xls_rejected(client):
     resp = client.post("/sources",
                        data={"source_id": "old", "as_of_date": "2026-01-01"},

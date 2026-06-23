@@ -7,6 +7,7 @@
   <p class="muted mono">{{ source.id }}</p>
 </div>
 {% include "_source_tabs.html" %}
+{% if adapters_error %}<div class="callout callout-warn">{{ adapters_error }}</div>{% endif %}
 
 <div class="card">
   <h2>Current file</h2>

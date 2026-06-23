@@ -187,17 +187,23 @@ def register(
         rows: list[list[str]] = []
         data_rows: list[list[str]] = []
         total = 0
+        adapters_error: str | None = None
         if current:
             fpath = root / current["stored_path"]
             if fpath.is_file():
                 fmt = (source or {}).get("format", "csv")
                 sheet = (source or {}).get("sheet")
-                table = extract_table(fpath.read_bytes(), fmt, sheet=sheet)
-                header, data_rows = table.header, table.rows
-                total = len(data_rows)
-                page = max(1, page)
-                start = (page - 1) * PAGE_SIZE
-                rows = data_rows[start:start + PAGE_SIZE]
+                # Never 500: an xlsx/parquet source viewed without the [adapters]
+                # extra degrades to a friendly banner instead of raising.
+                try:
+                    table = extract_table(fpath.read_bytes(), fmt, sheet=sheet)
+                    header, data_rows = table.header, table.rows
+                    total = len(data_rows)
+                    page = max(1, page)
+                    start = (page - 1) * PAGE_SIZE
+                    rows = data_rows[start:start + PAGE_SIZE]
+                except AdaptersUnavailable as e:
+                    adapters_error = str(e)
         page_count = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
         # Coercion-health verdict computed over the FULL file (not the paginated
         # slice) so it stays honest even when page 1 happens to be clean (0004).
@@ -210,7 +216,8 @@ def register(
              "source": source, "current": current,
              "header": header, "rows": rows, "total": total,
              "page": min(page, page_count), "page_count": page_count,
-             "page_size": PAGE_SIZE, "coercion": coercion, "active": "data"},
+             "page_size": PAGE_SIZE, "coercion": coercion,
+             "adapters_error": adapters_error, "active": "data"},
         )
 
     @app.get("/sources/{source_id}/history", response_class=HTMLResponse)
