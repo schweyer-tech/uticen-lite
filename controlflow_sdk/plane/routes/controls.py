@@ -608,11 +608,28 @@ def register(
         try:
             form = await request.form()
             try:
-                _save_from_form(conn, form)
+                cid = _save_from_form(conn, form)
             except LintError as exc:
                 return _rerender_with_error(request, conn, control_id, exc.errors)
             except PipelineError as exc:
                 return _rerender_with_error(request, conn, control_id, [str(exc)])
-            return RedirectResponse(f"/controls/{control_id}", status_code=303)
+            return RedirectResponse(f"/controls/{cid}", status_code=303)
+        finally:
+            conn.close()
+
+    @app.post("/controls/{control_id}/id", response_model=None)
+    async def update_control_id(
+        control_id: str, request: Request
+    ) -> HTMLResponse | RedirectResponse:
+        root = request.app.state.project_root
+        conn = connect(root)
+        try:
+            form = await request.form()
+            new_id = str(form.get("new_id", "")).strip()
+            try:
+                repo.rename_control_id(conn, control_id, new_id)
+            except ValueError as exc:
+                return _rerender_with_error(request, conn, control_id, [str(exc)])
+            return RedirectResponse(f"/controls/{new_id or control_id}", status_code=303)
         finally:
             conn.close()

@@ -72,6 +72,36 @@ def test_edit_control_shows_values(client):
     assert "Editable" in page.text
 
 
+def test_edit_control_moves_id_editing_to_header(client):
+    _make_source(client)
+    client.post("/controls", data={
+        "id": "HDRID1", "title": "Header ID", "objective": "o", "narrative": "n",
+        "source_ids": ["users"]}, follow_redirects=False)
+
+    page = client.get("/controls/HDRID1")
+    assert page.status_code == 200
+    assert 'class="control-id-banner"' in page.text
+    assert 'action="/controls/HDRID1/id"' in page.text
+    assert 'name="new_id"' in page.text
+    assert 'id="f-id"' not in page.text
+
+
+def test_edit_control_header_id_editor_renames_control(client):
+    _make_source(client)
+    client.post("/controls", data={
+        "id": "CIDOLD1", "title": "Rename me", "objective": "o", "narrative": "n",
+        "source_ids": ["users"]}, follow_redirects=False)
+
+    resp = client.post("/controls/CIDOLD1/id", data={"new_id": "CIDNEW1"}, follow_redirects=False)
+    assert resp.status_code in (302, 303)
+    assert resp.headers["location"] == "/controls/CIDNEW1"
+    assert _get_control(client, "CIDOLD1") is None
+    renamed = _get_control(client, "CIDNEW1")
+    assert renamed is not None
+    assert renamed["title"] == "Rename me"
+    assert renamed["source_ids"] == ["users"]
+
+
 def test_source_picker_shows_title_and_view_link(client):
     _make_source(client, sid="invoices")
     # Give the source a friendly title.

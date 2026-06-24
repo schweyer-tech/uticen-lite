@@ -310,6 +310,63 @@ def set_control_sources(conn: sqlite3.Connection, control_id: str, source_ids: l
     conn.commit()
 
 
+def rename_control_id(conn: sqlite3.Connection, current_id: str, new_id: str) -> None:
+    """Rename a control id while preserving source bindings and runs."""
+    current_id = current_id.strip()
+    new_id = new_id.strip()
+    if not new_id:
+        raise ValueError("Control ID is required.")
+    if current_id == new_id:
+        return
+    if get_control(conn, current_id) is None:
+        raise ValueError(f"Control {current_id!r} does not exist.")
+    if get_control(conn, new_id) is not None:
+        raise ValueError(f"Control ID {new_id!r} already exists.")
+
+    row = conn.execute("SELECT * FROM controls WHERE id = ?", (current_id,)).fetchone()
+    if row is None:
+        raise ValueError(f"Control {current_id!r} does not exist.")
+    control = dict(row)
+
+    try:
+        conn.execute("BEGIN")
+        conn.execute(
+            """INSERT INTO controls
+                 (id, title, objective, narrative, framework_refs,
+                  failure_threshold_pct, failure_threshold_count,
+                  test_kind, rule_spec, test_code, pipeline, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                new_id,
+                control["title"],
+                control["objective"],
+                control["narrative"],
+                control["framework_refs"],
+                control["failure_threshold_pct"],
+                control["failure_threshold_count"],
+                control["test_kind"],
+                control["rule_spec"],
+                control["test_code"],
+                control["pipeline"],
+                control["created_at"],
+                control["updated_at"],
+            ),
+        )
+        conn.execute(
+            "UPDATE control_sources SET control_id = ? WHERE control_id = ?",
+            (new_id, current_id),
+        )
+        conn.execute(
+            "UPDATE runs SET control_id = ? WHERE control_id = ?",
+            (new_id, current_id),
+        )
+        conn.execute("DELETE FROM controls WHERE id = ?", (current_id,))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
 def _source_ids_for(conn: sqlite3.Connection, control_id: str) -> list[str]:
     rows = conn.execute(
         "SELECT source_id FROM control_sources WHERE control_id = ? ORDER BY ordinal",

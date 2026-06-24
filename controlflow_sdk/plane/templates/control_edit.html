@@ -5,7 +5,21 @@
 <a class="crumb" href="/">← Controls</a>
 <div class="page-head">
   <h1>{% if control %}{{ control.title }}{% else %}New control{% endif %}</h1>
-  {% if control %}<p class="muted mono">{{ control.id }}</p>{% endif %}
+  {% if control %}
+  <div class="control-id-banner">
+    <span class="control-id-label">Control ID</span>
+    <span class="control-id-value mono">{{ control.id }}</span>
+    <details class="control-id-edit">
+      <summary class="btn btn-sm btn-ghost">Edit</summary>
+      <form method="post" action="/controls/{{ control.id }}/id" class="control-id-edit-form">
+        <label for="f-id-inline">New control ID</label>
+        <input id="f-id-inline" type="text" name="new_id" value="{{ control.id }}"
+               placeholder="e.g. AC-2-01" required>
+        <button class="btn btn-primary btn-sm" type="submit">Save ID</button>
+      </form>
+    </details>
+  </div>
+  {% endif %}
 </div>
 {% if control %}{% set active = 'definition' %}{% include "_control_tabs.html" %}{% endif %}
 
@@ -19,13 +33,18 @@
 {% endif %}
 
 <form method="post" action="{% if control %}/controls/{{ control.id }}{% else %}/controls{% endif %}"{% if control %} data-source-autosave-form{% endif %}>
+  {% if control %}
+  <input type="hidden" name="id" value="{{ control.id }}">
+  {% endif %}
   <div class="card">
     <h2>Details</h2>
+    {% if not control %}
     <div class="field">
       <label for="f-id">Control ID</label>
       <input id="f-id" type="text" name="id" value="{{ control.id if control else '' }}"
-             {% if control %}readonly{% endif %} placeholder="e.g. AC-2-01" required>
+             placeholder="e.g. AC-2-01" required>
     </div>
+    {% endif %}
     <div class="field">
       <label for="f-title">Title</label>
       <input id="f-title" type="text" name="title" value="{{ control.title if control else '' }}" required>

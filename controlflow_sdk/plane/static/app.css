@@ -111,6 +111,60 @@ main { max-width: 1120px; margin: 0 auto; padding: 28px 24px 64px; }
 
 .page-head { margin-bottom: 20px; }
 .page-head h1 { margin-bottom: 4px; }
+.control-id-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: var(--bg-surface-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+}
+.control-id-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+.control-id-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.control-id-edit {
+  position: relative;
+}
+.control-id-edit > summary {
+  list-style: none;
+}
+.control-id-edit > summary::-webkit-details-marker {
+  display: none;
+}
+.control-id-edit-form {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 5;
+  width: 280px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  background: var(--bg-surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+.control-id-edit-form label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+.control-id-edit-form input {
+  margin-top: 0;
+  max-width: 100%;
+}
 .crumb { display: inline-block; margin-bottom: 12px; font-size: 13px; color: var(--text-secondary); }
 .crumb:hover { color: var(--accent-primary); }
 .page-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
