@@ -39,8 +39,8 @@
   {% for box in diagram.boxes %}
     {% set x = pad + (box.lane * lane_pitch) %}
     {% set y = pad + (box.row * (box_h + gap_y)) %}
-    <a hx-get="/controls/{{ control_id }}/logic/step/{{ box.id }}/data"
-       hx-target="#step-drawer" hx-swap="innerHTML" style="cursor:pointer;">
+    <a href="/controls/{{ control_id }}/logic/step/{{ box.id }}/data"
+       target="_blank" rel="noopener" style="cursor:pointer;">
     <g class="fc-box{% if box.terminal %} fc-terminal{% endif %}">
       {% if box.narrative %}<title>{{ box.narrative }}</title>{% endif %}
       <rect x="{{ x }}" y="{{ y }}" width="{{ box_w }}" height="{{ box_h }}" rx="8" />

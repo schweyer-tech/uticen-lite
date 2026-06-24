@@ -5,10 +5,9 @@
     <span class="pipe-kind k-{{ node.type }}">{{ node.type.replace('_', ' ') }}</span>
     <span class="pipe-id">{{ node.id }}</span>
     {% if node.count is not none %}
-    <button class="pipe-count pipe-count-btn" type="button"
-            hx-get="/controls/{{ control_id }}/logic/step/{{ node.id }}/data"
-            hx-target="#step-drawer" hx-swap="innerHTML"
-            title="Inspect this step's data">rows: <strong>{{ "{:,}".format(node.count) }}</strong></button>
+    <a class="pipe-count pipe-count-btn" target="_blank" rel="noopener"
+       href="/controls/{{ control_id }}/logic/step/{{ node.id }}/data"
+       title="Inspect this step's data in a new tab">rows: <strong>{{ "{:,}".format(node.count) }}</strong></a>
     {% else %}
     <span class="pipe-count">rows: —</span>
     {% endif %}
