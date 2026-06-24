@@ -28,7 +28,7 @@ from dataclasses import dataclass
 
 from controlflow_sdk.pipeline.model import Node, Pipeline
 from controlflow_sdk.rules.render_rule import _mask_expr
-from controlflow_sdk.rules.spec import Condition, parse_rule_spec, referenced_columns
+from controlflow_sdk.rules.spec import Condition, parse_rule_spec
 
 
 @dataclass(frozen=True)
@@ -204,8 +204,8 @@ def _build_flat_spec(
     """
     conditions: list[dict] = []
     for flt in reversed(filters):  # Import-order narrowing first
-        conditions.extend(flt.config.get("conditions", []))
-    conditions.extend(terminal.config.get("conditions", []))
+        conditions.extend(_usable_conditions(list(flt.config.get("conditions", []))))
+    conditions.extend(_usable_conditions(list(terminal.config.get("conditions", []))))
     if not conditions:
         return None
 
@@ -234,7 +234,29 @@ def _conditions(raw: list[dict]) -> list[Condition]:
     SAME operator grammar (incl. cross-source ``exists_in``) as the no-code rule
     builder — one source of truth for the operator set.
     """
-    return parse_rule_spec({"logic": "all", "conditions": raw}).conditions
+    usable = _usable_conditions(raw)
+    if not usable:
+        return []
+    return parse_rule_spec({"logic": "all", "conditions": usable}).conditions
+
+
+def _usable_conditions(raw: list[dict]) -> list[dict]:
+    """Drop placeholder condition rows that are still incomplete in the UI.
+
+    The visual builder keeps a blank row around after "+ Add condition" so the
+    author can fill it in, but that placeholder should behave like no condition
+    at all until it has the required fields for its operator family.
+    """
+    out: list[dict] = []
+    for cond in raw:
+        op = cond.get("op")
+        if op in ("exists_in", "not_exists_in"):
+            if cond.get("other_source") and cond.get("this_key") and cond.get("other_key"):
+                out.append(cond)
+            continue
+        if cond.get("column"):
+            out.append(cond)
+    return out
 
 
 def _emit_python(pipeline: Pipeline) -> str:
@@ -435,8 +457,10 @@ def _emit_terminal_rule(node: Node, out_var: str) -> list[str]:
         return lines
     combine = " & " if node.config.get("logic", "all") == "all" else " | "
     mask = combine.join(_mask_expr(c, frame=src) for c in conds)
-    ref_cols = referenced_columns(parse_rule_spec(
-        {"logic": "all", "conditions": node.config.get("conditions", [])}))
+    # Use the already-filtered `conds` list (via `_usable_conditions`) so that
+    # blank placeholder rows added by "+ Add condition" before the author fills
+    # them in never reach `parse_rule_spec`, which rejects empty columns.
+    ref_cols = list(dict.fromkeys(c.column for c in conds))
     template = node.config.get("description_template", "")
     severity = node.config.get("severity", "medium")
     item_key = node.config.get("item_key_column")
