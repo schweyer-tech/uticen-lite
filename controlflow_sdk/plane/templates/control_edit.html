@@ -4,7 +4,21 @@
 {% block body %}
 <a class="crumb" href="/">← Controls</a>
 <div class="page-head">
-  <h1>{% if control %}{{ control.title }}{% else %}New control{% endif %}</h1>
+  {% if control %}
+  <details class="control-title-edit">
+    <summary class="control-title-trigger" aria-label="Edit control title">
+      <h1 class="control-title-text">{{ control.title }}</h1>
+      <span class="control-title-pencil" aria-hidden="true">✎</span>
+    </summary>
+    <form method="post" action="/controls/{{ control.id }}/title" class="control-title-edit-form">
+      <label for="f-title-inline">Control title</label>
+      <input id="f-title-inline" type="text" name="title" value="{{ control.title }}" required>
+      <button class="btn btn-primary btn-sm" type="submit">Save title</button>
+    </form>
+  </details>
+  {% else %}
+  <h1>New control</h1>
+  {% endif %}
   {% if control %}
   <div class="control-id-banner">
     <span class="control-id-label">Control ID</span>
@@ -35,6 +49,7 @@
 <form method="post" action="{% if control %}/controls/{{ control.id }}{% else %}/controls{% endif %}"{% if control %} data-source-autosave-form{% endif %}>
   {% if control %}
   <input type="hidden" name="id" value="{{ control.id }}">
+  <input type="hidden" name="title" value="{{ control.title }}">
   {% endif %}
   <div class="card">
     <h2>Details</h2>
@@ -45,10 +60,12 @@
              placeholder="e.g. AC-2-01" required>
     </div>
     {% endif %}
+    {% if not control %}
     <div class="field">
       <label for="f-title">Title</label>
-      <input id="f-title" type="text" name="title" value="{{ control.title if control else '' }}" required>
+      <input id="f-title" type="text" name="title" value="" required>
     </div>
+    {% endif %}
     <div class="field">
       <label for="f-obj">Objective</label>
       <textarea id="f-obj" name="objective" rows="3">{{ control.objective if control else '' }}</textarea>

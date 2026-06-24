@@ -633,3 +633,40 @@ def register(
             return RedirectResponse(f"/controls/{new_id or control_id}", status_code=303)
         finally:
             conn.close()
+
+    @app.post("/controls/{control_id}/title", response_model=None)
+    async def update_control_title(
+        control_id: str, request: Request
+    ) -> HTMLResponse | RedirectResponse:
+        root = request.app.state.project_root
+        conn = connect(root)
+        try:
+            form = await request.form()
+            title = str(form.get("title", "")).strip()
+            if not title:
+                return _rerender_with_error(
+                    request, conn, control_id, ["Control title is required."]
+                )
+            existing = repo.get_control(conn, control_id)
+            if existing is None:
+                return _rerender_with_error(
+                    request, conn, control_id, [f"Control {control_id!r} does not exist."]
+                )
+            repo.upsert_control(
+                conn,
+                id=existing["id"],
+                title=title,
+                objective=existing["objective"],
+                narrative=existing["narrative"],
+                framework_refs=existing["framework_refs"],
+                test_kind=existing["test_kind"],
+                rule_spec=existing["rule_spec"],
+                test_code=existing["test_code"],
+                pipeline=existing["pipeline"],
+                failure_threshold_pct=existing["failure_threshold_pct"],
+                failure_threshold_count=existing["failure_threshold_count"],
+            )
+            repo.set_control_sources(conn, control_id, existing["source_ids"])
+            return RedirectResponse(f"/controls/{control_id}", status_code=303)
+        finally:
+            conn.close()
