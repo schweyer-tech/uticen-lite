@@ -531,7 +531,7 @@ legend {
 }
 .update-popover {
   position: absolute;
-  top: calc(100% + 8px);
+  top: 100%;
   right: 0;
   display: none;
   min-width: 220px;
