@@ -74,6 +74,8 @@ def test_header_indicator_up_to_date_shows_hover_actions(client, monkeypatch):
     assert "indicator-text" not in resp.text
     assert "You are up to date." not in resp.text
     assert 'hx-post="/updates/indicator/check"' in resp.text
+    assert 'hx-target="#header-update-indicator"' in resp.text
+    assert 'hx-post="/updates/indicator/check"' in resp.text
     assert "Check now" in resp.text
 
 
@@ -95,5 +97,24 @@ def test_header_indicator_update_available_shows_update_now_action(client, monke
     assert "indicator-text" not in resp.text
     assert "New version" not in resp.text
     assert "aria-label=" in resp.text
+    assert 'hx-post="/updates/indicator/check"' in resp.text
+    assert 'hx-target="#header-update-indicator"' in resp.text
     assert 'hx-post="/upgrade"' in resp.text
     assert "Update now" in resp.text
+
+
+def test_base_template_polls_header_indicator_every_two_minutes(client):
+    page = client.get("/settings")
+    assert page.status_code == 200
+    assert "/updates/indicator/check" in page.text
+    assert "120000" in page.text
+
+
+def test_refresh_indicator_skips_check_when_toggle_off(client, monkeypatch):
+    monkeypatch.setattr(
+        "controlflow_sdk.plane.routes.updates.check_for_update",
+        lambda method: (_ for _ in ()).throw(AssertionError("unexpected network check")),
+    )
+    resp = client.post("/updates/indicator/check")
+    assert resp.status_code == 200
+    assert resp.text == ""

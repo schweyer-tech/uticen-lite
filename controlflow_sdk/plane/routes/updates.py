@@ -105,7 +105,12 @@ def register(
         )
 
     @app.post("/updates/indicator/check", response_class=HTMLResponse)
-    def refresh_update_indicator(request: Request) -> HTMLResponse:
+    def refresh_update_indicator(
+        request: Request,
+        conn: sqlite3.Connection = Depends(get_conn),
+    ) -> HTMLResponse:
+        if not repo.get_check_updates_on_launch(conn):
+            return HTMLResponse("")
         info = check_for_update(detect_install())
         request.app.state.update_check = info
         return templates.TemplateResponse(

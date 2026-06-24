@@ -1,7 +1,13 @@
 {% if info %}
   <div id="header-update-indicator" class="update-indicator-wrap">
     {% if info.available %}
-    <button type="button" class="update-indicator update-available" aria-label="Update available: {{ info.latest }}" title="Update available: {{ info.latest }}">
+    <button type="button"
+            class="update-indicator update-available"
+            aria-label="Update available: {{ info.latest }}"
+            title="Update available: {{ info.latest }}"
+            hx-post="/updates/indicator/check"
+            hx-target="#header-update-indicator"
+            hx-swap="outerHTML">
       <span class="indicator-dot"></span>
       <span class="sr-only">Update available: {{ info.latest }}</span>
     </button>
@@ -19,7 +25,13 @@
       </button>
     </div>
     {% else %}
-    <button type="button" class="update-indicator up-to-date" aria-label="Up to date: {{ current_version }}" title="Current version: {{ current_version }}">
+    <button type="button"
+            class="update-indicator up-to-date"
+            aria-label="Up to date: {{ current_version }}"
+            title="Current version: {{ current_version }}"
+            hx-post="/updates/indicator/check"
+            hx-target="#header-update-indicator"
+            hx-swap="outerHTML">
       <span class="indicator-dot"></span>
       <span class="sr-only">Up to date: {{ current_version }}</span>
     </button>
