@@ -1192,3 +1192,27 @@ def test_autosave_js_sequence_guard_present(client):
         "autosaveSubmit must check the sequence counter before applying "
         "a response (seq !== _autosaveSeq guard)"
     )
+
+
+def test_builder_renders_recalculate_button(client):
+    """The builder page contains a Recalculate button that allows users to
+    refresh row counts after structural changes (e.g., removing nodes).
+
+    The button serializes the current graph and calls reload() to trigger
+    an autosave, which recalculates row counts and updates the UI in place.
+    """
+    _make_control(client, "RC1")
+    body = client.get("/controls/RC1/logic/builder").text
+
+    # The recalculate button must be present with correct ID.
+    assert 'id="recalc-btn"' in body, "recalc-btn element missing"
+
+    # The button text must be visible.
+    assert '↻ Recalculate' in body or 'Recalculate' in body, (
+        "Recalculate button text missing"
+    )
+
+    # The button must have a click handler that calls reload().
+    assert 'recalc-btn' in body and 'addEventListener' in body and 'reload()' in body, (
+        "recalc-btn click handler missing or doesn't call reload()"
+    )

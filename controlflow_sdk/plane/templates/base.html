@@ -57,6 +57,20 @@
         try { localStorage.setItem("cf-theme", next); } catch (e) {}
       });
     })();
+    // Trigger the header indicator HTMX request when HTMX is ready
+    document.addEventListener("htmx:load", function() {
+      var indicator = document.querySelector("#header-update-indicator");
+      if (indicator && window.htmx) {
+        window.htmx.ajax("GET", "/updates/indicator", {target: indicator, swap: "outerHTML"});
+      }
+    });
+    // Fallback: manually trigger if htmx:load doesn't fire
+    setTimeout(function() {
+      var indicator = document.querySelector("#header-update-indicator");
+      if (indicator && window.htmx && !indicator.innerHTML.trim()) {
+        window.htmx.ajax("GET", "/updates/indicator", {target: indicator, swap: "outerHTML"});
+      }
+    }, 500);
   </script>
 </body>
 </html>
