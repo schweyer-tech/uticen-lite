@@ -111,6 +111,61 @@ main { max-width: 1120px; margin: 0 auto; padding: 28px 24px 64px; }
 
 .page-head { margin-bottom: 20px; }
 .page-head h1 { margin-bottom: 4px; }
+.control-title-edit {
+  position: relative;
+  display: inline-block;
+}
+.control-title-trigger {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.control-title-trigger::-webkit-details-marker {
+  display: none;
+}
+.control-title-text {
+  margin: 0;
+}
+.control-title-pencil {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.control-title-trigger:hover .control-title-pencil {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+.control-title-edit-form {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 6;
+  width: 320px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  background: var(--bg-surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+.control-title-edit-form label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+.control-title-edit-form input {
+  margin-top: 0;
+  max-width: 100%;
+}
 .control-id-banner {
   display: inline-flex;
   align-items: center;

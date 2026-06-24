@@ -102,6 +102,38 @@ def test_edit_control_header_id_editor_renames_control(client):
     assert renamed["source_ids"] == ["users"]
 
 
+def test_edit_control_moves_title_editing_to_header(client):
+    _make_source(client)
+    client.post("/controls", data={
+        "id": "HDRTITLE1", "title": "Header title", "objective": "o", "narrative": "n",
+        "source_ids": ["users"]}, follow_redirects=False)
+
+    page = client.get("/controls/HDRTITLE1")
+    assert page.status_code == 200
+    assert 'class="control-title-edit"' in page.text
+    assert 'action="/controls/HDRTITLE1/title"' in page.text
+    assert 'class="control-title-trigger"' in page.text
+    assert 'class="control-title-pencil"' in page.text
+    assert 'id="f-title"' not in page.text
+
+
+def test_edit_control_header_title_editor_updates_title(client):
+    _make_source(client)
+    client.post("/controls", data={
+        "id": "TITLEEDIT1", "title": "Old title", "objective": "o", "narrative": "n",
+        "source_ids": ["users"]}, follow_redirects=False)
+
+    resp = client.post(
+        "/controls/TITLEEDIT1/title",
+        data={"title": "New title from header"},
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303)
+    assert resp.headers["location"] == "/controls/TITLEEDIT1"
+    updated = _get_control(client, "TITLEEDIT1")
+    assert updated["title"] == "New title from header"
+
+
 def test_source_picker_shows_title_and_view_link(client):
     _make_source(client, sid="invoices")
     # Give the source a friendly title.
