@@ -473,6 +473,13 @@ legend {
 .indicator-text {
   display: inline;
 }
+.indicator-link {
+  text-decoration: none;
+  color: inherit;
+}
+.indicator-link:hover {
+  text-decoration: underline;
+}
 .indicator-btn {
   background: transparent; border: 0; color: inherit; cursor: pointer;
   font-size: inherit; font-weight: inherit; padding: 0; margin: 0;

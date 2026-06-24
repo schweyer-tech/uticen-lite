@@ -54,3 +54,20 @@ def test_check_now_returns_result_partial(client, monkeypatch):
     resp = client.post("/settings/updates/check")
     assert resp.status_code == 200
     assert "0.2.0" in resp.text
+
+
+def test_header_indicator_up_to_date_links_to_updates_page(client, monkeypatch):
+    conn = connect(client.app.state.project_root)
+    repo.set_check_updates_on_launch(conn, True)
+    conn.close()
+    monkeypatch.setattr(
+        "controlflow_sdk.plane.routes.updates.detect_install",
+        lambda: InstallMethod.PIP,
+    )
+    monkeypatch.setattr(
+        "controlflow_sdk.plane.routes.updates.check_for_update",
+        lambda method: UpdateInfo(method, "0.1.0", "0.1.0", False, "You are up to date."),
+    )
+    resp = client.get("/updates/indicator")
+    assert resp.status_code == 200
+    assert 'href="/settings/updates"' in resp.text
