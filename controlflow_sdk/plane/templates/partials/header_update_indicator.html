@@ -12,9 +12,11 @@
     </div>
   {% else %}
     {# Up-to-date - show green indicator #}
-    <div class="update-indicator up-to-date" title="Current version: {{ current_version }}">
+    <a class="update-indicator up-to-date indicator-link"
+       href="/settings/updates"
+       title="Current version: {{ current_version }} — click for update settings">
       <span class="indicator-dot"></span>
       <span class="indicator-text">{{ current_version }}</span>
-    </div>
+    </a>
   {% endif %}
 {% endif %}
