@@ -85,6 +85,24 @@ def register(
             request, "partials/update_badge.html", {"info": info}
         )
 
+    @app.get("/updates/indicator", response_class=HTMLResponse)
+    def update_indicator(
+        request: Request,
+        conn: sqlite3.Connection = Depends(get_conn),
+    ) -> HTMLResponse:
+        # Header indicator: OFF → no indicator; ON → show status + click-to-upgrade
+        if not repo.get_check_updates_on_launch(conn):
+            return HTMLResponse("")
+        info = getattr(request.app.state, "update_check", None)
+        if info is None:
+            info = check_for_update(detect_install())
+            request.app.state.update_check = info
+        return templates.TemplateResponse(
+            request,
+            "partials/header_update_indicator.html",
+            {"info": info, "current_version": current_version()},
+        )
+
     @app.post("/upgrade", response_class=HTMLResponse)
     def do_upgrade(request: Request) -> HTMLResponse:
         method = detect_install()

@@ -443,6 +443,47 @@ legend {
 .copy-btn.copied .copy-icon { display: none; }
 .copy-btn.copied .copy-done { display: inline-flex; }
 
+/* ── Update indicator (header) ────────────────────────────────────────────── */
+.update-indicator {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 8px; border-radius: 4px;
+  border: 1px solid var(--border-strong);
+  font-size: 12px; font-weight: 600;
+  white-space: nowrap;
+}
+.update-indicator.up-to-date {
+  background: var(--bg-success-muted, rgba(34, 197, 94, 0.08));
+  border-color: var(--status-success, #22c55e);
+  color: var(--text-primary);
+}
+.update-indicator.update-available {
+  background: var(--bg-warning-muted, rgba(245, 158, 11, 0.08));
+  border-color: var(--status-warning, #f59e0b);
+  color: var(--text-primary);
+}
+.indicator-dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+}
+.update-indicator.up-to-date .indicator-dot {
+  background: var(--status-success, #22c55e);
+}
+.update-indicator.update-available .indicator-dot {
+  background: var(--status-warning, #f59e0b);
+}
+.indicator-text {
+  display: inline;
+}
+.indicator-btn {
+  background: transparent; border: 0; color: inherit; cursor: pointer;
+  font-size: inherit; font-weight: inherit; padding: 0; margin: 0;
+  text-decoration: none;
+  transition: color 0.12s;
+}
+.update-available .indicator-btn:hover {
+  color: var(--status-warning, #f59e0b);
+  text-decoration: underline;
+}
+
 /* ── Step inspector — clickable row-count opens the step data in a new tab ── */
 .pipe-count-btn { cursor: pointer; background: none; border: 0; font: inherit; color: inherit; padding: 0; text-decoration: none; }
 .pipe-count-btn:hover strong { text-decoration: underline; }

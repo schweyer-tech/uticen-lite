@@ -1,0 +1,20 @@
+{% if info %}
+  {% if info.available %}
+    {# Update available - show orange indicator #}
+    <div class="update-indicator update-available" title="Update available: {{ info.latest }}">
+      <span class="indicator-dot"></span>
+      <button class="indicator-btn"
+              hx-post="/upgrade" hx-target="body" hx-swap="innerHTML"
+              hx-confirm="This will close the app and upgrade controlflow-sdk. Continue?"
+              title="Click to update to {{ info.latest }}">
+        Update: {{ info.latest }}
+      </button>
+    </div>
+  {% else %}
+    {# Up-to-date - show green indicator #}
+    <div class="update-indicator up-to-date" title="Current version: {{ current_version }}">
+      <span class="indicator-dot"></span>
+      <span class="indicator-text">{{ current_version }}</span>
+    </div>
+  {% endif %}
+{% endif %}
