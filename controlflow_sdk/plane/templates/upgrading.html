@@ -55,6 +55,9 @@
     Progress is logged to <code class="mono">.controlplane-upgrade.log</code> in the
     engagement folder. You can close this tab.
   </p>
+  <p class="hint" id="reconnect-status">
+    We’ll auto-reconnect when the app comes back up.
+  </p>
 </div>
 
 <script>
@@ -71,6 +74,30 @@
         });
       });
     });
+  })();
+
+  /* Auto-reconnect: once the detached upgrade helper restarts controlplane on the
+     same URL, probe it and send the user back to home automatically. */
+  (function () {
+    var appUrl = "{{ app_url }}/";
+    var status = document.getElementById("reconnect-status");
+    var started = Date.now();
+    var timer = setInterval(function () {
+      fetch(appUrl, { cache: "no-store" })
+        .then(function (resp) {
+          if (!resp.ok) return;
+          clearInterval(timer);
+          if (status) status.textContent = "Upgrade finished. Reconnecting…";
+          window.location.href = "/";
+        })
+        .catch(function () {});
+      if (Date.now() - started > 120000) {
+        clearInterval(timer);
+        if (status) {
+          status.textContent = "Still waiting for restart. Use the commands above if needed.";
+        }
+      }
+    }, 1500);
   })();
 </script>
 {% endblock %}

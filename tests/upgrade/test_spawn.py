@@ -31,13 +31,20 @@ def test_spawn_writes_helper_and_invokes_popen(tmp_path):
 
     commands = [["pipx", "upgrade", "controlflow-sdk"]]
     helper = spawn.spawn_detached_upgrade(
-        tmp_path, commands, current="0.1.0", popen=fake_popen
+        tmp_path,
+        commands,
+        current="0.1.0",
+        restart_command=["python", "-m", "controlflow_sdk.plane", "--project", str(tmp_path)],
+        popen=fake_popen,
     )
     assert helper.exists()
     # argv[0] is the interpreter; argv[1] is the helper; argv[2] is JSON config.
     assert calls["argv"][1] == str(helper)
     cfg = json.loads(calls["argv"][2])
     assert cfg["commands"] == commands
+    assert cfg["restart_command"] == [
+        "python", "-m", "controlflow_sdk.plane", "--project", str(tmp_path)
+    ]
     assert cfg["from"] == "0.1.0"
     assert cfg["status"].endswith(spawn.STATUS_FILE)
 

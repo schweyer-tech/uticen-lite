@@ -53,7 +53,9 @@ def test_upgrade_spawns_and_renders_upgrading(client, monkeypatch):
     )
     monkeypatch.setattr(
         "controlflow_sdk.plane.routes.updates.spawn_detached_upgrade",
-        lambda root, commands, current: spawned.update(commands=commands) or None,
+        lambda root, commands, current, restart_command=None: (
+            spawned.update(commands=commands, restart_command=restart_command) or None
+        ),
     )
     monkeypatch.setattr(
         "controlflow_sdk.plane.routes.updates.schedule_shutdown",
@@ -63,6 +65,11 @@ def test_upgrade_spawns_and_renders_upgrading(client, monkeypatch):
     assert resp.status_code == 200
     assert "Upgrading" in resp.text
     assert spawned["commands"] == [["pip", "install", "-U", "controlflow-sdk"]]
+    assert spawned["restart_command"] is not None
+    assert "-m" in spawned["restart_command"]
+    assert "controlflow_sdk.plane" in spawned["restart_command"]
+    assert "--project" in spawned["restart_command"]
+    assert str(client.app.state.project_root) in spawned["restart_command"]
     assert spawned["shutdown"] is True
     # Re-run instructions: both the console-script and the module fallback, each
     # copyable (a copy button carrying the exact command), wired to the engagement dir.
@@ -72,6 +79,7 @@ def test_upgrade_spawns_and_renders_upgrading(client, monkeypatch):
     assert resp.text.count('class="copy-btn"') == 2
     assert 'data-copy="controlplane --project' in resp.text
     assert 'data-copy="python -m controlflow_sdk.plane --project' in resp.text
+    assert 'window.location.href = "/"' in resp.text
 
 
 def test_upgrade_unknown_renders_instructions(client, monkeypatch):

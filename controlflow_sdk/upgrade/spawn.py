@@ -59,8 +59,28 @@ def main():
             if result.returncode != 0:
                 ok = False
                 break
+    restarted = False
+    restart = cfg.get("restart_command")
+    if ok and restart:
+        kwargs = {}
+        if os.name == "posix":
+            kwargs["start_new_session"] = True
+        else:
+            kwargs["creationflags"] = 0x00000008 | 0x00000200
+        try:
+            subprocess.Popen(
+                restart,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                **kwargs,
+            )
+            restarted = True
+        except Exception as exc:
+            with open(cfg["log"], "a") as log:
+                log.write("RESTART ERROR: %r\\n" % (exc,))
     with open(cfg["status"], "w") as status:
-        json.dump({"ok": ok, "from": cfg["from"]}, status)
+        json.dump({"ok": ok, "from": cfg["from"], "restarted": restarted}, status)
 
 
 main()
@@ -88,6 +108,7 @@ def spawn_detached_upgrade(
     commands: list[list[str]],
     *,
     current: str,
+    restart_command: list[str] | None = None,
     popen: Callable[..., Any] | None = None,
 ) -> Path:
     root = Path(project_root)
@@ -99,6 +120,7 @@ def spawn_detached_upgrade(
             "log": str(root / LOG_FILE),
             "status": str(root / STATUS_FILE),
             "commands": commands,
+            "restart_command": restart_command,
             "from": current,
         }
     )

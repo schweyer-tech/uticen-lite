@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import shlex
 import sqlite3
+import sys
 from collections.abc import Callable, Generator
 
 from fastapi import Depends, FastAPI, Request
@@ -113,11 +114,32 @@ def register(
             )
         src = source_dir() if method is InstallMethod.GIT_EDITABLE else None
         commands = build_upgrade_command(method, source_dir=str(src) if src else None)
-        spawn_detached_upgrade(request.app.state.project_root, commands, current=current)
+        restart_command = [
+            sys.executable,
+            "-m",
+            "controlflow_sdk.plane",
+            "--project",
+            str(request.app.state.project_root),
+            "--no-browser",
+        ]
+        if request.url.port:
+            restart_command.extend(["--port", str(request.url.port)])
+        spawn_detached_upgrade(
+            request.app.state.project_root,
+            commands,
+            current=current,
+            restart_command=restart_command,
+        )
         schedule_shutdown()
         # shlex.quote so the copyable re-run command is paste-and-run even when the
         # engagement path contains spaces.
         project_dir = shlex.quote(str(request.app.state.project_root))
         return templates.TemplateResponse(
-            request, "upgrading.html", {"current": current, "project_dir": project_dir}
+            request,
+            "upgrading.html",
+            {
+                "current": current,
+                "project_dir": project_dir,
+                "app_url": str(request.base_url).rstrip("/"),
+            },
         )
