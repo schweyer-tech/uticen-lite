@@ -18,7 +18,7 @@
 </div>
 {% endif %}
 
-<form method="post" action="{% if control %}/controls/{{ control.id }}{% else %}/controls{% endif %}">
+<form method="post" action="{% if control %}/controls/{{ control.id }}{% else %}/controls{% endif %}"{% if control %} data-source-autosave-form{% endif %}>
   <div class="card">
     <h2>Details</h2>
     <div class="field">
@@ -69,6 +69,7 @@
       <div class="check-row">
         <label>
           <input type="checkbox" name="source_ids" value="{{ source.id }}"
+                 {% if control %}onchange="this.form.submit()"{% endif %}
                  {% if control and source.id in control.source_ids %}checked{% endif %}>
           <span class="src-name">{{ source.title or source.id }}</span>
           {% if source.title %}<span class="mono muted">({{ source.id }})</span>{% endif %}

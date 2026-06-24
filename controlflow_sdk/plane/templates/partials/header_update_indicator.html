@@ -1,22 +1,38 @@
 {% if info %}
-  {% if info.available %}
-    {# Update available - show orange indicator #}
-    <div class="update-indicator update-available" title="Update available: {{ info.latest }}">
+  <div id="header-update-indicator" class="update-indicator-wrap">
+    {% if info.available %}
+    <button type="button" class="update-indicator update-available" title="Update available: {{ info.latest }}">
       <span class="indicator-dot"></span>
-      <button class="indicator-btn"
+      <span class="indicator-text">Update available</span>
+    </button>
+    <div class="update-popover" role="menu" aria-label="Update actions">
+      <p class="update-popover-text">New version {{ info.latest }} is available.</p>
+      <button class="btn btn-sm btn-primary"
               hx-post="/upgrade" hx-target="body" hx-swap="innerHTML"
-              hx-confirm="This will close the app and upgrade controlflow-sdk. Continue?"
-              title="Click to update to {{ info.latest }}">
-        Update: {{ info.latest }}
+              hx-confirm="This will close the app and upgrade controlflow-sdk. Continue?">
+        Update now
+      </button>
+      <button class="btn btn-sm btn-ghost"
+              hx-post="/updates/indicator/check"
+              hx-target="#header-update-indicator"
+              hx-swap="outerHTML">
+        Re-check
       </button>
     </div>
-  {% else %}
-    {# Up-to-date - show green indicator #}
-    <a class="update-indicator up-to-date indicator-link"
-       href="/settings/updates"
-       title="Current version: {{ current_version }} — click for update settings">
+    {% else %}
+    <button type="button" class="update-indicator up-to-date" title="Current version: {{ current_version }}">
       <span class="indicator-dot"></span>
       <span class="indicator-text">{{ current_version }}</span>
-    </a>
-  {% endif %}
+    </button>
+    <div class="update-popover" role="menu" aria-label="Update actions">
+      <p class="update-popover-text">You are up to date.</p>
+      <button class="btn btn-sm btn-ghost"
+              hx-post="/updates/indicator/check"
+              hx-target="#header-update-indicator"
+              hx-swap="outerHTML">
+        Check now
+      </button>
+    </div>
+    {% endif %}
+  </div>
 {% endif %}

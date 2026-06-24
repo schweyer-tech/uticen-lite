@@ -450,6 +450,8 @@ legend {
   border: 1px solid var(--border-strong);
   font-size: 12px; font-weight: 600;
   white-space: nowrap;
+  background: transparent;
+  cursor: pointer;
 }
 .update-indicator.up-to-date {
   background: var(--bg-success-muted, rgba(34, 197, 94, 0.08));
@@ -473,22 +475,37 @@ legend {
 .indicator-text {
   display: inline;
 }
-.indicator-link {
-  text-decoration: none;
-  color: inherit;
+.update-indicator-wrap {
+  position: relative;
+  display: inline-flex;
 }
-.indicator-link:hover {
-  text-decoration: underline;
+.update-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  display: none;
+  min-width: 220px;
+  padding: 10px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-input);
+  background: var(--bg-surface-2);
+  box-shadow: var(--shadow-elev-2);
+  z-index: 30;
 }
-.indicator-btn {
-  background: transparent; border: 0; color: inherit; cursor: pointer;
-  font-size: inherit; font-weight: inherit; padding: 0; margin: 0;
-  text-decoration: none;
-  transition: color 0.12s;
+.update-popover-text {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
-.update-available .indicator-btn:hover {
-  color: var(--status-warning, #f59e0b);
-  text-decoration: underline;
+.update-popover .btn {
+  width: 100%;
+}
+.update-popover .btn + .btn {
+  margin-top: 8px;
+}
+.update-indicator-wrap:hover .update-popover,
+.update-indicator-wrap:focus-within .update-popover {
+  display: block;
 }
 
 /* ── Step inspector — clickable row-count opens the step data in a new tab ── */

@@ -246,11 +246,10 @@ def test_definition_add_source_auto_adds_import_node(client):
     }, follow_redirects=False)
 
     updated = _get_control(client, cid)
-    import_sources = [
-        n.get("source_id") for n in (updated.get("pipeline") or {}).get("nodes", [])
-        if n.get("type") == "import"
-    ]
+    nodes = (updated.get("pipeline") or {}).get("nodes", [])
+    import_sources = [n.get("source_id") for n in nodes if n.get("type") == "import"]
     assert "def_b" in import_sources
+    assert [n.get("type") for n in nodes[:2]] == ["import", "import"]
 
 
 def test_definition_remove_source_unimports_and_cleans_inputs(client):
@@ -287,3 +286,15 @@ def test_definition_remove_source_unimports_and_cleans_inputs(client):
     assert "drop_b" not in import_sources
     test_node = next(n for n in nodes if n.get("id") == "tst")
     assert "imp_b" not in list(test_node.get("inputs") or [])
+
+
+def test_definition_existing_control_enables_source_autosave(client):
+    _make_source(client, "auto_src")
+    client.post("/controls", data={
+        "id": "AUTOSAVE1", "title": "Autosave check", "objective": "o", "narrative": "n",
+        "source_ids": ["auto_src"],
+    }, follow_redirects=False)
+
+    page = client.get("/controls/AUTOSAVE1")
+    assert page.status_code == 200
+    assert "data-source-autosave-form" in page.text

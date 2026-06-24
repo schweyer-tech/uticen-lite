@@ -104,6 +104,16 @@ def register(
             {"info": info, "current_version": current_version()},
         )
 
+    @app.post("/updates/indicator/check", response_class=HTMLResponse)
+    def refresh_update_indicator(request: Request) -> HTMLResponse:
+        info = check_for_update(detect_install())
+        request.app.state.update_check = info
+        return templates.TemplateResponse(
+            request,
+            "partials/header_update_indicator.html",
+            {"info": info, "current_version": current_version()},
+        )
+
     @app.post("/upgrade", response_class=HTMLResponse)
     def do_upgrade(request: Request) -> HTMLResponse:
         method = detect_install()

@@ -332,39 +332,49 @@ def _reconcile_pipeline_imports(
     if not isinstance(pipeline, dict):
         return pipeline
     nodes = list(pipeline.get("nodes") or [])
-    selected = set(selected_source_ids)
+    selected_order: list[str] = []
+    selected_set: set[str] = set()
+    for sid in selected_source_ids:
+        if sid not in selected_set:
+            selected_set.add(sid)
+            selected_order.append(sid)
 
     removed_ids: set[str] = set()
-    kept_nodes: list[dict[str, Any]] = []
+    import_by_source: dict[str, dict[str, Any]] = {}
+    non_import_nodes: list[dict[str, Any]] = []
     for n in nodes:
-        if n.get("type") == "import" and n.get("source_id") not in selected:
+        if n.get("type") != "import":
+            non_import_nodes.append(dict(n))
+            continue
+        sid = str(n.get("source_id") or "")
+        if sid not in selected_set:
             removed_ids.add(str(n.get("id") or ""))
             continue
-        kept_nodes.append(dict(n))
+        if sid in import_by_source:
+            removed_ids.add(str(n.get("id") or ""))
+            continue
+        import_by_source[sid] = dict(n)
 
     if removed_ids:
-        for n in kept_nodes:
+        for n in non_import_nodes:
             if isinstance(n.get("inputs"), list):
                 n["inputs"] = [i for i in n["inputs"] if i not in removed_ids]
 
-    import_sources = [
-        str(n.get("source_id"))
-        for n in kept_nodes
-        if n.get("type") == "import" and n.get("source_id")
-    ]
-    missing = [sid for sid in selected_source_ids if sid not in import_sources]
-    for sid in missing:
-        kept_nodes.append(
-            {
-                "id": _node_id_for_import(kept_nodes, sid),
+    ordered_imports: list[dict[str, Any]] = []
+    id_scope = [*non_import_nodes]
+    for sid in selected_order:
+        existing = import_by_source.get(sid)
+        if existing is None:
+            existing = {
+                "id": _node_id_for_import(id_scope + ordered_imports, sid),
                 "type": "import",
                 "source_id": sid,
                 "narrative": "",
             }
-        )
+        ordered_imports.append(existing)
 
     out = dict(pipeline)
-    out["nodes"] = kept_nodes
+    out["nodes"] = [*ordered_imports, *non_import_nodes]
     return out
 
 

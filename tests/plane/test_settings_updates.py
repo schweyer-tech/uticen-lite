@@ -56,7 +56,7 @@ def test_check_now_returns_result_partial(client, monkeypatch):
     assert "0.2.0" in resp.text
 
 
-def test_header_indicator_up_to_date_links_to_updates_page(client, monkeypatch):
+def test_header_indicator_up_to_date_shows_hover_actions(client, monkeypatch):
     conn = connect(client.app.state.project_root)
     repo.set_check_updates_on_launch(conn, True)
     conn.close()
@@ -70,4 +70,25 @@ def test_header_indicator_up_to_date_links_to_updates_page(client, monkeypatch):
     )
     resp = client.get("/updates/indicator")
     assert resp.status_code == 200
-    assert 'href="/settings/updates"' in resp.text
+    assert "up-to-date" in resp.text
+    assert 'hx-post="/updates/indicator/check"' in resp.text
+    assert "Check now" in resp.text
+
+
+def test_header_indicator_update_available_shows_update_now_action(client, monkeypatch):
+    conn = connect(client.app.state.project_root)
+    repo.set_check_updates_on_launch(conn, True)
+    conn.close()
+    monkeypatch.setattr(
+        "controlflow_sdk.plane.routes.updates.detect_install",
+        lambda: InstallMethod.PIP,
+    )
+    monkeypatch.setattr(
+        "controlflow_sdk.plane.routes.updates.check_for_update",
+        lambda method: UpdateInfo(method, "0.1.0", "0.2.0", True, "Version 0.2.0 is available."),
+    )
+    resp = client.get("/updates/indicator")
+    assert resp.status_code == 200
+    assert "update-available" in resp.text
+    assert 'hx-post="/upgrade"' in resp.text
+    assert "Update now" in resp.text
