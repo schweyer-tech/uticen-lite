@@ -1,12 +1,11 @@
 {% if info %}
   <div id="header-update-indicator" class="update-indicator-wrap">
     {% if info.available %}
-    <button type="button" class="update-indicator update-available" title="Update available: {{ info.latest }}">
+    <button type="button" class="update-indicator update-available" aria-label="Update available: {{ info.latest }}" title="Update available: {{ info.latest }}">
       <span class="indicator-dot"></span>
-      <span class="indicator-text">Update available</span>
+      <span class="sr-only">Update available: {{ info.latest }}</span>
     </button>
     <div class="update-popover" role="menu" aria-label="Update actions">
-      <p class="update-popover-text">New version {{ info.latest }} is available.</p>
       <button class="btn btn-sm btn-primary"
               hx-post="/upgrade" hx-target="body" hx-swap="innerHTML"
               hx-confirm="This will close the app and upgrade controlflow-sdk. Continue?">
@@ -20,12 +19,11 @@
       </button>
     </div>
     {% else %}
-    <button type="button" class="update-indicator up-to-date" title="Current version: {{ current_version }}">
+    <button type="button" class="update-indicator up-to-date" aria-label="Up to date: {{ current_version }}" title="Current version: {{ current_version }}">
       <span class="indicator-dot"></span>
-      <span class="indicator-text">{{ current_version }}</span>
+      <span class="sr-only">Up to date: {{ current_version }}</span>
     </button>
     <div class="update-popover" role="menu" aria-label="Update actions">
-      <p class="update-popover-text">You are up to date.</p>
       <button class="btn btn-sm btn-ghost"
               hx-post="/updates/indicator/check"
               hx-target="#header-update-indicator"
