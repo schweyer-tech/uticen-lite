@@ -71,6 +71,8 @@ def test_header_indicator_up_to_date_shows_hover_actions(client, monkeypatch):
     resp = client.get("/updates/indicator")
     assert resp.status_code == 200
     assert "up-to-date" in resp.text
+    assert "indicator-text" not in resp.text
+    assert "You are up to date." not in resp.text
     assert 'hx-post="/updates/indicator/check"' in resp.text
     assert "Check now" in resp.text
 
@@ -90,5 +92,8 @@ def test_header_indicator_update_available_shows_update_now_action(client, monke
     resp = client.get("/updates/indicator")
     assert resp.status_code == 200
     assert "update-available" in resp.text
+    assert "indicator-text" not in resp.text
+    assert "New version" not in resp.text
+    assert "aria-label=" in resp.text
     assert 'hx-post="/upgrade"' in resp.text
     assert "Update now" in resp.text
