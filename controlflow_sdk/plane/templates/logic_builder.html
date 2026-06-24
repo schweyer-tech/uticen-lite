@@ -158,6 +158,10 @@
 
     <div class="page-actions">
       <button class="btn btn-primary" type="submit">Save pipeline</button>
+      <button class="btn btn-sm btn-ghost" type="button" id="recalc-btn"
+              title="Recalculate row counts and refresh the pipeline visualization">
+        ↻ Recalculate
+      </button>
       <span id="autosave-status" aria-live="polite"></span>
       <a class="btn btn-sm" href="/controls/{{ control_id }}/logic/export-steps.xlsx">
         Export step workbook (.xlsx)</a>
@@ -469,6 +473,15 @@
 
     // Initial bind on page load.
     bindCards(document);
+
+    // Recalculate button: re-serialize and refresh row counts
+    var recalcBtn = document.getElementById('recalc-btn');
+    if (recalcBtn) {
+      recalcBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        reload();  // serialize + autosaveSubmit to refresh row counts
+      });
+    }
 
     // Re-bind after HTMX swaps the cards (ai-apply success path).
     document.getElementById('pipe-cards').addEventListener('htmx:afterSwap', function () {
