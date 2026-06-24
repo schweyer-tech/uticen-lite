@@ -660,6 +660,8 @@ def register(
         control = repo.get_control(conn, control_id)
         pipeline = _pipeline_for_view(control)
         ctx: dict[str, Any] = {
+            "project": repo.get_project(conn) or {"name": ""},
+            "control": control,
             "control_id": control_id, "node_id": node_id,
             "frame_available": False, "reason": "This step is not computable yet.",
         }
@@ -688,7 +690,7 @@ def register(
                 })
             elif not pipeline.import_source_ids() or node is not None:
                 ctx["reason"] = "Bind a data source (and complete this step) to inspect it."
-        return templates.TemplateResponse(request, "partials/_step_data.html", ctx)
+        return templates.TemplateResponse(request, "step_data.html", ctx)
 
     # --- Step export routes --------------------------------------------------
 

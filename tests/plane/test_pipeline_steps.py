@@ -131,6 +131,11 @@ def test_step_data_route_paginates(client):
     r = c.get(f"/controls/{control_id}/logic/step/flt/data")
     assert r.status_code == 200
     assert "records" in r.text and "of" in r.text          # "records X–Y of Z"
+    # It is now a full standalone page (opened in a new tab), not an HTMX drawer
+    # partial: it carries the back-to-builder link and drops the #step-drawer target.
+    assert "Back to builder" in r.text
+    assert f"/controls/{control_id}/logic/builder" in r.text
+    assert "step-drawer" not in r.text
 
 
 def test_step_data_unknown_node_degrades(client):
@@ -138,6 +143,21 @@ def test_step_data_unknown_node_degrades(client):
     r = c.get(f"/controls/{control_id}/logic/step/does-not-exist/data")
     assert r.status_code == 200                              # never 500
     assert "isn't computable" in r.text or "not computable" in r.text
+    assert "Back to builder" in r.text                       # still the full page
+
+
+def test_builder_count_links_open_in_new_tab(client):
+    """The clickable row-count on the builder is a target=_blank link to the
+    step-data page (opens in a new tab), not an inline HTMX drawer trigger."""
+    c, control_id = _seeded(client)
+    r = c.get(f"/controls/{control_id}/logic/builder")
+    assert r.status_code == 200
+    assert 'class="pipe-count pipe-count-btn"' in r.text
+    assert 'target="_blank"' in r.text
+    assert f"/controls/{control_id}/logic/step/flt/data" in r.text
+    # The old inline-drawer plumbing is gone.
+    assert 'id="step-drawer"' not in r.text
+    assert 'hx-target="#step-drawer"' not in r.text
 
 
 # ---------------------------------------------------------------------------

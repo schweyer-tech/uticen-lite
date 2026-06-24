@@ -1,4 +1,4 @@
-"""Browser smoke: click a step count → drawer opens → table visible → download link present.
+"""Browser smoke: click a step count → step data opens in a new tab → table + links present.
 
 Opt-in test (the ``browser`` marker is excluded from the fast unit lane via
 ``addopts = "--ignore=tests/e2e"`` in pyproject.toml).  CI runs it via:
@@ -102,28 +102,29 @@ def _seed(page: Page, base: str) -> str:
 
 
 @pytest.mark.browser
-def test_step_inspector_drawer(page: Page, live_server: str) -> None:
-    """Click a step count badge → HTMX loads the drawer → table + download link visible."""
+def test_step_inspector_opens_new_tab(page: Page, live_server: str) -> None:
+    """Click a step count badge → it opens the step data as a full page in a NEW TAB
+    with a table, the per-step download link, and a back-to-builder link."""
     base = live_server
     cid = _seed(page, base)
 
     # Navigate to the Logic ▸ Builder page for the seeded control.
     page.goto(f"{base}/controls/{cid}/logic/builder")
 
-    # The pipe-count-btn is only rendered when node.count is not None (i.e.,
-    # after a run).  Click the first visible one (the Import node's badge).
-    count_btn = page.locator(".pipe-count-btn").first
-    expect(count_btn).to_be_visible()
-    count_btn.click()
+    # The pipe-count-btn is only rendered when node.count is not None.  It is now
+    # an anchor that opens the step-data page in a new tab (target="_blank").
+    count_link = page.locator(".pipe-count-btn").first
+    expect(count_link).to_be_visible()
+    expect(count_link).to_have_attribute("target", "_blank")
 
-    # HTMX swaps the drawer content into #step-drawer.  Wait for the step-panel
-    # to appear (the drawer partial renders a <div class="step-panel card">).
-    step_panel = page.locator("#step-drawer .step-panel")
-    step_panel.wait_for(state="visible")
+    # Clicking opens a new browser tab (popup); capture it.
+    with page.context.expect_page() as popup_info:
+        count_link.click()
+    popup = popup_info.value
+    popup.wait_for_load_state()
 
-    # The drawer must contain a data table.
-    expect(step_panel.locator("table")).to_have_count(1)
-
-    # The drawer must show the "Download this step" export link.
-    # The exact link text in _step_data.html is "Download this step (.xlsx)".
-    expect(step_panel.get_by_text("Download this step", exact=False)).to_have_count(1)
+    # The new tab is the full step-data page: a data table, the per-step export
+    # link, and a back-to-builder link.
+    expect(popup.locator("table")).to_have_count(1)
+    expect(popup.get_by_text("Download this step", exact=False)).to_have_count(1)
+    expect(popup.get_by_text("Back to builder", exact=False)).to_have_count(1)
