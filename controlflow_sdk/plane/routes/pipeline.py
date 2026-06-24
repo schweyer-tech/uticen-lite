@@ -854,6 +854,7 @@ def register(
                 graph = json.loads(str(raw)) if raw else dict(_EMPTY_GRAPH)
             except (ValueError, TypeError):
                 graph = dict(_EMPTY_GRAPH)
+            autosave = form.get("autosave") in ("1", "true")
             errors = _save_pipeline_graph(conn, control_id, graph)
             if errors:
                 node_errors = _node_errors_from(errors)
@@ -869,6 +870,38 @@ def register(
                 ctx["logic_tab"] = "builder"
                 return templates.TemplateResponse(
                     request, "logic_builder.html", ctx, status_code=422
+                )
+            if autosave:
+                # Return the re-rendered pipe-cards fragment so HTMX can swap
+                # the cards in place — keeps the author in the builder without
+                # a full-page redirect.
+                source_columns = _source_columns(conn)
+                sources = repo.list_sources(conn)
+                try:
+                    builder_parsed: Pipeline | None = parse_pipeline(graph)
+                except PipelineError:
+                    builder_parsed = None
+                builder_stream_cols: dict[str, list[dict]] = {}
+                builder_counts: dict[str, int] = {}
+                if builder_parsed is not None:
+                    builder_counts = _row_counts(conn, root, builder_parsed)
+                    builder_stream_cols = _stream_columns(builder_parsed, source_columns)
+                ordered_nodes = (
+                    [_card_vm(n, builder_parsed, builder_stream_cols, builder_counts, {})
+                     for n in builder_parsed.topological()]
+                    if builder_parsed is not None
+                    else [_raw_card_vm(n, {}) for n in graph.get("nodes", [])]
+                )
+                return templates.TemplateResponse(
+                    request,
+                    "partials/_pipe_cards.html",
+                    {
+                        "control_id": control_id,
+                        "nodes": ordered_nodes,
+                        "sources": sources,
+                        "op_choices": OP_CHOICES,
+                        "join_mode_choices": JOIN_MODE_CHOICES,
+                    },
                 )
             return RedirectResponse(f"/controls/{control_id}/logic/builder", status_code=303)
         finally:

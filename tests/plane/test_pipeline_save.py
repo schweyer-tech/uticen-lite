@@ -430,3 +430,84 @@ def test_save_pipeline_with_blank_condition_placeholder_does_not_500(client):
     assert '""' not in c["test_code"] or "column" not in c["test_code"]
     # The stored pipeline graph retains the blank condition for UI round-trip.
     assert c["pipeline"] is not None
+
+
+# ---------------------------------------------------------------------------
+# Autosave mode: in-place fragment response (no redirect)
+# ---------------------------------------------------------------------------
+
+def _make_simple_graph() -> dict:
+    """Single-Import + Test graph that compiles cleanly."""
+    return {"nodes": [
+        {"id": "imp", "type": "import", "source_id": "acct_as",
+         "narrative": "All accounts"},
+        {"id": "tst", "type": "test", "inputs": ["imp"],
+         "config": {"logic": "all", "severity": "high",
+                    "item_key_column": "account_id",
+                    "conditions": [{"column": "is_active", "op": "eq",
+                                    "value": "true"}]}},
+    ]}
+
+
+def test_autosave_returns_fragment_not_redirect(client):
+    """Posting autosave=1 on a valid graph MUST return 200 HTML fragment, NOT redirect."""
+    _make_source(client, "acct_as",
+                 b"account_id,is_active\nA1,true\nA2,false\n")
+    client.post("/controls", data={
+        "id": "as1", "title": "AS Test", "objective": "o", "narrative": "n",
+    }, follow_redirects=False)
+
+    resp = client.post(
+        "/controls/as1/logic/builder",
+        data={"pipeline_json": json.dumps(_make_simple_graph()), "autosave": "1"},
+        follow_redirects=False,
+    )
+
+    # Must be 200 fragment, not 302/303.
+    assert resp.status_code == 200, (
+        f"autosave should return 200 fragment, got {resp.status_code}"
+    )
+    # Must NOT be a redirect.
+    assert resp.status_code not in (302, 303)
+    # The fragment must contain card HTML (the pipe-insert affordance).
+    assert "pipe-insert" in resp.text, "expected pipe-cards fragment in autosave response"
+
+    # The control MUST still be persisted after autosave.
+    from controlflow_sdk.store import repo
+    conn = _conn(client)
+    c = repo.get_control(conn, "as1")
+    conn.close()
+    assert c is not None
+    assert c["test_kind"] == "pipeline"
+    assert c["pipeline"] is not None
+
+
+def test_autosave_validation_error_returns_422_not_redirect(client):
+    """Posting autosave=1 with an unsafe graph returns 422 (not redirect, not 500)."""
+    _make_source(client, "journal_entries", b"entry_id,amount\nE1,100\n")
+    client.post("/controls", data={
+        "id": "as2", "title": "AS Err", "objective": "o", "narrative": "n",
+    }, follow_redirects=False)
+
+    resp = client.post(
+        "/controls/as2/logic/builder",
+        data={
+            "pipeline_json": json.dumps(_custom_pipeline("rows = open('/etc/passwd').read()")),
+            "autosave": "1",
+        },
+        follow_redirects=False,
+    )
+
+    # Must be 422 (validation error), not a redirect, not a 500.
+    assert resp.status_code == 422, (
+        f"autosave error should return 422, got {resp.status_code}"
+    )
+    assert _OFFRAMP_STABLE in resp.text
+
+    # The pipeline must NOT be persisted after a failed autosave.
+    from controlflow_sdk.store import repo
+    conn = _conn(client)
+    c = repo.get_control(conn, "as2")
+    conn.close()
+    assert c is not None
+    assert c["pipeline"] is None
