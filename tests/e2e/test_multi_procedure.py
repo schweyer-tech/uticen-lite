@@ -18,8 +18,8 @@ Authoring sequence:
   1. Upload CSV source, create control.
   2. Open Builder — scaffold: Import(src) → Test(tst).
   3. For tst: set proc-title + threshold_count=5, add condition (user_id eq A1).
-     Each add-cond click serialises the current card state and submits the
-     form (full-page navigation); proc-title/threshold are saved via this POST.
+     Each add-cond click serialises the current card state and autosaves via fetch
+     (scroll-stable, in-place DOM swap); proc-title/threshold are saved via this POST.
   4. For tes1: the 2nd Test node is injected by submitting the complete pipeline
      JSON (with both nodes wired) directly to the builder POST endpoint via
      page.evaluate(fetch(...)). The builder route validates, compiles, and saves
@@ -115,10 +115,9 @@ def test_author_run_export_two_procedure_control(
     tst.locator("[data-itemkey]").select_option("user_id")
 
     # Click "+ Add condition" → serialises card state (incl. proc-title/threshold)
-    # and submits the form. Server saves and 303-redirects to the Builder GET.
-    with page.expect_navigation():
-        tst.locator("[data-add-cond]").click()
-    expect(page).to_have_url(base + "/controls/fork/logic/builder")
+    # and autosaves via fetch (scroll-stable, in-place DOM swap). Wait for response.
+    tst.locator("[data-add-cond]").click()
+    page.wait_for_load_state("networkidle")
 
     # Fill condition row 0 for "tst": user_id eq A1.
     tst = page.locator('[data-node="tst"]')

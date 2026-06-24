@@ -29,20 +29,22 @@ Import and Test cards don't collide):
 
 Clicking ``[data-add-cond]`` serialises the current card state via JS
 ``serialize()`` (reading all [data-cond] rows, [data-severity], [data-desc],
-[data-itemkey] from the DOM), writes ``pipeline_json``, and submits the form to
-POST /controls/{id}/logic/builder, which saves the pipeline and 303-redirects
-back to the Builder GET — the re-render shows the new empty condition row with
-the source's column dropdown pre-populated from the bound Import node.
+[data-itemkey] from the DOM), writes ``pipeline_json``, and sends a fetch POST
+with ``autosave=1`` to POST /controls/{id}/logic/builder. The response contains
+only the updated cards fragment, which is swapped into the DOM in-place (scroll
+position preserved) — no full-page navigation. The re-render shows the new
+empty condition row with the source's column dropdown pre-populated from the
+bound Import node.
 
 The authoring sequence for the two-condition rule is therefore:
   1. Set severity/desc/itemkey on the initial 0-condition scaffold.
-  2. Click ``[data-add-cond]`` — auto-save+redirect → GET re-renders Test node
-     with 1 empty condition row (column <select> pre-filled from the users source).
+  2. Click ``[data-add-cond]`` — autosave → cards fragment swapped in-place, new
+     empty condition row rendered.
   3. Fill condition row 0: select column=user_id, op=eq, value=U1.
-  4. Click ``[data-add-cond]`` again — auto-save+redirect → GET re-renders Test
-     node with condition row 0 preserved and a new empty condition row 1.
+  4. Click ``[data-add-cond]`` again — autosave → cards fragment swapped,
+     condition row 0 preserved and new empty condition row 1 rendered.
   5. Fill condition row 1: select column=can_create, op=not_empty.
-  6. Click "Save pipeline" — final save+redirect, pipeline stored.
+  6. Click "Save pipeline" — final save (full-page POST), 303-redirect, pipeline stored.
 """
 
 import json
@@ -137,10 +139,10 @@ def test_author_run_export_smoke(page: Page, live_server: str, tmp_path: Path) -
     # item key: source is bound so [data-itemkey] is a <select>; pick user_id.
     test_card.locator("[data-itemkey]").select_option("user_id")
     # Click "+ Add condition" — JS serialises the card, adds an empty condition,
-    # and submits the form. Wait for the resulting full-page navigation.
-    with page.expect_navigation():
-        test_card.locator("[data-add-cond]").click()
-    expect(page).to_have_url(base + "/controls/sod/logic/builder")
+    # and autosaves via fetch (scroll-stable, in-place DOM swap). Wait for the
+    # autosave response to update #pipe-cards.
+    test_card.locator("[data-add-cond]").click()
+    page.wait_for_load_state("networkidle")
 
     # --- Step 2: condition row 0 is now rendered with a column <select> (source
     #             'users' is bound so the server pre-populates it). Fill it:
@@ -152,9 +154,9 @@ def test_author_run_export_smoke(page: Page, live_server: str, tmp_path: Path) -
     row0.locator("[data-cond-op]").select_option("eq")
     row0.locator("[data-cond-val]").fill("U1")
     # Click "+ Add condition" again — saves condition 0 + appends empty condition 1.
-    with page.expect_navigation():
-        test_card.locator("[data-add-cond]").click()
-    expect(page).to_have_url(base + "/controls/sod/logic/builder")
+    # Autosave via fetch (scroll-stable). Wait for networkidle to ensure response.
+    test_card.locator("[data-add-cond]").click()
+    page.wait_for_load_state("networkidle")
 
     # --- Step 3: condition row 1 is now rendered. Fill it:
     #             column=can_create, op=not_empty (no value needed). ---
