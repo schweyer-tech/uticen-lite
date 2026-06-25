@@ -584,28 +584,49 @@ legend {
   display: inline-flex;
   align-items: center;
 }
-.update-popover {
+.update-modal[hidden] { display: none; }
+.update-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.update-modal-backdrop {
   position: absolute;
-  top: 100%;
-  right: 0;
-  display: none;
-  min-width: 220px;
-  padding: 10px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-input);
-  background: var(--bg-surface-2);
-  box-shadow: var(--shadow-elev-2);
-  z-index: 30;
+  inset: 0;
+  background: rgba(3, 7, 18, 0.65);
 }
-.update-popover .btn {
-  width: 100%;
+.update-modal-panel {
+  position: relative;
+  width: min(420px, 100%);
+  padding: 20px;
+  background: var(--bg-surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  z-index: 1;
 }
-.update-popover .btn + .btn {
-  margin-top: 8px;
+.update-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 999px;
 }
-.update-indicator-wrap:hover .update-popover,
-.update-indicator-wrap:focus-within .update-popover {
-  display: block;
+.update-modal-body {
+  display: grid;
+  gap: 12px;
+  padding-top: 8px;
+}
+.update-modal-body .lead {
+  margin: 0;
+}
+.update-modal-body .page-actions {
+  justify-content: flex-end;
 }
 .sr-only {
   position: absolute;

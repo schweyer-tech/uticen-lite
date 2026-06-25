@@ -43,6 +43,16 @@
       </div>
     </div>
   </header>
+  <div id="update-modal" class="update-modal" hidden aria-hidden="true">
+    <div class="update-modal-backdrop" data-update-modal-close></div>
+    <div class="update-modal-panel" role="dialog" aria-modal="true" aria-labelledby="update-modal-title" tabindex="-1">
+      <button type="button"
+              class="update-modal-close"
+              aria-label="Close update modal"
+              data-update-modal-close>×</button>
+      <div id="update-modal-content"></div>
+    </div>
+  </div>
   <main>{% block body %}{% endblock %}</main>
   <footer class="app-footer">
     ControlFlow Control Plane · local authoring surface · created by
@@ -56,6 +66,44 @@
         var next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
         document.documentElement.setAttribute("data-theme", next);
         try { localStorage.setItem("cf-theme", next); } catch (e) {}
+      });
+    })();
+    (function () {
+      var modal = document.getElementById("update-modal");
+      var content = document.getElementById("update-modal-content");
+      var panel = modal ? modal.querySelector(".update-modal-panel") : null;
+      function closeUpdateModal() {
+        if (!modal || !content) return;
+        modal.hidden = true;
+        modal.setAttribute("aria-hidden", "true");
+        content.innerHTML = "";
+      }
+      function openUpdateModal() {
+        var template = document.getElementById("update-modal-template");
+        if (!modal || !content || !template) return;
+        content.innerHTML = template.innerHTML;
+        modal.hidden = false;
+        modal.setAttribute("aria-hidden", "false");
+        if (panel && panel.focus) {
+          panel.focus();
+        }
+      }
+      document.addEventListener("click", function (event) {
+        var openTrigger = event.target.closest("[data-update-modal-open]");
+        if (openTrigger) {
+          event.preventDefault();
+          openUpdateModal();
+          return;
+        }
+        if (event.target.closest("[data-update-modal-close]")) {
+          event.preventDefault();
+          closeUpdateModal();
+        }
+      });
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+          closeUpdateModal();
+        }
       });
     })();
     function refreshHeaderIndicator(method, path) {

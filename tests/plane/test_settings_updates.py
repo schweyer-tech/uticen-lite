@@ -56,7 +56,7 @@ def test_check_now_returns_result_partial(client, monkeypatch):
     assert "0.2.0" in resp.text
 
 
-def test_header_indicator_up_to_date_shows_hover_actions(client, monkeypatch):
+def test_header_indicator_up_to_date_shows_tooltip_and_modal_trigger(client, monkeypatch):
     conn = connect(client.app.state.project_root)
     repo.set_check_updates_on_launch(conn, True)
     conn.close()
@@ -72,14 +72,15 @@ def test_header_indicator_up_to_date_shows_hover_actions(client, monkeypatch):
     assert resp.status_code == 200
     assert "up-to-date" in resp.text
     assert "indicator-text" not in resp.text
-    assert "You are up to date." not in resp.text
-    assert 'hx-post="/updates/indicator/check"' in resp.text
-    assert 'hx-target="#header-update-indicator"' in resp.text
-    assert 'hx-post="/updates/indicator/check"' in resp.text
-    assert "Check now" in resp.text
+    assert 'title="Up to date: 0.1.0"' in resp.text
+    assert 'data-update-modal-open' in resp.text
+    assert 'update-popover' not in resp.text
+    assert "update-modal-template" in resp.text
+    assert 'hx-post="/updates/indicator/check"' not in resp.text
+    assert "Check now" not in resp.text
 
 
-def test_header_indicator_update_available_shows_update_now_action(client, monkeypatch):
+def test_header_indicator_update_available_shows_update_now_in_modal(client, monkeypatch):
     conn = connect(client.app.state.project_root)
     repo.set_check_updates_on_launch(conn, True)
     conn.close()
@@ -95,10 +96,11 @@ def test_header_indicator_update_available_shows_update_now_action(client, monke
     assert resp.status_code == 200
     assert "update-available" in resp.text
     assert "indicator-text" not in resp.text
-    assert "New version" not in resp.text
-    assert "aria-label=" in resp.text
-    assert 'hx-post="/updates/indicator/check"' in resp.text
-    assert 'hx-target="#header-update-indicator"' in resp.text
+    assert 'title="Update available: 0.2.0"' in resp.text
+    assert 'data-update-modal-open' in resp.text
+    assert 'update-popover' not in resp.text
+    assert "update-modal-template" in resp.text
+    assert 'hx-post="/updates/indicator/check"' not in resp.text
     assert 'hx-post="/upgrade"' in resp.text
     assert "Update now" in resp.text
 
@@ -108,6 +110,8 @@ def test_base_template_polls_header_indicator_every_two_minutes(client):
     assert page.status_code == 200
     assert "/updates/indicator/check" in page.text
     assert "120000" in page.text
+    assert "update-modal" in page.text
+    assert "update-modal-content" in page.text
 
 
 def test_refresh_indicator_skips_check_when_toggle_off(client, monkeypatch):
