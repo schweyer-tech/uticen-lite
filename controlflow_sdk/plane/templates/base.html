@@ -43,6 +43,13 @@
       </div>
     </div>
   </header>
+  <dialog id="update-modal" class="update-modal" aria-labelledby="update-modal-title">
+    <button type="button"
+            class="update-modal-close"
+            aria-label="Close update modal"
+            data-update-modal-close>×</button>
+    <div id="update-modal-content"></div>
+  </dialog>
   <main>{% block body %}{% endblock %}</main>
   <footer class="app-footer">
     ControlFlow Control Plane · local authoring surface · created by
@@ -56,6 +63,108 @@
         var next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
         document.documentElement.setAttribute("data-theme", next);
         try { localStorage.setItem("cf-theme", next); } catch (e) {}
+      });
+    })();
+    (function () {
+      var modal = document.getElementById("update-modal");
+      var content = document.getElementById("update-modal-content");
+      var lastTrigger = null;
+      function focusables() {
+        if (!modal) return [];
+        return Array.prototype.filter.call(
+          modal.querySelectorAll(
+            "[data-update-modal-close], .btn-primary, .btn-ghost, button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"
+          ),
+          function (el) {
+            return !el.disabled;
+          }
+        );
+      }
+      var restoreFocus = function () {
+        var trigger = lastTrigger && document.contains(lastTrigger)
+          ? lastTrigger
+          : document.querySelector("[data-update-modal-open]");
+        if (trigger && trigger.focus) {
+          trigger.focus();
+        }
+        lastTrigger = null;
+      };
+      function closeUpdateModal() {
+        if (!modal || !content) return;
+        if (modal.open) {
+          modal.close();
+          requestAnimationFrame(function () {
+            requestAnimationFrame(restoreFocus);
+          });
+        }
+      }
+      function openUpdateModal(trigger) {
+        var template = document.getElementById("update-modal-template");
+        if (!modal || !content || !template) return;
+        lastTrigger = trigger || document.activeElement;
+        content.innerHTML = template.innerHTML;
+        if (!modal.open && modal.showModal) {
+          modal.showModal();
+        }
+        var focusTarget = modal.querySelector(
+          "[data-update-modal-close], .btn-primary, button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"
+        );
+        if (focusTarget && focusTarget.focus) {
+          focusTarget.focus();
+        }
+      }
+      function trapFocus(event) {
+        if (!modal || !modal.open || event.key !== "Tab") return;
+        var items = focusables();
+        if (!items.length) return;
+        var first = items[0];
+        var last = items[items.length - 1];
+        var active = document.activeElement;
+        if (event.shiftKey && active === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && active === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+      document.addEventListener("click", function (event) {
+        var openTrigger = event.target.closest("[data-update-modal-open]");
+        if (openTrigger) {
+          event.preventDefault();
+          openUpdateModal(openTrigger);
+          return;
+        }
+        if (event.target.closest("[data-update-modal-close]")) {
+          event.preventDefault();
+          closeUpdateModal();
+        }
+      });
+      document.addEventListener("mousedown", function (event) {
+        if (event.target.closest("[data-update-modal-close]")) {
+          event.preventDefault();
+        }
+      });
+      modal.addEventListener("click", function (event) {
+        if (event.target === modal) {
+          closeUpdateModal();
+        }
+      });
+      modal.addEventListener("cancel", function (event) {
+        event.preventDefault();
+        closeUpdateModal();
+      });
+      modal.addEventListener("keydown", trapFocus);
+      document.addEventListener("focusin", function (event) {
+        if (!modal || !modal.open) return;
+        if (modal.contains(event.target)) return;
+        var items = focusables();
+        if (items.length) {
+          items[0].focus();
+        }
+      });
+      modal.addEventListener("close", function () {
+        content.innerHTML = "";
       });
     })();
     function refreshHeaderIndicator(method, path) {

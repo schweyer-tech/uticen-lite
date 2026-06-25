@@ -5,44 +5,48 @@
             class="update-indicator update-available"
             aria-label="Update available: {{ info.latest }}"
             title="Update available: {{ info.latest }}"
-            hx-post="/updates/indicator/check"
-            hx-target="#header-update-indicator"
-            hx-swap="outerHTML">
+            aria-controls="update-modal"
+            data-update-modal-open>
       <span class="indicator-dot"></span>
       <span class="sr-only">Update available: {{ info.latest }}</span>
     </button>
-    <div class="update-popover" role="menu" aria-label="Update actions">
-      <button class="btn btn-sm btn-primary"
-              hx-post="/upgrade" hx-target="body" hx-swap="innerHTML"
-              hx-confirm="This will close the app and upgrade controlflow-sdk. Continue?">
-        Update now
-      </button>
-      <button class="btn btn-sm btn-ghost"
-              hx-post="/updates/indicator/check"
-              hx-target="#header-update-indicator"
-              hx-swap="outerHTML">
-        Re-check
-      </button>
-    </div>
+    <template id="update-modal-template">
+      <div class="update-modal-body">
+        <h2 id="update-modal-title">Update available: {{ info.latest }}</h2>
+        <p class="lead">{{ info.message }}</p>
+        <div class="page-actions">
+          <button class="btn btn-sm btn-primary"
+                  hx-post="/upgrade" hx-target="body" hx-swap="innerHTML"
+                  hx-confirm="This will close the app and upgrade controlflow-sdk. Continue?">
+            Update now
+          </button>
+          <button type="button" class="btn btn-sm btn-ghost" data-update-modal-close>
+            Close
+          </button>
+        </div>
+      </div>
+    </template>
     {% else %}
     <button type="button"
             class="update-indicator up-to-date"
             aria-label="Up to date: {{ current_version }}"
-            title="Current version: {{ current_version }}"
-            hx-post="/updates/indicator/check"
-            hx-target="#header-update-indicator"
-            hx-swap="outerHTML">
+            title="Up to date: {{ current_version }}"
+            aria-controls="update-modal"
+            data-update-modal-open>
       <span class="indicator-dot"></span>
       <span class="sr-only">Up to date: {{ current_version }}</span>
     </button>
-    <div class="update-popover" role="menu" aria-label="Update actions">
-      <button class="btn btn-sm btn-ghost"
-              hx-post="/updates/indicator/check"
-              hx-target="#header-update-indicator"
-              hx-swap="outerHTML">
-        Check now
-      </button>
-    </div>
+    <template id="update-modal-template">
+      <div class="update-modal-body">
+        <h2 id="update-modal-title">Up to date: {{ current_version }}</h2>
+        <p class="lead">{{ info.message }}</p>
+        <div class="page-actions">
+          <button type="button" class="btn btn-sm btn-ghost" data-update-modal-close>
+            Close
+          </button>
+        </div>
+      </div>
+    </template>
     {% endif %}
   </div>
 {% endif %}

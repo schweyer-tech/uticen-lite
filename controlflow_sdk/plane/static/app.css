@@ -584,28 +584,53 @@ legend {
   display: inline-flex;
   align-items: center;
 }
-.update-popover {
+.update-modal {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  z-index: 60;
+}
+.update-modal::backdrop {
+  background: rgba(3, 7, 18, 0.65);
+}
+.update-modal[open] {
+  display: grid;
+  place-items: center;
+  inset: 0;
+  position: fixed;
+  padding: 24px;
+  width: 100vw;
+  max-width: none;
+  max-height: none;
+}
+.update-modal > #update-modal-content {
+  width: min(420px, 100%);
+  padding: 20px;
+  background: var(--bg-surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  position: relative;
+}
+.update-modal-close {
   position: absolute;
-  top: 100%;
-  right: 0;
-  display: none;
-  min-width: 220px;
-  padding: 10px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-input);
-  background: var(--bg-surface-2);
-  box-shadow: var(--shadow-elev-2);
-  z-index: 30;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 999px;
 }
-.update-popover .btn {
-  width: 100%;
+.update-modal-body {
+  display: grid;
+  gap: 12px;
+  padding-top: 8px;
 }
-.update-popover .btn + .btn {
-  margin-top: 8px;
+.update-modal-body .lead {
+  margin: 0;
 }
-.update-indicator-wrap:hover .update-popover,
-.update-indicator-wrap:focus-within .update-popover {
-  display: block;
+.update-modal-body .page-actions {
+  justify-content: flex-end;
 }
 .sr-only {
   position: absolute;
