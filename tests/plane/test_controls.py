@@ -112,7 +112,7 @@ def test_edit_control_moves_title_editing_to_header(client):
     assert page.status_code == 200
     assert 'class="control-title-edit"' in page.text
     assert 'action="/controls/HDRTITLE1/title"' in page.text
-    assert 'class="control-title-trigger"' in page.text
+    assert 'class="control-title-display"' in page.text
     assert 'class="control-title-pencil"' in page.text
     assert 'id="f-title"' not in page.text
 

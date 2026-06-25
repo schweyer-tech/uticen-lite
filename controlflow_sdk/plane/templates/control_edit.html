@@ -5,17 +5,19 @@
 <a class="crumb" href="/">← Controls</a>
 <div class="page-head">
   {% if control %}
-  <details class="control-title-edit">
-    <summary class="control-title-trigger" aria-label="Edit control title">
+  <div class="control-title-edit" data-control-id="{{ control.id }}">
+    <div class="control-title-display">
       <h1 class="control-title-text">{{ control.title }}</h1>
-      <span class="control-title-pencil" aria-hidden="true">✎</span>
-    </summary>
-    <form method="post" action="/controls/{{ control.id }}/title" class="control-title-edit-form">
-      <label for="f-title-inline">Control title</label>
+      <button class="control-title-pencil" aria-label="Edit control title" type="button"></button>
+    </div>
+    <form method="post" action="/controls/{{ control.id }}/title" class="control-title-edit-form" style="display: none;">
       <input id="f-title-inline" type="text" name="title" value="{{ control.title }}" required>
-      <button class="btn btn-primary btn-sm" type="submit">Save title</button>
+      <div class="control-title-form-actions">
+        <button class="btn btn-primary btn-sm" type="submit">Save</button>
+        <button class="btn btn-ghost btn-sm" type="button" data-cancel>Cancel</button>
+      </div>
     </form>
-  </details>
+  </div>
   {% else %}
   <h1>New control</h1>
   {% endif %}
@@ -125,4 +127,53 @@
     <a class="btn btn-ghost" href="/">Cancel</a>
   </div>
 </form>
+
+<script>
+(function() {
+  const editContainer = document.querySelector('.control-title-edit');
+  if (!editContainer) return;
+
+  const display = editContainer.querySelector('.control-title-display');
+  const form = editContainer.querySelector('.control-title-edit-form');
+  const button = editContainer.querySelector('.control-title-pencil');
+  const input = form.querySelector('input[name="title"]');
+  const cancelBtn = form.querySelector('[data-cancel]');
+
+  function showEdit() {
+    display.style.display = 'none';
+    form.style.display = 'inline-flex';
+    input.focus();
+    input.select();
+  }
+
+  function hideEdit() {
+    form.style.display = 'none';
+    display.style.display = 'inline-flex';
+  }
+
+  button.addEventListener('click', (e) => {
+    e.preventDefault();
+    showEdit();
+  });
+
+  cancelBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    input.value = display.querySelector('.control-title-text').textContent;
+    hideEdit();
+  });
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    form.submit();
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      input.value = display.querySelector('.control-title-text').textContent;
+      hideEdit();
+    }
+  });
+})();
+</script>
 {% endblock %}
