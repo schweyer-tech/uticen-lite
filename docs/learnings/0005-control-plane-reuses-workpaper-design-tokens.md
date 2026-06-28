@@ -46,6 +46,13 @@ the app *only because every color was already a CSS custom property* — light m
 - **The embedded workpaper stays as-is inside the app.** `run_view.html` embeds the workpaper via an
   `<iframe srcdoc>`; it is a fixed, self-contained artifact (the SDK's contract output) and keeps its
   own dark styling in both app themes. Do not try to re-theme the embedded workpaper from the app.
+- **To restyle ONE page's use of a shared structural class, add a modifier class — never mutate the
+  base class.** `.page-head` is included by ~20 `plane/` templates; making `.page-head` itself
+  `display:flex` to push one page's button to the right silently re-lays-out every other page. Scope
+  it: keep the base rule, add `<div class="page-head control-head">` and a `.control-head { display:
+  flex; ... }` rule that only that page carries (2026-06-27: the control-editor split header). Same
+  guard for `.card`, `.field`, `.btn` — grep the template tree for the class before changing its base
+  rule, and put per-page behavior on a modifier.
 
 ## Reference
 
