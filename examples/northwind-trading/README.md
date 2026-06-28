@@ -26,8 +26,11 @@ Eight production-ready audit controls span financial, IT access, and procurement
 | **mfa-enforcement** | IT Access | access_accounts | IA-2 | Active accounts without multi-factor authentication enabled | 0 ✓ |
 | **duplicate-payments** | Procurement | payments | — | Payments to the same vendor for the same amount within 5 days | 2 |
 | **vendor-master-sod** | Procurement | payments, vendor_master | AC-5 | Payments approved by the vendor master creator or last modifier | 2 |
+| **datacenter-temperature** | Facilities | datacenter_weather | PE-14 | Data-center sites running above the 27°C safe-operating ceiling | 2 |
 
 **Note:** `mfa-enforcement` is a passing control — all active accounts have MFA enabled. Its workpaper is included to demonstrate a clean audit result.
+
+**Public-API source:** `datacenter-temperature` is built on `datacenter_weather`, a source **snapshotted once from the public [Open-Meteo](https://open-meteo.com) API** (no API key) and frozen to `data/datacenter_weather.csv`. It demonstrates Uticen Lite's "fetch from URL" on-ramp — the local snapshot is the source of truth (one-time snapshot-to-file), so the test stays fully offline and deterministic. To reproduce the fetch in the app: **Sources → Add source → Fetch from URL** with an Open-Meteo `current=temperature_2m,wind_speed_10m` request.
 
 ## Run It Locally
 
@@ -69,8 +72,8 @@ Then in the app:
 4. Select `import-bundle.zip`
 
 The import lands:
-- **8 controls** with full metadata (title, objective, narrative, NIST framework refs)
-- **8 workpapers** — one per control, including the passing `mfa-enforcement`
+- **9 controls** with full metadata (title, objective, narrative, NIST framework refs)
+- **9 workpapers** — one per control, including the passing `mfa-enforcement`
 - **18 exceptions** — flagged violations across all controls (the 3 controls with 0 exceptions show passing results)
 - **Full provenance** — SHA256 hashes and row counts embedded in each workpaper
 

@@ -36,6 +36,7 @@ EXPECTED: dict[str, int] = {
     "IT.AC.3": 0,
     "Finance.AP.3": 2,
     "Finance.AP.2": 2,
+    "IT.ENV.1": 2,  # data-center temperature (public-API source): Singapore + Mumbai > 27°C
 }
 
 
@@ -75,7 +76,7 @@ def test_northwind_runs_and_builds(tmp_path: Path) -> None:
     )
 
     # Total exceptions across the population are unchanged at 18.
-    assert sum(by_control.values()) == 18, "Northwind seeded exception total drifted from 18"
+    assert sum(by_control.values()) == 20, "Northwind seeded exception total drifted from 20"
 
     # 2b. Threshold flips a failing control to PASS ----------------------------
     twm_html = (into / "target" / "workpapers" / "Finance.AP.1.html").read_text(encoding="utf-8")
@@ -98,9 +99,9 @@ def test_northwind_runs_and_builds(tmp_path: Path) -> None:
 
     errors = validate_bundle(manifest)
     assert errors == [], f"validate_bundle reported errors: {errors}"
-    assert len(manifest["controls"]) == 8, (
-        f"Expected 8 controls in manifest, got {len(manifest['controls'])}"
+    assert len(manifest["controls"]) == 9, (
+        f"Expected 9 controls in manifest, got {len(manifest['controls'])}"
     )
-    assert sum(len(c["runs"]) for c in manifest["controls"]) == 8, (
-        "Expected exactly 8 run entries across all controls in the bundle"
+    assert sum(len(c["runs"]) for c in manifest["controls"]) == 9, (
+        "Expected exactly 9 run entries across all controls in the bundle"
     )

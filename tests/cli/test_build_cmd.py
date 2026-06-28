@@ -46,7 +46,7 @@ def test_run_then_build_from_store(tmp_path: Path) -> None:
     assert build_cmd(argparse.Namespace(dir=str(root), out=str(out), at=FIXED_AT)) == 0
     manifest = read_bundle(out)
     assert manifest["schema_version"] == "1.0"
-    assert len(manifest["controls"]) == 8
+    assert len(manifest["controls"]) == 9
     # contract conformance is asserted by tests/test_contract_export.py against the schema
 
 
@@ -100,9 +100,9 @@ class TestBuildHappyPath:
         out_zip = tmp_path / "bundle.zip"
         main(["build", str(root), "--out", str(out_zip), "--at", FIXED_AT])
         out = capsys.readouterr().out
-        # Summary line: "  BUNDLE  <path>  8 controls / 8 runs"
-        assert "8 controls" in out
-        assert "8 runs" in out
+        # Summary line: "  BUNDLE  <path>  9 controls / 9 runs"
+        assert "9 controls" in out
+        assert "9 runs" in out
 
 
 # ---------------------------------------------------------------------------

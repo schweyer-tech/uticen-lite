@@ -63,8 +63,8 @@ def test_wheel_ships_bundled_demo(built_wheel: Path) -> None:
         for n in names
         if n.startswith(demo + "controls/") and n.endswith("control.yaml")
     ]
-    assert len(csvs) == 8
-    assert len(ctrls) == 8
+    assert len(csvs) == 9
+    assert len(ctrls) == 9
     assert demo + "cflow.yaml" in names
     assert demo + "sources.yaml" in names
 

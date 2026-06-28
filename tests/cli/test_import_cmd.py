@@ -14,8 +14,8 @@ def test_import_northwind(tmp_path: Path):
     conn = connect(into)
     controls = repo.list_controls(conn)
     sources = repo.list_sources(conn)
-    assert len(controls) == 8
-    assert len(sources) == 8
+    assert len(controls) == 9
+    assert len(sources) == 9
 
     # The demo is authored entirely no-code (sidecar rule.yaml / pipeline.yaml next
     # to control.yaml): it showcases the no-code rule builder and the visual

@@ -82,8 +82,8 @@ def test_post_setup_demo_loads_runnable_engagement(fresh_client: TestClient, tmp
 
     conn = connect(tmp_path)
     assert repo.get_project(conn)["name"]  # demo names the engagement
-    assert len(repo.list_controls(conn)) == 8
-    assert len(list((tmp_path / "data").glob("*.csv"))) == 8
+    assert len(repo.list_controls(conn)) == 9
+    assert len(list((tmp_path / "data").glob("*.csv"))) == 9
 
     # Dashboard now lists the demo controls and a run works.
     page = fresh_client.get("/")
