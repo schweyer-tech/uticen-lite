@@ -89,9 +89,16 @@ procedures:
     code: P1
     name: Independent Review (SoD)
     assertion: Segregation of duties
+    narrative: >-
+      Independent review (segregation of duties): every material manual journal entry
+      must be reviewed by someone other than its preparer. Flags entries a preparer
+      reviewed themselves.
     position: 0
   - id: p2
     code: P2
     name: Reviewer Assigned
     assertion: Authorization / approval evidence
+    narrative: >-
+      Authorization evidence: every material manual journal entry must have an
+      independent reviewer recorded. Flags entries with no reviewer assigned.
     position: 1

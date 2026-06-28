@@ -133,3 +133,14 @@ def test_northwind_runs_and_builds(tmp_path: Path) -> None:
     assert p2["result"]["failed"] == 1, (
         f"Finance.GL.1 P2: expected 1 failed, got {p2['result']['failed']}"
     )
+    # Each procedure carries its own authored narrative (shown in the procedure
+    # header + workpaper), distinct from the per-step node narratives.
+    assert p1["narrative"] == (
+        "Independent review (segregation of duties): every material manual journal "
+        "entry must be reviewed by someone other than its preparer. Flags entries a "
+        "preparer reviewed themselves."
+    ), p1["narrative"]
+    assert p2["narrative"] == (
+        "Authorization evidence: every material manual journal entry must have an "
+        "independent reviewer recorded. Flags entries with no reviewer assigned."
+    ), p2["narrative"]
