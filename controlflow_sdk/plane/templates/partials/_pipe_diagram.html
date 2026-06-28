@@ -19,6 +19,16 @@
 {% set lanes = diagram.lanes if diagram.lanes else 1 %}
 {% set width = (2 * pad) + (lanes * box_w) + ((lanes - 1) * lane_gap) %}
 {% set height = (diagram.rows * box_h) + ((diagram.rows - 1) * gap_y) + (2 * pad) %}
+{% if diagram.procedures %}
+<ul class="fc-legend" aria-label="Procedures">
+  {% for proc in diagram.procedures %}
+  <li class="fc-legend-item">
+    <span class="fc-legend-dot" style="background:{{ proc.color }}"></span>
+    <span class="fc-legend-label">{{ proc.code }} · {{ proc.name }}</span>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
 <svg viewBox="0 0 {{ width }} {{ height }}" role="img" aria-label="Pipeline flowchart">
   {% for edge in diagram.edges %}
     {% set fx = pad + (edge.from_lane * lane_pitch) + (box_w / 2) %}
@@ -43,7 +53,8 @@
        target="_blank" rel="noopener" style="cursor:pointer;">
     <g class="fc-box{% if box.terminal %} fc-terminal{% endif %}">
       {% if box.narrative %}<title>{{ box.narrative }}</title>{% endif %}
-      <rect x="{{ x }}" y="{{ y }}" width="{{ box_w }}" height="{{ box_h }}" rx="8" />
+      <rect x="{{ x }}" y="{{ y }}" width="{{ box_w }}" height="{{ box_h }}" rx="8"
+            style="{% if box.proc_color %}stroke:{{ box.proc_color }}{% endif %}" />
       <text x="{{ x + 12 }}" y="{{ y + 20 }}">{{ box.label }}</text>
       <text class="fc-count" x="{{ x + 12 }}" y="{{ y + 37 }}">{{ box.id }} · rows: {% if box.count is not none %}{{ "{:,}".format(box.count) }}{% else %}—{% endif %}</text>
       {% if box.narrative %}<text class="fc-narr" x="{{ x + 12 }}" y="{{ y + 56 }}">{{ box.narrative | truncate(34, True, '…', 0) }}</text>{% endif %}

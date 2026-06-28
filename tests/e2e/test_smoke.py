@@ -166,12 +166,37 @@ def test_author_run_export_smoke(page: Page, live_server: str, tmp_path: Path) -
     row1.locator("[data-cond-col]").select_option("can_create")
     row1.locator("[data-cond-op]").select_option("not_empty")
 
+    # --- Step 3b: Procedures panel. Click "＋ Add procedure" (#proc-add) to append
+    #              a panel row; the JS injects its <option> into the Test card's
+    #              "Procedure ▾" select immediately (no server round-trip, so the
+    #              filled condition rows above are untouched). Fill the row and
+    #              select it as the Test's owning procedure. serializeProcedures()
+    #              runs inside serialize() on Save, so it rides along with the POST.
+    page.click("#proc-add")
+    new_row = page.locator("#proc-list [data-proc-row]").last
+    pid = new_row.get_attribute("data-proc-id")
+    assert pid
+    new_row.locator("[data-proc-code]").fill("P1")
+    new_row.locator("[data-proc-name]").fill("Manual JE Review")
+    new_row.locator("[data-proc-assert]").fill("Segregation of Duties")
+    page.locator('[data-node="tst"] [data-procedure]').select_option(pid)
+
     # --- Step 4: save the final pipeline. The form's submit listener calls
-    #             serialize() which reads both [data-cond] rows and the fixed
-    #             fields, writes #pipeline-json, and POSTs to the builder endpoint.
-    #             On success: 303-redirect back to the Builder GET. ---
+    #             serialize() (which reads both [data-cond] rows, the fixed fields,
+    #             the Test's procedure_id, AND the Procedures panel rows), writes
+    #             #pipeline-json, and POSTs to the builder endpoint. On success:
+    #             303-redirect back to the Builder GET. ---
     page.click("button:has-text('Save pipeline')")
     expect(page).to_have_url(base + "/controls/sod/logic/builder")
+
+    # --- Step 3c: reload the Builder and assert the procedure round-tripped: the
+    #              panel row re-hydrates with its name, and the Test's "Procedure ▾"
+    #              still selects the procedure we created (effective-owner preselect). ---
+    page.goto(base + "/controls/sod/logic/builder")
+    expect(
+        page.locator(f'[data-proc-row][data-proc-id="{pid}"] [data-proc-name]')
+    ).to_have_value("Manual JE Review")
+    expect(page.locator('[data-node="tst"] [data-procedure]')).to_have_value(pid)
 
     # 4. Run it. The run button lives on the dashboard as a row-scoped
     #    <form action="/controls/sod/run"> with a "Run" submit button.

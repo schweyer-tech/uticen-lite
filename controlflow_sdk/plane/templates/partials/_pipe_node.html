@@ -124,6 +124,23 @@
              placeholder="Procedure title (optional)"
              value="{{ node.config.get('title', '') }}">
     </div>
+    {# Procedure ▾ — which audit procedure owns this Test. Pre-selects the node's
+       EFFECTIVE owner (selected_procedure_for) so a legacy/auto-derived control
+       round-trips on save instead of resetting to "unassigned". #}
+    {% if procedures is defined %}
+    <div class="pipe-row">
+      <label>Procedure</label>
+      <select data-procedure>
+        <option value="">— unassigned —</option>
+        {% for p in procedures %}
+        <option value="{{ p.id }}" {% if selected_procedure_for.get(node.id) == p.id %}selected{% endif %}>{{ p.code }} · {{ p.name }}</option>
+        {% endfor %}
+      </select>
+      {% for chip in node_procedures.get(node.id, []) %}
+      <span class="proc-chip" style="border-color:{{ chip.color }}">{{ chip.code }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
     <div class="pipe-row">
       <label>Threshold %</label>
       <input type="text" data-threshold-pct style="width:80px;"
@@ -208,6 +225,16 @@
       <button type="button" class="btn btn-sm btn-ghost pipe-expand" title="Expand to edit"
               onclick="openFieldModal(this, 'narrative')">⤢</button>
     </div>
+
+    {# Support steps (Import/Filter/Join/Custom) show the derived procedure chips
+       read-only — they belong to the union of procedures their terminals own. #}
+    {% if node.type != 'test' and node_procedures is defined and node_procedures.get(node.id) %}
+    <div class="pipe-row pipe-chips">
+      {% for chip in node_procedures.get(node.id, []) %}
+      <span class="proc-chip" style="border-color:{{ chip.color }}">{{ chip.code }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
 
     {% if node.errors %}
     <div class="node-err-msg">{% for e in node.errors %}{{ e }}{% if not loop.last %}<br>{% endif %}{% endfor %}</div>

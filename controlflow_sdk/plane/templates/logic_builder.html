@@ -164,6 +164,9 @@
   </div>
 </div>
 {% else %}
+<div class="card">
+  {% include "partials/_procedures_panel.html" %}
+</div>
 <form method="post" action="/controls/{{ control_id }}/logic/builder" id="pipeline-form">
   <input type="hidden" name="pipeline_json" id="pipeline-json" value="">
 
@@ -237,6 +240,7 @@
         }
         if (type === 'filter' || type === 'test') {
           if (type === 'test') {
+            node.config.procedure_id = (card.querySelector('[data-procedure]') || {}).value || null;
             node.config.severity = (card.querySelector('[data-severity]') || {}).value || 'medium';
             node.config.description_template = (card.querySelector('[data-desc]') || {}).value || '';
             node.config.item_key_column = (card.querySelector('[data-itemkey]') || {}).value || null;
@@ -293,6 +297,99 @@
         nodes.push(node);
       });
       graph.nodes = nodes;
+      serializeProcedures();  // read the Procedures panel into graph.procedures too
+    }
+
+    // Read every Procedures-panel row into graph.procedures. The panel lives
+    // OUTSIDE #pipe-cards so it survives the HTMX cards-swap; reading it on every
+    // serialize() keeps procedure edits riding along with each save/autosave.
+    function serializeProcedures() {
+      var rows = document.querySelectorAll('[data-proc-row]');
+      graph.procedures = Array.prototype.map.call(rows, function (row, i) {
+        var pct = (row.querySelector('[data-proc-pct]') || {}).value || '';
+        var cnt = (row.querySelector('[data-proc-count]') || {}).value || '';
+        return {
+          id: row.getAttribute('data-proc-id'),
+          code: (row.querySelector('[data-proc-code]') || {}).value || ('P' + (i + 1)),
+          name: (row.querySelector('[data-proc-name]') || {}).value || '',
+          assertion: (row.querySelector('[data-proc-assert]') || {}).value || '',
+          failure_threshold_pct: pct === '' ? null : Number(pct),
+          failure_threshold_count: cnt === '' ? null : Number(cnt),
+          position: i
+        };
+      });
+    }
+
+    // ── Procedures panel: add / remove rows + keep every Test's Procedure ▾ in
+    // sync. A new procedure is selectable on the Test cards immediately (we inject
+    // its <option> into each [data-procedure]) — no server round-trip needed; the
+    // mapping is persisted when the author clicks Save (serializeProcedures()).
+    function procOptionLabel(code, name) {
+      return (code || '') + ' · ' + (name || '');
+    }
+    function addProcedureOption(pid, code, name) {
+      document.querySelectorAll('[data-procedure]').forEach(function (sel) {
+        if (sel.querySelector('option[value="' + pid + '"]')) { return; }
+        var opt = document.createElement('option');
+        opt.value = pid;
+        opt.textContent = procOptionLabel(code, name);
+        sel.appendChild(opt);
+      });
+    }
+    function updateProcedureOption(pid, code, name) {
+      document.querySelectorAll('[data-procedure] option[value="' + pid + '"]')
+        .forEach(function (opt) { opt.textContent = procOptionLabel(code, name); });
+    }
+    function removeProcedureOption(pid) {
+      document.querySelectorAll('[data-procedure] option[value="' + pid + '"]')
+        .forEach(function (opt) { opt.parentNode.removeChild(opt); });
+    }
+    function newProcedureRow(pid, code) {
+      var row = document.createElement('div');
+      row.className = 'proc-row';
+      row.setAttribute('data-proc-row', '');
+      row.setAttribute('data-proc-id', pid);
+      row.innerHTML =
+        '<span class="proc-dot"></span>' +
+        '<input class="proc-in" data-proc-code style="width:54px" aria-label="Code">' +
+        '<input class="proc-in" data-proc-name placeholder="Name" style="flex:1;min-width:160px" aria-label="Name">' +
+        '<input class="proc-in" data-proc-assert placeholder="Assertion / category" style="flex:1;min-width:160px" aria-label="Assertion">' +
+        '<input class="proc-in" data-proc-pct placeholder="thr %" style="width:64px" aria-label="Threshold percent">' +
+        '<input class="proc-in" data-proc-count placeholder="count" style="width:64px" aria-label="Threshold count">' +
+        '<button type="button" class="btn btn-sm btn-ghost" data-proc-del aria-label="Remove procedure">✕</button>';
+      row.querySelector('[data-proc-code]').value = code;
+      return row;
+    }
+    var procList = document.getElementById('proc-list');
+    var procAdd = document.getElementById('proc-add');
+    if (procAdd && procList) {
+      procAdd.addEventListener('click', function () {
+        var pid = 'p_' + Math.random().toString(36).slice(2, 8);
+        var n = procList.querySelectorAll('[data-proc-row]').length + 1;
+        var code = 'P' + n;
+        procList.appendChild(newProcedureRow(pid, code));
+        addProcedureOption(pid, code, '');
+      });
+      // Delete + live label sync are delegated so server- and JS-rendered rows
+      // both work (and survive across re-renders of the rows).
+      procList.addEventListener('click', function (e) {
+        var del = e.target.closest('[data-proc-del]');
+        if (!del) { return; }
+        var row = del.closest('[data-proc-row]');
+        if (!row) { return; }
+        removeProcedureOption(row.getAttribute('data-proc-id'));
+        row.parentNode.removeChild(row);
+      });
+      procList.addEventListener('input', function (e) {
+        if (!e.target.matches('[data-proc-code], [data-proc-name]')) { return; }
+        var row = e.target.closest('[data-proc-row]');
+        if (!row) { return; }
+        updateProcedureOption(
+          row.getAttribute('data-proc-id'),
+          (row.querySelector('[data-proc-code]') || {}).value || '',
+          (row.querySelector('[data-proc-name]') || {}).value || ''
+        );
+      });
     }
 
     // ── autosave: post the graph and swap only #pipe-cards ───────────────
