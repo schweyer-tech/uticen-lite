@@ -59,7 +59,7 @@ def test_rejects_missing_terminal_test():
              "config": {"logic": "all", "conditions": []}},
         ]
     }
-    with pytest.raises(PipelineError, match="endpoint|terminal"):
+    with pytest.raises(PipelineError, match="feeds nothing|terminal"):
         parse_pipeline(raw)
 
 
@@ -88,7 +88,7 @@ def test_pipeline_rejects_non_test_sink():
         {"id": "tst", "type": "test", "inputs": ["imp"],
          "config": {"logic": "all", "conditions": [{"column": "x", "op": "is_empty"}]}},
     ]}  # flt is a dangling non-test sink
-    with pytest.raises(PipelineError, match="endpoint"):
+    with pytest.raises(PipelineError, match="feeds nothing"):
         parse_pipeline(graph)
 
 

@@ -227,9 +227,11 @@ def _validate_terminal(nodes: list[Node]) -> None:
     sinks = [n for n in nodes if n.id not in consumed]
     non_terminal = [s for s in sinks if not _is_terminal(s)]
     if non_terminal:
+        # Prefix with ``node '<id>': `` so the editor pins this on the offending
+        # card (red), not just a top banner (_node_errors_from; 2026-06-27 review).
         raise PipelineError(
-            "every pipeline endpoint must be a Test (or a custom_python test-flavor) "
-            f"node; node {non_terminal[0].id!r} feeds nothing and is not a Test"
+            f"node {non_terminal[0].id!r}: must end in a Test (or a custom_python "
+            "test-flavor) node — it feeds nothing and is not a Test"
         )
     if not any(_is_terminal(s) for s in sinks):
         raise PipelineError("a pipeline needs at least one terminal Test node")
