@@ -194,14 +194,19 @@
       <label>Code</label>
       <textarea data-code rows="6" style="flex:1;min-width:320px;font-family:var(--font-mono);font-size:12px;"
                 placeholder="# only `rows` is in scope — no file/source access">{{ node.config.get('code', '') }}</textarea>
+      <button type="button" class="btn btn-sm btn-ghost pipe-expand"
+              title="Expand with syntax highlighting" onclick="openFieldModal(this, 'code')">⤢</button>
     </div>
     {% endif %}
 
-    {# Narrative (why this step exists) — workpaper metadata. #}
-    <div class="pipe-row">
+    {# Narrative (why this step exists) — workpaper metadata. Wraps + expands;
+       pop out to a modal for the full text. 2026-06-27 review. #}
+    <div class="pipe-row pipe-row-field">
       <label>Narrative</label>
-      <input type="text" data-narrative style="flex:1;min-width:240px;"
-             placeholder="Why this step exists" value="{{ node.narrative }}">
+      <textarea data-narrative class="pipe-textarea" rows="2"
+                placeholder="Why this step exists">{{ node.narrative }}</textarea>
+      <button type="button" class="btn btn-sm btn-ghost pipe-expand" title="Expand to edit"
+              onclick="openFieldModal(this, 'narrative')">⤢</button>
     </div>
 
     {% if node.errors %}
