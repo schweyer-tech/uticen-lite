@@ -295,7 +295,8 @@
         var cnt = (head.querySelector('[data-proc-count]') || {}).value || '';
         return {
           id: head.getAttribute('data-proc-id'),
-          code: (head.querySelector('[data-proc-code]') || {}).value || ('P' + (i + 1)),
+          code: (head.querySelector('[data-proc-code]') || {}).value
+                 || (heads.length > 1 ? 'P' + (i + 1) : ''),
           name: (head.querySelector('[data-proc-name]') || {}).value || '',
           assertion: (head.querySelector('[data-proc-assert]') || {}).value || '',
           narrative: (head.querySelector('[data-proc-narrative]') || {}).value || '',

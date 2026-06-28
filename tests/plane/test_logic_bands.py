@@ -157,6 +157,36 @@ def test_card_bands_proc_carries_narrative():
     assert bands["procedures"][0]["proc"]["narrative"] == "Why we test this"
 
 
+def test_procedure_context_sole_procedure_code_empty():
+    """A single auto-derived procedure shows an EMPTY code so the workpaper heading
+    stays the legacy 'P1: title' form (learning 0036) — not 'P1'."""
+    pipe = parse_pipeline({
+        "nodes": [
+            {"id": "src", "type": "import", "source_id": "s"},
+            {"id": "t1", "type": "test", "inputs": ["src"],
+             "config": {"conditions": [{"column": "a", "op": "not_empty"}]}},
+        ],
+    })
+    ctx = _procedure_context(pipe)
+    assert len(ctx["procedures"]) == 1
+    assert ctx["procedures"][0]["code"] == ""
+
+
+def test_procedure_context_multi_procedure_codes_numbered():
+    """With 2+ procedures, auto codes are P1..Pn by position."""
+    pipe = parse_pipeline({
+        "nodes": [
+            {"id": "src", "type": "import", "source_id": "s"},
+            {"id": "t1", "type": "test", "inputs": ["src"],
+             "config": {"conditions": [{"column": "a", "op": "not_empty"}]}},
+            {"id": "t2", "type": "test", "inputs": ["src"],
+             "config": {"conditions": [{"column": "a", "op": "not_empty"}]}},
+        ],
+    })
+    ctx = _procedure_context(pipe)
+    assert [p["code"] for p in ctx["procedures"]] == ["P1", "P2"]
+
+
 def test_builder_get_renders_procedure_narrative_field(client):
     """The procedure section header exposes an editable narrative field, pre-filled
     from the procedure's narrative."""

@@ -698,7 +698,7 @@ def _procedure_context(pipeline: Pipeline | None) -> dict[str, Any]:
         procedures = [
             {
                 "id": p.id,
-                "code": p.code or f"P{i + 1}",
+                "code": p.code or (f"P{i + 1}" if len(eff) > 1 else ""),
                 "name": p.name,
                 "assertion": p.assertion,
                 "narrative": p.narrative,
