@@ -77,6 +77,10 @@
         "failure_threshold_count": {
           "type": ["integer", "null"],
           "minimum": 0
+        },
+        "rationale": {
+          "type": ["string", "null"],
+          "description": "Optional author prose justifying the chosen tolerance. Render + store only; never serialized into the export bundle."
         }
       },
       "additionalProperties": false

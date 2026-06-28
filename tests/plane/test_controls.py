@@ -403,3 +403,39 @@ def test_definition_existing_control_enables_source_autosave(client):
     page = client.get("/controls/AUTOSAVE1")
     assert page.status_code == 200
     assert "data-source-autosave-form" in page.text
+
+
+def test_threshold_rationale_persists_and_renders(client):
+    _make_source(client, "tr_src")
+    client.post("/controls", data={
+        "id": "TR1", "title": "Threshold rationale", "objective": "o", "narrative": "n",
+        "source_ids": ["tr_src"],
+        "failure_threshold_count": "2",
+        "failure_threshold_rationale": "Up to 2 exceptions is immaterial for this account.",
+    }, follow_redirects=False)
+
+    stored = _get_control(client, "TR1")
+    assert stored["failure_threshold_rationale"] == \
+        "Up to 2 exceptions is immaterial for this account."
+
+    page = client.get("/controls/TR1")
+    assert "Threshold rationale" in page.text            # the field label
+    assert "immaterial for this account" in page.text    # the saved value renders
+
+
+def test_threshold_rationale_survives_title_edit(client):
+    """Regression (learning 0023): a title-only update must not NULL the rationale."""
+    _make_source(client, "tr_src2")
+    client.post("/controls", data={
+        "id": "TR2", "title": "Before", "objective": "o", "narrative": "n",
+        "source_ids": ["tr_src2"],
+        "failure_threshold_rationale": "Documented tolerance.",
+    }, follow_redirects=False)
+    assert _get_control(client, "TR2")["failure_threshold_rationale"] == "Documented tolerance."
+
+    # The header pencil posts only the title through a separate handler.
+    client.post("/controls/TR2/title", data={"title": "After"}, follow_redirects=False)
+
+    updated = _get_control(client, "TR2")
+    assert updated["title"] == "After"
+    assert updated["failure_threshold_rationale"] == "Documented tolerance."  # not nulled

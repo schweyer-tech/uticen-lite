@@ -77,6 +77,7 @@ def load_project_from_store(conn: sqlite3.Connection) -> Project:
                 threshold=Threshold(
                     failure_threshold_pct=c["failure_threshold_pct"],
                     failure_threshold_count=c["failure_threshold_count"],
+                    rationale=c["failure_threshold_rationale"],
                 ),
             )
         )

@@ -28,10 +28,16 @@ class Threshold:
     **AND** the exception count is ``<= failure_threshold_count`` (each ignored
     when ``None``).  When **both** are ``None`` the implicit threshold is ``0``
     (any exception is a deficiency) — preserving the SDK's original behaviour.
+
+    ``rationale`` is optional author prose explaining *why* the tolerance was set
+    where it is (audit justification). Like the thresholds themselves it is a
+    render + store concern and is **never** serialized into the export bundle
+    (learning 0015).
     """
 
     failure_threshold_pct: float | None = None
     failure_threshold_count: int | None = None
+    rationale: str | None = None
 
     @property
     def is_implicit_zero(self) -> bool:
@@ -64,7 +70,14 @@ class Threshold:
             if count < 0:
                 raise ValueError("failure_threshold_count must be >= 0")
 
-        return cls(failure_threshold_pct=pct, failure_threshold_count=count)
+        rationale_raw = raw.get("rationale")
+        rationale = str(rationale_raw).strip() or None if rationale_raw is not None else None
+
+        return cls(
+            failure_threshold_pct=pct,
+            failure_threshold_count=count,
+            rationale=rationale,
+        )
 
     def passes(self, exception_count: int, records_tested: int) -> bool:
         """Return True when *exception_count* satisfies this threshold.
@@ -91,6 +104,7 @@ class Threshold:
         return {
             "failure_threshold_pct": self.failure_threshold_pct,
             "failure_threshold_count": self.failure_threshold_count,
+            "rationale": self.rationale,
         }
 
 

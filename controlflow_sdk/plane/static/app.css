@@ -160,18 +160,23 @@ main { max-width: 1120px; margin: 0 auto; padding: 28px 24px 64px; }
   align-items: center;
   gap: 8px;
 }
-.control-title-edit-form input {
+/* type="text" needed so this out-specifies the later base `input[type="text"]`
+   rule (equal specificity → source order would otherwise shrink it to 13px). */
+.control-title-edit-form input[type="text"] {
   margin: 0;
   flex: 1;
   min-width: 320px;
   max-width: 640px;
-  /* Match the <h1> so it reads as editing the title in place. */
+  /* Match the <h1> exactly so it reads as editing the title in place. */
   font-family: var(--font-sans);
   font-size: 24px;
   line-height: 32px;
   font-weight: 600;
   color: var(--text-primary);
-  padding: 2px 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-input);
+  padding: 1px 8px;
 }
 .control-title-form-actions {
   display: inline-flex;
@@ -292,13 +297,26 @@ legend {
   cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px;
 }
 .source-chip .chip-remove:hover { color: var(--status-critical); }
-/* Searchable single-select combobox: a dropdown that opens to the full source
-   list when the ▾ arrow is clicked (or the field is focused) and narrows as
-   the analyst types. */
-.source-combobox { position: relative; max-width: 380px; }
-.source-search { width: 100%; margin: 0; padding-right: 32px; }
+/* Searchable single-select combobox: the text field and the ▾ arrow share one
+   bordered shell so they read as a single select-style control. Opens to the
+   full source list on click/focus and narrows as the analyst types. */
+.source-combobox {
+  position: relative; max-width: 380px;
+  display: flex; align-items: stretch;
+  background: var(--bg-input);
+  border: 1px solid var(--border-default); border-radius: var(--radius-input);
+}
+.source-combobox:focus-within {
+  border-color: var(--accent-primary); box-shadow: 0 0 0 3px var(--accent-muted);
+}
+/* Strip the field's own box so it sits flush inside the shared shell. */
+.source-combobox .source-search {
+  flex: 1 1 auto; min-width: 0; margin: 0; max-width: none;
+  border: none; border-radius: 0; background: transparent;
+}
+.source-combobox .source-search:focus { outline: none; box-shadow: none; }
 .source-combobox-toggle {
-  position: absolute; top: 0; right: 0; bottom: 0; width: 30px;
+  flex: 0 0 auto; width: 32px;
   display: flex; align-items: center; justify-content: center;
   padding: 0; border: none; border-radius: 0; background: transparent;
   color: var(--text-secondary); font-size: 11px; cursor: pointer;
