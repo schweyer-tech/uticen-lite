@@ -299,20 +299,14 @@ def test_builder_collapse_and_section_insert(page: Page, live_server: str) -> No
     # ── Step 4b: collapse by clicking proc-dot (sits outside .proc-head) ─────
     # Clicking .proc-dot IS inside <summary> but NOT inside .proc-head, so the
     # JS handler does not call e.preventDefault() and the <details> toggles.
+    ls_key = f"cflow.logic.collapse.coltest.{pid}"
     section.locator(".proc-dot").click()
     # not_to_have_attribute requires a value: checks the attribute does NOT have
     # the value "" (i.e. the boolean `open` attribute is absent after collapse).
     expect(section).not_to_have_attribute("open", "")
-    # Verify the toggle event handler wrote to localStorage (belt-and-suspenders:
-    # if the toggle event didn't fire in headless Chrome, write the value
-    # explicitly so the reload assertion remains a meaningful test of
-    # restoreCollapse() — the primary contract being checked here).
-    ls_key = f"cflow.logic.collapse.coltest.{pid}"
-    ls_val = page.evaluate(f"window.localStorage.getItem({json.dumps(ls_key)})")
-    if ls_val != "closed":
-        page.evaluate(
-            f"window.localStorage.setItem({json.dumps(ls_key)}, 'closed')"
-        )
+    page.wait_for_function(
+        "key => window.localStorage.getItem(key) === 'closed'", arg=ls_key,
+    )  # verifies the app's toggle-listener WRITE; fails loudly if it regresses
 
     # ── Step 4c: reload — localStorage persists the collapsed state ──────────
     # restoreCollapse() runs synchronously on page load (inline <script> IIFE)
@@ -331,7 +325,7 @@ def test_builder_collapse_and_section_insert(page: Page, live_server: str) -> No
     # insertStep wires the new node with inputs=['tst'], procedure_id='p1'.
     end_zone = section.locator(".pipe-insert").last
     end_zone.locator("[data-insert-toggle]").click()
-    end_zone.locator('[data-insert][data-type="test"]').click()
+    end_zone.locator('[data-insert][data-type="test"][data-proc]').click()
     page.wait_for_load_state("networkidle")
 
     # After the autosave DOM swap the section has 2 Test nodes.
