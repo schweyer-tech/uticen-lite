@@ -24,9 +24,10 @@ def test_existing_control_renders_chips_and_picker(client):
     page = client.get("/controls/c1")
     assert page.status_code == 200
     assert 'id="bound-sources"' in page.text
-    # a searchable single-select combobox, not an always-open list of every source
+    # a searchable single-select combobox with a ▾ arrow to reveal every source
     assert "source-combobox" in page.text
-    assert 'class="source-results" hidden' in page.text   # collapsed until you search
+    assert "source-combobox-toggle" in page.text          # click the arrow to open the list
+    assert 'id="source-results-list" hidden' in page.text  # collapsed until you open/search
     # the bound source shows as a chip; the unbound one is a pick option
     assert "source-chip" in page.text
     # the old auto-submitting checkbox behaviour is gone for existing controls

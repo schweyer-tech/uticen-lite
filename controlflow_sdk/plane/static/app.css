@@ -292,10 +292,18 @@ legend {
   cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px;
 }
 .source-chip .chip-remove:hover { color: var(--status-critical); }
-/* Searchable single-select combobox: the results panel is a dropdown that
-   stays collapsed until the analyst types (no long dump of every source). */
+/* Searchable single-select combobox: a dropdown that opens to the full source
+   list when the ▾ arrow is clicked (or the field is focused) and narrows as
+   the analyst types. */
 .source-combobox { position: relative; max-width: 380px; }
-.source-search { width: 100%; margin: 0; }
+.source-search { width: 100%; margin: 0; padding-right: 32px; }
+.source-combobox-toggle {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 30px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0; border: none; border-radius: 0; background: transparent;
+  color: var(--text-secondary); font-size: 11px; cursor: pointer;
+}
+.source-combobox-toggle:hover { background: transparent; color: var(--text-primary); }
 .source-results {
   position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 20;
   list-style: none; margin: 0; padding: 4px; max-height: 240px; overflow-y: auto;

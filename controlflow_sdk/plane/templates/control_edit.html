@@ -123,10 +123,16 @@
 </form>
 
 <script>
-// Searchable single-select data-source combobox. The results panel stays
-// collapsed until the analyst types — never a long dump of every source.
+// Searchable single-select data-source combobox. Clicking the ▾ arrow (or
+// focusing the field) opens the full list of sources; typing then narrows it.
 // Page-level so it survives HTMX fragment swaps (inline handlers re-bind).
-// 2026-06-27 review.
+// 2026-06-28 review.
+function setSourceResultsOpen(box, open) {
+  const results = box.querySelector('.source-results');
+  const input = box.querySelector('.source-search');
+  if (results) results.hidden = !open;
+  if (input) input.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
 function filterSourceOptions(input) {
   const q = (input.value || '').trim().toLowerCase();
   const box = input.closest('.source-combobox');
@@ -136,24 +142,33 @@ function filterSourceOptions(input) {
   let shown = 0;
   results.querySelectorAll('.source-option-row').forEach(function(row) {
     const label = row.getAttribute('data-label') || '';
-    const match = q !== '' && label.indexOf(q) !== -1;
+    // Empty query shows every source; typing narrows to matches.
+    const match = q === '' || label.indexOf(q) !== -1;
     row.style.display = match ? '' : 'none';
     if (match) shown++;
   });
   const empty = results.querySelector('.source-no-match');
-  if (empty) empty.style.display = (q !== '' && shown === 0) ? '' : 'none';
-  const open = q !== '';
-  results.hidden = !open;
-  input.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (empty) empty.style.display = shown === 0 ? '' : 'none';
+  setSourceResultsOpen(box, true);
+}
+// The ▾ arrow toggles the list: open it (showing all) when closed, else collapse.
+function toggleSourceResults(button) {
+  const box = button.closest('.source-combobox');
+  if (!box) return;
+  const results = box.querySelector('.source-results');
+  if (results && !results.hidden) {
+    setSourceResultsOpen(box, false);
+  } else {
+    const input = box.querySelector('.source-search');
+    if (input) input.focus();
+    if (input) filterSourceOptions(input);
+  }
 }
 // Close on blur, but after a beat so a click on an option still registers.
 function closeSourceResults(input) {
   setTimeout(function() {
     const box = input.closest('.source-combobox');
-    if (!box) return;
-    const results = box.querySelector('.source-results');
-    if (results) results.hidden = true;
-    input.setAttribute('aria-expanded', 'false');
+    if (box) setSourceResultsOpen(box, false);
   }, 150);
 }
 (function() {
