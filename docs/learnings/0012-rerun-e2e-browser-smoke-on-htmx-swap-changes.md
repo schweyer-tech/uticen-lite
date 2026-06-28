@@ -49,6 +49,18 @@ broke a multi-procedure heading regex — both were **stale-test fixes**, not bu
 new value is the correct one, then update the expectation; never edit an assertion whose new
 value looks wrong — [[0035]].)
 
+**Corollary — a removed/renamed DOM hook fans out to e2e suites your per-task gate SKIPS.**
+The browser e2e tests are marked `-m browser`, so the default `pytest -q` AND a per-task gate
+scoped to one suite (e.g. `tests/plane`) both **deselect** them — a change that removes or
+renames a `data-*` attribute an e2e asserts on passes its own task gate while silently breaking
+a browser test in another file. Before trusting such a change, `grep -rn` the **whole `tests/`
+tree** (incl. `tests/e2e`) for the old attribute and run `pytest tests/e2e -m browser`.
+(2026-06-28: removing `data-proc-title` / `data-threshold-pct` / `data-threshold-count` from the
+Test node card broke `tests/e2e/test_multi_procedure.py`, invisible to the task's `tests/plane`
+gate; it surfaced only when the e2e task ran later — migrate the dropped assertion to the
+attribute's new home, don't just delete it.) DOM-hook member of the fan-out-audit family
+([[0031]] count literals, [[0014]] singular accessors, [[0038]] render sites).
+
 ## Reference
 
 - `tests/e2e/test_smoke.py` — the browser gate (issue #13).

@@ -39,11 +39,27 @@ single-procedure assemble path hardcodes `code=""`.
   render disagree with the exported bundle — pin it with a test asserting the sole item's
   label is empty AND the single-item render uses the legacy (no-prefix) form.
 
+**Corollary — enforce the sole-empty rule at the AUTHORING surface too, not only at
+render/bundle.** When a Builder/editor renders a per-item HEADER for a grouping whose count can
+be 1 or N, the **display pre-fill default** AND the **client serialize default** must each keep
+a sole auto-item's label empty, and the two must AGREE. A header that pre-fills the lone item's
+code as `"P1"` (e.g. `code = p.code or f"P{i+1}"`) and a serializer that defaults an empty code
+to `"P{i+1}"` will, on the first open-and-save, **promote** the single-item control to an
+explicit `code="P1"` — flipping its workpaper heading and re-introducing the exact local-vs-bundle
+divergence the render-layer rule prevents (the render guard alone is not enough once an authoring
+surface can write the label). Make both defaults conditional on `count > 1` (2026-06-28: fixed
+`_procedure_context`'s display default and `serializeProcedures()`'s persist default together;
+pinned with a view-model test asserting a sole procedure's `code == ""` and a 2+ set is
+`P1..Pn`). Author-typed labels are always preserved at any count.
+
 ## Reference
 
 - `controlflow_sdk/pipeline/procedures.py` — `_auto_procedure` / `effective_procedures`
   (the `lone` branch that forces `code=""`).
 - `controlflow_sdk/render/html.py` — `_emit_procedures` (`if proc.code:` heading branch);
   `controlflow_sdk/bundle/assemble.py` — single-procedure path (`code=""`).
+- `controlflow_sdk/plane/routes/pipeline.py` `_procedure_context` (display default) +
+  `controlflow_sdk/plane/templates/logic_builder.html` `serializeProcedures()` (persist
+  default) — the two authoring-surface defaults that must agree (the 2026-06-28 corollary).
 - Keeps the bundle and the local workpaper in parity ([[0001]] cardinal); verdict/threshold
   stay out of the bundle ([[0015]]).
