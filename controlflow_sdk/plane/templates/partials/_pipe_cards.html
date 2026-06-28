@@ -65,6 +65,9 @@
       <input class="proc-in" data-proc-pct    value="{{ band.proc.failure_threshold_pct if band.proc.failure_threshold_pct is not none else '' }}" placeholder="thr %" style="width:64px" aria-label="Threshold percent">
       <input class="proc-in" data-proc-count  value="{{ band.proc.failure_threshold_count if band.proc.failure_threshold_count is not none else '' }}" placeholder="count" style="width:64px" aria-label="Threshold count">
       <button type="button" class="btn btn-sm btn-ghost" data-proc-del aria-label="Remove procedure">✕</button>
+      <textarea class="proc-in proc-narr" data-proc-narrative rows="2"
+                placeholder="Procedure narrative — what this procedure tests and why"
+                aria-label="Procedure narrative">{{ band.proc.narrative }}</textarea>
     </span>
   </summary>
   <div class="band-body">

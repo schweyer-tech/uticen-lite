@@ -310,6 +310,7 @@
           code: (head.querySelector('[data-proc-code]') || {}).value || ('P' + (i + 1)),
           name: (head.querySelector('[data-proc-name]') || {}).value || '',
           assertion: (head.querySelector('[data-proc-assert]') || {}).value || '',
+          narrative: (head.querySelector('[data-proc-narrative]') || {}).value || '',
           failure_threshold_pct: pct === '' ? null : Number(pct),
           failure_threshold_count: cnt === '' ? null : Number(cnt),
           position: i
@@ -360,6 +361,9 @@
         '<input class="proc-in" data-proc-pct placeholder="thr %" style="width:64px" aria-label="Threshold percent">' +
         '<input class="proc-in" data-proc-count placeholder="count" style="width:64px" aria-label="Threshold count">' +
         '<button type="button" class="btn btn-sm btn-ghost" data-proc-del aria-label="Remove procedure">✕</button>' +
+        '<textarea class="proc-in proc-narr" data-proc-narrative rows="2" ' +
+        'placeholder="Procedure narrative — what this procedure tests and why" ' +
+        'aria-label="Procedure narrative"></textarea>' +
         '</span></summary>' +
         '<div class="band-body"><p class="muted proc-empty">No test yet — insert a ' +
         '<strong>Test</strong> below to give this procedure a result.</p>' +

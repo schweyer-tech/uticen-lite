@@ -125,6 +125,65 @@ def test_diagram_collapsed_band_emits_summary_box():
     assert any(box["id"] == "t1" for box in d["boxes"])
 
 
+def test_procedure_context_includes_narrative():
+    pipe = parse_pipeline({
+        "nodes": [
+            {"id": "src", "type": "import", "source_id": "s"},
+            {"id": "t1", "type": "test", "inputs": ["src"],
+             "config": {"procedure_id": "p1", "conditions": [{"column": "a", "op": "not_empty"}]}},
+        ],
+        "procedures": [
+            {"id": "p1", "code": "P1", "name": "One",
+             "narrative": "Why we test this", "position": 0},
+        ],
+    })
+    ctx = _procedure_context(pipe)
+    assert ctx["procedures"][0]["narrative"] == "Why we test this"
+
+
+def test_card_bands_proc_carries_narrative():
+    pipe = parse_pipeline({
+        "nodes": [
+            {"id": "src", "type": "import", "source_id": "s"},
+            {"id": "t1", "type": "test", "inputs": ["src"],
+             "config": {"procedure_id": "p1", "conditions": [{"column": "a", "op": "not_empty"}]}},
+        ],
+        "procedures": [
+            {"id": "p1", "code": "P1", "name": "One",
+             "narrative": "Why we test this", "position": 0},
+        ],
+    })
+    bands = _card_bands(pipe, _vms(pipe), _procedure_context(pipe))
+    assert bands["procedures"][0]["proc"]["narrative"] == "Why we test this"
+
+
+def test_builder_get_renders_procedure_narrative_field(client):
+    """The procedure section header exposes an editable narrative field, pre-filled
+    from the procedure's narrative."""
+    csv = b"user_id,can_create\nU1,true\nU2,\n"
+    client.post("/sources", data={"source_id": "users", "format": "csv"},
+                files={"file": ("users.csv", io.BytesIO(csv), "text/csv")},
+                follow_redirects=False)
+    client.post("/controls", data={"id": "c1", "title": "C1", "objective": "o",
+                "narrative": "n", "source_ids": ["users"], "failure_threshold_count": "0"},
+                follow_redirects=False)
+    graph = {
+        "nodes": [
+            {"id": "src", "type": "import", "source_id": "users"},
+            {"id": "tst", "type": "test", "inputs": ["src"],
+             "config": {"logic": "all", "procedure_id": "p1",
+                        "conditions": [{"column": "can_create", "op": "not_empty"}]}},
+        ],
+        "procedures": [{"id": "p1", "code": "P1", "name": "One",
+                        "narrative": "Reviewer independence", "position": 0}],
+    }
+    client.post("/controls/c1/logic/builder",
+                data={"pipeline_json": json.dumps(graph)}, follow_redirects=False)
+    page = client.get("/controls/c1/logic/builder").text
+    assert "data-proc-narrative" in page
+    assert "Reviewer independence" in page
+
+
 def test_builder_get_degrades_gracefully_on_partial_pipeline(
     client: TestClient, engagement: Path
 ) -> None:
