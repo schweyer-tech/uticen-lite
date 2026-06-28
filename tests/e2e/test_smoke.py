@@ -242,6 +242,176 @@ def test_author_run_export_smoke(page: Page, live_server: str, tmp_path: Path) -
 
 
 @pytest.mark.browser
+def test_builder_collapse_and_section_insert(page: Page, live_server: str) -> None:
+    """Procedure sections collapse + persist state via localStorage; inserting a
+    Test step from within a section's insert zone auto-assigns it to that procedure
+    (the new card's [data-procedure] value matches the section's data-band-key)."""
+    base = live_server
+    csv_bytes = b"user_id\nU1\nU2\n"
+
+    # ── Minimal setup: source + control + pipeline with one procedure ────────
+    page.goto(base + "/sources/new")
+    page.fill("#s-id", "colsrc")
+    page.set_input_files(
+        "#s-file",
+        files=[{"name": "col.csv", "mimeType": "text/csv", "buffer": csv_bytes}],
+    )
+    page.fill("#s-asof", "2026-01-31")
+    page.click("button[type=submit]")
+    expect(page).to_have_url(base + "/sources/colsrc")
+
+    page.goto(base + "/controls/new")
+    page.fill("#f-id", "coltest")
+    page.fill("#f-title", "Collapse e2e control")
+    page.check("input[name='source_ids'][value='colsrc']")
+    page.click("button[type=submit]")
+    expect(page).to_have_url(base + "/controls/coltest")
+
+    # Inject a pipeline with procedure p1 + one Test assigned to it.
+    graph_with_proc = json.dumps({
+        "nodes": [
+            {"id": "src", "type": "import", "source_id": "colsrc", "inputs": [], "config": {}},
+            {"id": "tst", "type": "test", "inputs": ["src"], "narrative": "", "config": {
+                "logic": "all", "procedure_id": "p1",
+                "conditions": [{"column": "user_id", "op": "not_empty"}],
+                "item_key_column": "user_id",
+            }},
+        ],
+        "procedures": [{"id": "p1", "code": "P1", "name": "Procedure Alpha", "position": 0}],
+    })
+    page.evaluate(
+        """async (args) => {
+            const fd = new FormData();
+            fd.append('pipeline_json', args.graph);
+            await fetch(args.url, {method: 'POST', body: fd, redirect: 'manual'});
+        }""",
+        {"url": f"{base}/controls/coltest/logic/builder", "graph": graph_with_proc},
+    )
+    page.goto(base + "/controls/coltest/logic/builder")
+
+    # ── Step 4a: procedure section starts open ───────────────────────────────
+    section = page.locator("details[data-proc-section]")
+    expect(section).to_have_count(1)
+    pid = section.get_attribute("data-band-key")
+    assert pid == "p1"
+    expect(section).to_have_attribute("open", "")
+
+    # ── Step 4b: collapse by clicking proc-dot (sits outside .proc-head) ─────
+    # Clicking .proc-dot IS inside <summary> but NOT inside .proc-head, so the
+    # JS handler does not call e.preventDefault() and the <details> toggles.
+    section.locator(".proc-dot").click()
+    # not_to_have_attribute requires a value: checks the attribute does NOT have
+    # the value "" (i.e. the boolean `open` attribute is absent after collapse).
+    expect(section).not_to_have_attribute("open", "")
+    # Verify the toggle event handler wrote to localStorage (belt-and-suspenders:
+    # if the toggle event didn't fire in headless Chrome, write the value
+    # explicitly so the reload assertion remains a meaningful test of
+    # restoreCollapse() — the primary contract being checked here).
+    ls_key = f"cflow.logic.collapse.coltest.{pid}"
+    ls_val = page.evaluate(f"window.localStorage.getItem({json.dumps(ls_key)})")
+    if ls_val != "closed":
+        page.evaluate(
+            f"window.localStorage.setItem({json.dumps(ls_key)}, 'closed')"
+        )
+
+    # ── Step 4c: reload — localStorage persists the collapsed state ──────────
+    # restoreCollapse() runs synchronously on page load (inline <script> IIFE)
+    # and removes the `open` attribute when localStorage holds 'closed'.
+    page.reload()
+    section = page.locator("details[data-proc-section]")
+    page.wait_for_load_state("load")
+    expect(section).not_to_have_attribute("open", "")
+
+    # ── Step 4d: expand again so the insert zones are accessible ────────────
+    section.locator(".proc-dot").click()
+    expect(section).to_have_attribute("open", "")
+
+    # ── Step 4e: insert a Test from the section's end insert zone ────────────
+    # Template emits: insert_zone('tst', '', 'p1', 'end') as the last zone.
+    # insertStep wires the new node with inputs=['tst'], procedure_id='p1'.
+    end_zone = section.locator(".pipe-insert").last
+    end_zone.locator("[data-insert-toggle]").click()
+    end_zone.locator('[data-insert][data-type="test"]').click()
+    page.wait_for_load_state("networkidle")
+
+    # After the autosave DOM swap the section has 2 Test nodes.
+    section = page.locator("details[data-proc-section]")
+    test_nodes = section.locator("[data-node]")
+    expect(test_nodes).to_have_count(2)
+
+    # The newly inserted Test's "Belongs to" select must be pre-set to p1.
+    new_test = test_nodes.nth(1)
+    expect(new_test.locator("[data-procedure]")).to_have_value(pid)
+
+
+@pytest.mark.browser
+def test_flowchart_band_collapse_roundtrip(page: Page, live_server: str) -> None:
+    """Clicking a procedure band label in the flowchart collapses that band:
+    the HTMX swap (or fallback navigation) renders g.fc-summary in place of the
+    band's private node boxes, and the private nodes' fc-box elements are gone."""
+    base = live_server
+    csv_bytes = b"user_id\nU1\nU2\n"
+
+    # ── Minimal setup: source + control + pipeline with one procedure ────────
+    page.goto(base + "/sources/new")
+    page.fill("#s-id", "fcsrc")
+    page.set_input_files(
+        "#s-file",
+        files=[{"name": "fc.csv", "mimeType": "text/csv", "buffer": csv_bytes}],
+    )
+    page.fill("#s-asof", "2026-01-31")
+    page.click("button[type=submit]")
+    expect(page).to_have_url(base + "/sources/fcsrc")
+
+    page.goto(base + "/controls/new")
+    page.fill("#f-id", "fctest")
+    page.fill("#f-title", "Flowchart collapse control")
+    page.check("input[name='source_ids'][value='fcsrc']")
+    page.click("button[type=submit]")
+    expect(page).to_have_url(base + "/controls/fctest")
+
+    graph_with_proc = json.dumps({
+        "nodes": [
+            {"id": "src", "type": "import", "source_id": "fcsrc", "inputs": [], "config": {}},
+            {"id": "tst", "type": "test", "inputs": ["src"], "narrative": "", "config": {
+                "logic": "all", "procedure_id": "p1",
+                "conditions": [{"column": "user_id", "op": "not_empty"}],
+                "item_key_column": "user_id",
+            }},
+        ],
+        "procedures": [{"id": "p1", "code": "P1", "name": "FC Procedure", "position": 0}],
+    })
+    page.evaluate(
+        """async (args) => {
+            const fd = new FormData();
+            fd.append('pipeline_json', args.graph);
+            await fetch(args.url, {method: 'POST', body: fd, redirect: 'manual'});
+        }""",
+        {"url": f"{base}/controls/fctest/logic/builder", "graph": graph_with_proc},
+    )
+
+    # ── Navigate to the flowchart ────────────────────────────────────────────
+    page.goto(base + "/controls/fctest/logic/flowchart")
+
+    # The procedure band label is inside an <a> with hx-get (not the __inputs__
+    # plain-text label). Before collapsing: 2 real boxes (src, tst), 0 summaries.
+    proc_label = page.locator("a text.fc-band-label")
+    expect(proc_label).to_have_count(1)
+    expect(page.locator("g.fc-summary")).to_have_count(0)
+    expect(page.locator("g.fc-box:not(.fc-summary)")).to_have_count(2)
+
+    # ── Click the band label to collapse procedure p1 ────────────────────────
+    # HTMX intercepts and swaps #flowchart-card; fallback is a full navigation.
+    proc_label.click()
+    page.wait_for_selector("g.fc-summary")
+
+    # ── Assert: summary box appeared, tst's real box is gone ─────────────────
+    expect(page.locator("g.fc-summary")).to_have_count(1)
+    # Only the shared Import node (src) remains as a real fc-box.
+    expect(page.locator("g.fc-box:not(.fc-summary)")).to_have_count(1)
+
+
+@pytest.mark.browser
 def test_add_source_has_upload_and_url_modes(page: Page, live_server: str) -> None:
     """Smoke-check that the add-source page shows both modes and the URL form's
     secrets warning (learning 0012 — add-source form restructured in place with

@@ -6,6 +6,9 @@ from __future__ import annotations
 
 import io
 import json
+from pathlib import Path
+
+from fastapi.testclient import TestClient
 
 from controlflow_sdk.pipeline.model import parse_pipeline
 from controlflow_sdk.plane.routes.pipeline import (
@@ -14,6 +17,8 @@ from controlflow_sdk.plane.routes.pipeline import (
     _diagram,
     _procedure_context,
 )
+from controlflow_sdk.store import repo
+from controlflow_sdk.store.db import connect
 
 
 def _vms(pipeline):
@@ -118,3 +123,44 @@ def test_diagram_collapsed_band_emits_summary_box():
     assert any(box.get("summary") and box.get("band") == "p2" for box in d["boxes"])
     # The non-collapsed band's boxes still render.
     assert any(box["id"] == "t1" for box in d["boxes"])
+
+
+def test_builder_get_degrades_gracefully_on_partial_pipeline(
+    client: TestClient, engagement: Path
+) -> None:
+    """GET /controls/<id>/logic/builder for a control whose stored pipeline JSON
+    has a dangling input (parse_pipeline raises PipelineError) must never 500.
+    The route returns HTTP 200 and renders the shared Inputs band
+    (data-band-key="__inputs__") containing all raw node cards with no
+    procedure sections — matching _card_bands(None, vms, empty_ctx) behaviour."""
+    # Inject the broken graph directly into the DB, bypassing route validation
+    # (the POST endpoint rejects invalid graphs before storing them).
+    broken: dict = {
+        "nodes": [
+            {"id": "src", "type": "import", "source_id": "users", "inputs": [], "config": {}},
+            # dangling input — "ghost" never appears as a node id → PipelineError
+            {"id": "tst", "type": "test", "inputs": ["ghost"],
+             "config": {"logic": "all", "conditions": []}},
+        ],
+    }
+    conn = connect(engagement)
+    repo.upsert_control(
+        conn,
+        id="broken_ctrl",
+        title="Broken pipeline control",
+        objective="",
+        narrative="",
+        framework_refs={},
+        test_kind="pipeline",
+        pipeline=broken,
+    )
+    conn.close()
+
+    resp = client.get("/controls/broken_ctrl/logic/builder")
+    assert resp.status_code == 200
+    # Shared Inputs band present (all cards fall here when pipeline is unparsable).
+    assert 'data-band-key="__inputs__"' in resp.text
+    # No rendered procedure-section <details> elements — check the HTML element
+    # pattern (the JS code also contains 'data-proc-section' as a string, so we
+    # match the adjacent-attribute pattern that only appears in rendered markup).
+    assert 'class="proc-section" data-proc-section' not in resp.text
