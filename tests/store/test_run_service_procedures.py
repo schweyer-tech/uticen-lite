@@ -88,9 +88,6 @@ def test_procedure_rollup_distinct_examined_and_merged(tmp_path: Path):
 
 def test_procedure_code_assertion_flow_to_workpaper(tmp_path: Path):
     """code/assertion must flow from ProcedureDef → ProcedureSpec → Workpaper.Procedure."""
-    from controlflow_sdk.render.html import render_html
-    from controlflow_sdk.store.run_service import run_control_in_store
-
     conn = _seed(tmp_path)
     run_control_in_store(conn, tmp_path, "gl1", "2026-06-28T00:00:00Z")
 

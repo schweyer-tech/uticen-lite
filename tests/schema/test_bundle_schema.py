@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import importlib.resources
+import json
+
 from controlflow_sdk.schema.validate import validate_bundle
 
 # ---------------------------------------------------------------------------
@@ -181,10 +184,7 @@ def test_procedure_with_code_and_assertion_validates():
 
 
 def test_procedure_required_fields_unchanged():
-    """required for procedure remains [title, narrative, test_code, result] — code/assertion optional."""
-    import json
-    import importlib.resources
-
+    """procedure.required stays [title, narrative, test_code, result]; code/assertion optional."""
     schema_bytes = (
         importlib.resources.files("controlflow_sdk.schema")
         .joinpath("bundle.schema.json")
