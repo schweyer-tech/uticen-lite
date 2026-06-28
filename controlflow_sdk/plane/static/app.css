@@ -309,6 +309,43 @@ legend {
 .check-row .mono.muted { font-size: 12px; }
 .check-row + .check-row { border-top: 1px solid var(--border-subtle, var(--border-default)); }
 .radio-row { display: flex; gap: 20px; }
+
+/* Bound data-source chips + searchable "+" picker (2026-06-27 review) */
+.bound-sources { display: flex; flex-direction: column; gap: 12px; }
+.source-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.source-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 8px 4px 12px; font-size: 13px;
+  background: var(--bg-surface-2); border: 1px solid var(--border-strong);
+  border-radius: 999px;
+}
+.source-chip .src-name { font-weight: 500; }
+.source-chip .mono.muted { font-size: 11px; }
+.source-chip .chip-view { text-decoration: none; color: var(--text-secondary); }
+.source-chip .chip-view:hover { color: var(--accent-primary); }
+.source-chip .chip-remove {
+  border: none; background: transparent; color: var(--text-secondary);
+  cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px;
+}
+.source-chip .chip-remove:hover { color: var(--status-critical); }
+.source-picker { max-width: 380px; }
+.source-picker > summary { display: inline-flex; width: auto; list-style: none; cursor: pointer; }
+.source-picker > summary::-webkit-details-marker { display: none; }
+.source-picker-body {
+  margin-top: 8px; padding: 8px; border-radius: 8px;
+  background: var(--bg-surface-1); border: 1px solid var(--border-strong);
+}
+.source-filter { width: 100%; margin-bottom: 8px; }
+.source-options { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; }
+.source-option {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 6px 8px; border: none; border-radius: 6px; cursor: pointer;
+  background: transparent; color: var(--text-primary); font-size: 13px;
+}
+.source-option .src-name { font-weight: 500; }
+.source-option .mono.muted { font-size: 11px; }
+.source-option:hover { background: var(--bg-surface-2); }
+.source-option-empty { padding: 8px; }
 .radio-row label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
 
 /* ── buttons ──────────────────────────────────────────────────────────────── */

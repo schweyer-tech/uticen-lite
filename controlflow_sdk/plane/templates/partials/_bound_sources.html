@@ -1,0 +1,46 @@
+{# Bound data sources for an existing control: chips + a searchable "+" picker.
+   Add/remove POST to /controls/{id}/sources and swap this fragment in place
+   (no full reload → scroll preserved). 2026-06-27 review. #}
+<div id="bound-sources" class="bound-sources">
+  {% set bound = control.source_ids %}
+  <div class="source-chips">
+    {% for source in sources if source.id in bound %}
+    <span class="source-chip">
+      <span class="src-name">{{ source.title or source.id }}</span>
+      {% if source.title %}<span class="mono muted">{{ source.id }}</span>{% endif %}
+      <a class="chip-view" href="/sources/{{ source.id }}" target="_blank"
+         rel="noopener" title="View source">↗</a>
+      <button type="button" class="chip-remove"
+              aria-label="Remove {{ source.title or source.id }}"
+              hx-post="/controls/{{ control.id }}/sources"
+              hx-vals='{"action": "remove", "source_id": "{{ source.id }}"}'
+              hx-target="#bound-sources" hx-swap="outerHTML">×</button>
+    </span>
+    {% else %}
+    <span class="muted">No data sources bound yet.</span>
+    {% endfor %}
+  </div>
+  <details class="source-picker">
+    <summary class="btn btn-add">+ Add data source</summary>
+    <div class="source-picker-body">
+      <input type="text" class="source-filter" placeholder="Search sources…"
+             oninput="filterSources(this)" aria-label="Search data sources">
+      <ul class="source-options">
+        {% for source in sources if source.id not in bound %}
+        <li class="source-option-row"
+            data-label="{{ ((source.title or '') ~ ' ' ~ source.id) | lower }}">
+          <button type="button" class="source-option"
+                  hx-post="/controls/{{ control.id }}/sources"
+                  hx-vals='{"action": "add", "source_id": "{{ source.id }}"}'
+                  hx-target="#bound-sources" hx-swap="outerHTML">
+            <span class="src-name">{{ source.title or source.id }}</span>
+            {% if source.title %}<span class="mono muted">{{ source.id }}</span>{% endif %}
+          </button>
+        </li>
+        {% else %}
+        <li class="muted source-option-empty">All available sources are bound.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </details>
+</div>

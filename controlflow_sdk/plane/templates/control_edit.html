@@ -107,21 +107,25 @@
   <div class="card">
     <h2>Data sources</h2>
     {% if sources %}
-    <div class="check-list">
-      {% for source in sources %}
-      <div class="check-row">
-        <label>
-          <input type="checkbox" name="source_ids" value="{{ source.id }}"
-                 {% if control %}onchange="this.form.submit()"{% endif %}
-                 {% if control and source.id in control.source_ids %}checked{% endif %}>
-          <span class="src-name">{{ source.title or source.id }}</span>
-          {% if source.title %}<span class="mono muted">({{ source.id }})</span>{% endif %}
-        </label>
-        <a class="btn btn-sm btn-ghost" href="/sources/{{ source.id }}"
-           target="_blank" rel="noopener">View ↗</a>
+      {% if control %}
+      {# existing control: chips + searchable "+" picker, persisted via HTMX #}
+      {% include "partials/_bound_sources.html" %}
+      {% else %}
+      {# new control: checkboxes submitted with the create form (one-shot, no scroll issue) #}
+      <div class="check-list">
+        {% for source in sources %}
+        <div class="check-row">
+          <label>
+            <input type="checkbox" name="source_ids" value="{{ source.id }}">
+            <span class="src-name">{{ source.title or source.id }}</span>
+            {% if source.title %}<span class="mono muted">({{ source.id }})</span>{% endif %}
+          </label>
+          <a class="btn btn-sm btn-ghost" href="/sources/{{ source.id }}"
+             target="_blank" rel="noopener">View ↗</a>
+        </div>
+        {% endfor %}
       </div>
-      {% endfor %}
-    </div>
+      {% endif %}
     {% else %}
     <p class="muted">No sources available. <a href="/sources">Add a source</a> first.</p>
     {% endif %}
@@ -134,6 +138,17 @@
 </form>
 
 <script>
+// Client-side filter for the "+" data-source picker (survives HTMX swaps via the
+// inline oninput handler calling this page-level function). 2026-06-27 review.
+function filterSources(input) {
+  const q = (input.value || '').trim().toLowerCase();
+  const body = input.closest('.source-picker-body');
+  if (!body) return;
+  body.querySelectorAll('.source-option-row').forEach(function(row) {
+    const label = row.getAttribute('data-label') || '';
+    row.style.display = (q === '' || label.indexOf(q) !== -1) ? '' : 'none';
+  });
+}
 (function() {
   const editContainer = document.querySelector('.control-title-edit');
   if (!editContainer) return;
