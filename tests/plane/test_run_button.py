@@ -80,3 +80,5 @@ def test_control_editor_has_run_button(client):
     assert page.status_code == 200
     # a Run affordance posting to the run route, available on the control page itself
     assert 'action="/controls/sod/run"' in page.text
+    # exactly ONE Run form — guards against the duplicate-block merge artifact
+    assert page.text.count('action="/controls/sod/run"') == 1
