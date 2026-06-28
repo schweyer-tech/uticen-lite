@@ -72,7 +72,9 @@ def test_edit_control_shows_values(client):
     assert "Editable" in page.text
 
 
-def test_edit_control_moves_id_editing_to_header(client):
+def test_edit_control_shows_id_in_details_box(client):
+    # 2026-06-27 review: the control ID renders/edits inside the Definition
+    # "Details" box, not the header banner.
     _make_source(client)
     client.post("/controls", data={
         "id": "HDRID1", "title": "Header ID", "objective": "o", "narrative": "n",
@@ -80,10 +82,12 @@ def test_edit_control_moves_id_editing_to_header(client):
 
     page = client.get("/controls/HDRID1")
     assert page.status_code == 200
-    assert 'class="control-id-banner"' in page.text
-    assert 'action="/controls/HDRID1/id"' in page.text
+    assert 'class="control-id-banner"' not in page.text   # gone from the header
+    assert 'class="control-id-row"' in page.text           # now in the Details card
+    assert 'action="/controls/HDRID1/id"' in page.text     # rename form still wired
     assert 'name="new_id"' in page.text
-    assert 'id="f-id"' not in page.text
+    assert 'form="id-rename-form"' in page.text             # not nested in the metadata form
+    assert 'id="f-id"' not in page.text                    # create-only input stays absent
 
 
 def test_edit_control_header_id_editor_renames_control(client):
