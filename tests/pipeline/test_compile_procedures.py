@@ -1,8 +1,14 @@
 import pandas as pd
 
 from controlflow_sdk.model.population import ColumnMeta, Population
-from controlflow_sdk.pipeline.compile import compile_pipeline_procedures
+from controlflow_sdk.pipeline.compile import (
+    _subpipeline_for,
+    compile_pipeline,
+    compile_pipeline_procedures,
+)
 from controlflow_sdk.pipeline.model import parse_pipeline
+from controlflow_sdk.rules.evaluate import evaluate_rule  # canonical interpreter
+from controlflow_sdk.rules.spec import parse_rule_spec
 
 
 def _multi_check_one_procedure() -> dict:
@@ -61,3 +67,15 @@ def test_compiled_union_matches_interpreter(tmp_path):
     keys = sorted(v["item_key"] for v in generated)
     # A (both), B (t2), C (t1) ⇒ keys A,A,B,C before dedupe (concat of both checks)
     assert keys == ["A", "A", "B", "C"]
+
+    # Cross-validate against the canonical interpreter (learning 0009): each check's
+    # single-terminal sub-pipeline compiles to a rule_spec; running evaluate_rule over
+    # the SAME population and unioning the violations must equal the generated union, so
+    # a future silent divergence between emit and interpreter is caught here.
+    interp_keys: list[str] = []
+    for node in (p.node("t1"), p.node("t2")):
+        single = compile_pipeline(_subpipeline_for(p, node))
+        assert single.rule_spec is not None  # filter + test flatten to a pure rule_spec
+        spec = parse_rule_spec(single.rule_spec)
+        interp_keys.extend(v["item_key"] for v in evaluate_rule(spec, pop))
+    assert sorted(interp_keys) == keys
