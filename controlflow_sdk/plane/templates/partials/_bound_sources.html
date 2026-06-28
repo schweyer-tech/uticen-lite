@@ -1,6 +1,7 @@
-{# Bound data sources for an existing control: chips + a searchable "+" picker.
-   Add/remove POST to /controls/{id}/sources and swap this fragment in place
-   (no full reload → scroll preserved). 2026-06-27 review. #}
+{# Bound data sources for an existing control: chips + a searchable picker.
+   Click the ▾ arrow (or focus the field) to see every source, then type to
+   narrow. Add/remove POST to /controls/{id}/sources and swap this fragment in
+   place (no full reload → scroll preserved). 2026-06-28 review. #}
 <div id="bound-sources" class="bound-sources">
   {% set bound = control.source_ids %}
   <div class="source-chips">
@@ -23,12 +24,17 @@
   {% set unbound = sources | rejectattr('id', 'in', bound) | list %}
   {% if unbound %}
   <div class="source-combobox">
-    <input type="text" class="source-search" placeholder="Search to add a data source…"
+    <input type="text" class="source-search" placeholder="Search or pick a data source…"
            role="combobox" aria-autocomplete="list" aria-expanded="false"
+           aria-controls="source-results-list"
            aria-label="Search data sources to add" autocomplete="off"
            oninput="filterSourceOptions(this)" onfocus="filterSourceOptions(this)"
            onblur="closeSourceResults(this)">
-    <ul class="source-results" hidden>
+    <button type="button" class="source-combobox-toggle" tabindex="-1"
+            aria-label="Show all data sources"
+            onmousedown="event.preventDefault()"
+            onclick="toggleSourceResults(this)">▾</button>
+    <ul class="source-results" id="source-results-list" hidden>
       {% for source in unbound %}
       <li class="source-option-row"
           data-label="{{ ((source.title or '') ~ ' ' ~ source.id) | lower }}"
