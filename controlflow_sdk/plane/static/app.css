@@ -159,25 +159,10 @@ main { max-width: 1120px; margin: 0 auto; padding: 28px 24px 64px; }
   display: inline-flex;
   gap: 8px;
 }
-.control-id-banner {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 6px;
-  padding: 8px 10px;
-  background: var(--bg-surface-1);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
-}
-.control-id-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-tertiary);
-}
+/* Control ID lives in the Definition "Details" card (2026-06-27 review) */
+.control-id-row { display: flex; align-items: center; gap: 10px; }
 .control-id-value {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -190,10 +175,10 @@ main { max-width: 1120px; margin: 0 auto; padding: 28px 24px 64px; }
 .control-id-edit > summary::-webkit-details-marker {
   display: none;
 }
-.control-id-edit-form {
+.control-id-edit-fields {
   position: absolute;
   top: calc(100% + 6px);
-  right: 0;
+  left: 0;
   z-index: 5;
   width: 280px;
   padding: 12px;
@@ -204,12 +189,7 @@ main { max-width: 1120px; margin: 0 auto; padding: 28px 24px 64px; }
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
 }
-.control-id-edit-form label {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-.control-id-edit-form input {
+.control-id-edit-fields input {
   margin-top: 0;
   max-width: 100%;
 }
