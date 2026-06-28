@@ -26,6 +26,11 @@
     <button class="btn btn-primary" type="submit">Run</button>
   </form>
   {% endif %}
+  {% if control %}
+  <form class="inline-form control-run-form" method="post" action="/controls/{{ control.id }}/run">
+    <button class="btn btn-primary" type="submit">Run</button>
+  </form>
+  {% endif %}
 </div>
 {% if control %}{% set active = 'definition' %}{% include "_control_tabs.html" %}{% endif %}
 
