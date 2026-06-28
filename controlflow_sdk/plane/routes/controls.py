@@ -378,7 +378,7 @@ def _reconcile_pipeline_imports(
     return out
 
 
-def _save_from_form(conn: sqlite3.Connection, form: Any) -> str:
+def _save_from_form(conn: sqlite3.Connection, form: Any, original_id: str | None = None) -> str:
     """Save the Definition form: metadata + sources only.
 
     For an EXISTING control the logic fields (test_kind, rule_spec, test_code,
@@ -397,6 +397,14 @@ def _save_from_form(conn: sqlite3.Connection, form: Any) -> str:
       sources into posted ``source_ids`` so needed bindings are never dropped.
     """
     cid = str(form.get("id")).strip()
+    # The Control ID is an editable Details field. On an existing control a
+    # changed id is a rename (moves the row, sources and runs); an empty field
+    # falls back to the original so a blank submit never corrupts the record.
+    if original_id is not None:
+        if not cid:
+            cid = original_id
+        if cid != original_id:
+            repo.rename_control_id(conn, original_id, cid)  # may raise ValueError
     nist = [s.strip() for s in str(form.get("framework_nist", "")).split(",") if s.strip()]
     pct = form.get("failure_threshold_pct")
     cnt = form.get("failure_threshold_count")
@@ -644,29 +652,16 @@ def register(
         try:
             form = await request.form()
             try:
-                cid = _save_from_form(conn, form)
+                cid = _save_from_form(conn, form, original_id=control_id)
             except LintError as exc:
                 return _rerender_with_error(request, conn, control_id, exc.errors)
             except PipelineError as exc:
                 return _rerender_with_error(request, conn, control_id, [str(exc)])
-            return RedirectResponse(f"/controls/{cid}", status_code=303)
-        finally:
-            conn.close()
-
-    @app.post("/controls/{control_id}/id", response_model=None)
-    async def update_control_id(
-        control_id: str, request: Request
-    ) -> HTMLResponse | RedirectResponse:
-        root = request.app.state.project_root
-        conn = connect(root)
-        try:
-            form = await request.form()
-            new_id = str(form.get("new_id", "")).strip()
-            try:
-                repo.rename_control_id(conn, control_id, new_id)
             except ValueError as exc:
+                # A bad rename (blank/duplicate id) or unparsable threshold —
+                # surface it inline rather than 500.
                 return _rerender_with_error(request, conn, control_id, [str(exc)])
-            return RedirectResponse(f"/controls/{new_id or control_id}", status_code=303)
+            return RedirectResponse(f"/controls/{cid}", status_code=303)
         finally:
             conn.close()
 

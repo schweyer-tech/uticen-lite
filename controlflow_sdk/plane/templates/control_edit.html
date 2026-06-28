@@ -3,7 +3,7 @@
 {% block head %}{% endblock %}
 {% block body %}
 <a class="crumb" href="/">← Controls</a>
-<div class="page-head">
+<div class="page-head control-head">
   {% if control %}
   <div class="control-title-edit" data-control-id="{{ control.id }}">
     <div class="control-title-display">
@@ -38,38 +38,20 @@
 </div>
 {% endif %}
 
-{# Standalone form so the Details-card ID rename (associated via form="id-rename-form")
-   isn't nested inside the metadata form below. 2026-06-27 review. #}
-{% if control %}<form id="id-rename-form" method="post" action="/controls/{{ control.id }}/id"></form>{% endif %}
 <form method="post" action="{% if control %}/controls/{{ control.id }}{% else %}/controls{% endif %}"{% if control %} data-source-autosave-form{% endif %}>
   {% if control %}
-  <input type="hidden" name="id" value="{{ control.id }}">
+  {# Title is edited via the header pencil; carry it through so a metadata save
+     never clears it. The Control ID is an editable field below. #}
   <input type="hidden" name="title" value="{{ control.title }}">
   {% endif %}
   <div class="card">
     <h2>Details</h2>
-    {% if not control %}
     <div class="field">
       <label for="f-id">Control ID</label>
       <input id="f-id" type="text" name="id" value="{{ control.id if control else '' }}"
              placeholder="e.g. AC-2-01" required>
+      {% if control %}<span class="hint">Renames the control everywhere when you save.</span>{% endif %}
     </div>
-    {% else %}
-    <div class="field">
-      <label>Control ID</label>
-      <div class="control-id-row">
-        <span class="control-id-value mono">{{ control.id }}</span>
-        <details class="control-id-edit">
-          <summary class="btn btn-sm btn-ghost">Edit</summary>
-          <div class="control-id-edit-fields">
-            <input id="f-id-inline" type="text" name="new_id" value="{{ control.id }}"
-                   form="id-rename-form" placeholder="e.g. AC-2-01" required>
-            <button class="btn btn-primary btn-sm" type="submit" form="id-rename-form">Save ID</button>
-          </div>
-        </details>
-      </div>
-    </div>
-    {% endif %}
     {% if not control %}
     <div class="field">
       <label for="f-title">Title</label>
@@ -141,16 +123,38 @@
 </form>
 
 <script>
-// Client-side filter for the "+" data-source picker (survives HTMX swaps via the
-// inline oninput handler calling this page-level function). 2026-06-27 review.
-function filterSources(input) {
+// Searchable single-select data-source combobox. The results panel stays
+// collapsed until the analyst types — never a long dump of every source.
+// Page-level so it survives HTMX fragment swaps (inline handlers re-bind).
+// 2026-06-27 review.
+function filterSourceOptions(input) {
   const q = (input.value || '').trim().toLowerCase();
-  const body = input.closest('.source-picker-body');
-  if (!body) return;
-  body.querySelectorAll('.source-option-row').forEach(function(row) {
+  const box = input.closest('.source-combobox');
+  if (!box) return;
+  const results = box.querySelector('.source-results');
+  if (!results) return;
+  let shown = 0;
+  results.querySelectorAll('.source-option-row').forEach(function(row) {
     const label = row.getAttribute('data-label') || '';
-    row.style.display = (q === '' || label.indexOf(q) !== -1) ? '' : 'none';
+    const match = q !== '' && label.indexOf(q) !== -1;
+    row.style.display = match ? '' : 'none';
+    if (match) shown++;
   });
+  const empty = results.querySelector('.source-no-match');
+  if (empty) empty.style.display = (q !== '' && shown === 0) ? '' : 'none';
+  const open = q !== '';
+  results.hidden = !open;
+  input.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+// Close on blur, but after a beat so a click on an option still registers.
+function closeSourceResults(input) {
+  setTimeout(function() {
+    const box = input.closest('.source-combobox');
+    if (!box) return;
+    const results = box.querySelector('.source-results');
+    if (results) results.hidden = true;
+    input.setAttribute('aria-expanded', 'false');
+  }, 150);
 }
 (function() {
   const editContainer = document.querySelector('.control-title-edit');

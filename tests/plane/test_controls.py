@@ -73,8 +73,9 @@ def test_edit_control_shows_values(client):
 
 
 def test_edit_control_shows_id_in_details_box(client):
-    # 2026-06-27 review: the control ID renders/edits inside the Definition
-    # "Details" box, not the header banner.
+    # 2026-06-27 review: the control ID is a plain editable field in the
+    # Definition "Details" box — like any other field, no separate Edit
+    # button or rename form. Saving the form renames the control.
     _make_source(client)
     client.post("/controls", data={
         "id": "HDRID1", "title": "Header ID", "objective": "o", "narrative": "n",
@@ -83,20 +84,28 @@ def test_edit_control_shows_id_in_details_box(client):
     page = client.get("/controls/HDRID1")
     assert page.status_code == 200
     assert 'class="control-id-banner"' not in page.text   # gone from the header
-    assert 'class="control-id-row"' in page.text           # now in the Details card
-    assert 'action="/controls/HDRID1/id"' in page.text     # rename form still wired
-    assert 'name="new_id"' in page.text
-    assert 'form="id-rename-form"' in page.text             # not nested in the metadata form
-    assert 'id="f-id"' not in page.text                    # create-only input stays absent
+    # A normal editable field inside the metadata form, valued at the current id.
+    assert 'id="f-id"' in page.text
+    assert 'name="id"' in page.text
+    assert 'value="HDRID1"' in page.text
+    # The standalone rename mechanism is gone: no separate Edit button/form.
+    assert 'class="control-id-row"' not in page.text
+    assert 'id="id-rename-form"' not in page.text
+    assert 'name="new_id"' not in page.text
+    assert 'action="/controls/HDRID1/id"' not in page.text
 
 
-def test_edit_control_header_id_editor_renames_control(client):
+def test_edit_control_renames_via_main_save(client):
+    # Editing the Control ID field and saving the Definition form renames the
+    # control everywhere (sources, runs) — the same path as any field edit.
     _make_source(client)
     client.post("/controls", data={
         "id": "CIDOLD1", "title": "Rename me", "objective": "o", "narrative": "n",
         "source_ids": ["users"]}, follow_redirects=False)
 
-    resp = client.post("/controls/CIDOLD1/id", data={"new_id": "CIDNEW1"}, follow_redirects=False)
+    resp = client.post("/controls/CIDOLD1", data={
+        "id": "CIDNEW1", "title": "Rename me", "objective": "o", "narrative": "n",
+        "source_ids": ["users"]}, follow_redirects=False)
     assert resp.status_code in (302, 303)
     assert resp.headers["location"] == "/controls/CIDNEW1"
     assert _get_control(client, "CIDOLD1") is None
@@ -104,6 +113,24 @@ def test_edit_control_header_id_editor_renames_control(client):
     assert renamed is not None
     assert renamed["title"] == "Rename me"
     assert renamed["source_ids"] == ["users"]
+
+
+def test_edit_control_rename_to_existing_id_is_friendly_not_500(client):
+    # Renaming onto an id that already exists must surface a friendly error,
+    # never a 500 from the rename's ValueError.
+    _make_source(client)
+    for cid in ("CIDA1", "CIDB1"):
+        client.post("/controls", data={
+            "id": cid, "title": cid, "objective": "o", "narrative": "n",
+            "source_ids": ["users"]}, follow_redirects=False)
+    resp = client.post("/controls/CIDA1", data={
+        "id": "CIDB1", "title": "CIDA1", "objective": "o", "narrative": "n",
+        "source_ids": ["users"]}, follow_redirects=False)
+    assert resp.status_code != 500, resp.text
+    assert "already exists" in resp.text
+    # both originals still exist (the clashing rename was refused)
+    assert _get_control(client, "CIDA1") is not None
+    assert _get_control(client, "CIDB1") is not None
 
 
 def test_edit_control_moves_title_editing_to_header(client):
@@ -136,6 +163,18 @@ def test_edit_control_header_title_editor_updates_title(client):
     assert resp.headers["location"] == "/controls/TITLEEDIT1"
     updated = _get_control(client, "TITLEEDIT1")
     assert updated["title"] == "New title from header"
+
+
+def test_edit_control_header_splits_title_and_run(client):
+    # 2026-06-27 review: the Run button sits to the right of the title (a split
+    # header), not crowding it.
+    _make_source(client)
+    client.post("/controls", data={
+        "id": "HDRLAYOUT1", "title": "Layout", "objective": "o", "narrative": "n",
+        "source_ids": ["users"]}, follow_redirects=False)
+    page = client.get("/controls/HDRLAYOUT1").text
+    assert "control-head" in page                       # flex split header
+    assert 'action="/controls/HDRLAYOUT1/run"' in page   # Run lives in that header
 
 
 def test_source_picker_shows_title_and_view_link(client):

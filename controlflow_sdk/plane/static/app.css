@@ -112,6 +112,15 @@ main { max-width: 1120px; margin: 0 auto; padding: 28px 24px 64px; }
 
 .page-head { margin-bottom: 20px; }
 .page-head h1 { margin-bottom: 4px; }
+/* Control editor header: title on the left, Run pushed to the right. */
+.control-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.control-head .control-run-form { margin-left: auto; }
 .control-title-edit {
   position: relative;
   display: inline-block;
@@ -154,45 +163,19 @@ main { max-width: 1120px; margin: 0 auto; padding: 28px 24px 64px; }
 .control-title-edit-form input {
   margin: 0;
   flex: 1;
-  min-width: 300px;
+  min-width: 320px;
+  max-width: 640px;
+  /* Match the <h1> so it reads as editing the title in place. */
+  font-family: var(--font-sans);
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding: 2px 8px;
 }
 .control-title-form-actions {
   display: inline-flex;
   gap: 8px;
-}
-/* Control ID lives in the Definition "Details" card (2026-06-27 review) */
-.control-id-row { display: flex; align-items: center; gap: 10px; }
-.control-id-value {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-.control-id-edit {
-  position: relative;
-}
-.control-id-edit > summary {
-  list-style: none;
-}
-.control-id-edit > summary::-webkit-details-marker {
-  display: none;
-}
-.control-id-edit-fields {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 5;
-  width: 280px;
-  padding: 12px;
-  display: grid;
-  gap: 8px;
-  background: var(--bg-surface-1);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
-}
-.control-id-edit-fields input {
-  margin-top: 0;
-  max-width: 100%;
 }
 .crumb { display: inline-block; margin-bottom: 12px; font-size: 13px; color: var(--text-secondary); }
 .crumb:hover { color: var(--accent-primary); }
@@ -309,15 +292,17 @@ legend {
   cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px;
 }
 .source-chip .chip-remove:hover { color: var(--status-critical); }
-.source-picker { max-width: 380px; }
-.source-picker > summary { display: inline-flex; width: auto; list-style: none; cursor: pointer; }
-.source-picker > summary::-webkit-details-marker { display: none; }
-.source-picker-body {
-  margin-top: 8px; padding: 8px; border-radius: 8px;
+/* Searchable single-select combobox: the results panel is a dropdown that
+   stays collapsed until the analyst types (no long dump of every source). */
+.source-combobox { position: relative; max-width: 380px; }
+.source-search { width: 100%; margin: 0; }
+.source-results {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 20;
+  list-style: none; margin: 0; padding: 4px; max-height: 240px; overflow-y: auto;
   background: var(--bg-surface-1); border: 1px solid var(--border-strong);
+  border-radius: 8px; box-shadow: var(--shadow-card);
 }
-.source-filter { width: 100%; margin-bottom: 8px; }
-.source-options { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; }
+.source-results[hidden] { display: none; }
 .source-option {
   display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
   padding: 6px 8px; border: none; border-radius: 6px; cursor: pointer;
@@ -326,7 +311,7 @@ legend {
 .source-option .src-name { font-weight: 500; }
 .source-option .mono.muted { font-size: 11px; }
 .source-option:hover { background: var(--bg-surface-2); }
-.source-option-empty { padding: 8px; }
+.source-no-match { padding: 8px; }
 .radio-row label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
 
 /* ── buttons ──────────────────────────────────────────────────────────────── */

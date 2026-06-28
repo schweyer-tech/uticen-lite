@@ -20,27 +20,32 @@
     <span class="muted">No data sources bound yet.</span>
     {% endfor %}
   </div>
-  <details class="source-picker">
-    <summary class="btn btn-add">+ Add data source</summary>
-    <div class="source-picker-body">
-      <input type="text" class="source-filter" placeholder="Search sources…"
-             oninput="filterSources(this)" aria-label="Search data sources">
-      <ul class="source-options">
-        {% for source in sources if source.id not in bound %}
-        <li class="source-option-row"
-            data-label="{{ ((source.title or '') ~ ' ' ~ source.id) | lower }}">
-          <button type="button" class="source-option"
-                  hx-post="/controls/{{ control.id }}/sources"
-                  hx-vals='{"action": "add", "source_id": "{{ source.id }}"}'
-                  hx-target="#bound-sources" hx-swap="outerHTML">
-            <span class="src-name">{{ source.title or source.id }}</span>
-            {% if source.title %}<span class="mono muted">{{ source.id }}</span>{% endif %}
-          </button>
-        </li>
-        {% else %}
-        <li class="muted source-option-empty">All available sources are bound.</li>
-        {% endfor %}
-      </ul>
-    </div>
-  </details>
+  {% set unbound = sources | rejectattr('id', 'in', bound) | list %}
+  {% if unbound %}
+  <div class="source-combobox">
+    <input type="text" class="source-search" placeholder="Search to add a data source…"
+           role="combobox" aria-autocomplete="list" aria-expanded="false"
+           aria-label="Search data sources to add" autocomplete="off"
+           oninput="filterSourceOptions(this)" onfocus="filterSourceOptions(this)"
+           onblur="closeSourceResults(this)">
+    <ul class="source-results" hidden>
+      {% for source in unbound %}
+      <li class="source-option-row"
+          data-label="{{ ((source.title or '') ~ ' ' ~ source.id) | lower }}"
+          style="display: none;">
+        <button type="button" class="source-option"
+                hx-post="/controls/{{ control.id }}/sources"
+                hx-vals='{"action": "add", "source_id": "{{ source.id }}"}'
+                hx-target="#bound-sources" hx-swap="outerHTML">
+          <span class="src-name">{{ source.title or source.id }}</span>
+          {% if source.title %}<span class="mono muted">{{ source.id }}</span>{% endif %}
+        </button>
+      </li>
+      {% endfor %}
+      <li class="muted source-no-match" style="display: none;">No matching sources.</li>
+    </ul>
+  </div>
+  {% else %}
+  <p class="muted source-all-bound">All available sources are bound.</p>
+  {% endif %}
 </div>
