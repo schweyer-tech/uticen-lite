@@ -114,7 +114,7 @@ def test_author_run_export_two_procedure_control(
     tst.locator("[data-desc]").fill("User {user_id} flagged in branch A")
     tst.locator("[data-itemkey]").select_option("user_id")
 
-    # Click "+ Add condition" → serialises card state (incl. proc-title/threshold)
+    # Click "+ Add condition" → serialises card state (severity/desc/item-key/conditions)
     # and autosaves via fetch (scroll-stable, in-place DOM swap). Wait for response.
     tst.locator("[data-add-cond]").click()
     page.wait_for_load_state("networkidle")
@@ -207,6 +207,11 @@ def test_author_run_export_two_procedure_control(
     expect(
         page.locator('[data-proc-head][data-proc-id="tes1"] [data-proc-name]')
     ).to_have_value("Zero tolerance")
+    # Branch A's threshold (authored in node config, surfaced via auto-derivation)
+    # persists on the procedure header — migrated from the removed node-card field.
+    expect(
+        page.locator('[data-proc-head][data-proc-id="tst"] [data-proc-count]')
+    ).to_have_value("5")
     # Confirm tes1's input wiring survived the save.
     tes1 = page.locator('[data-node="tes1"]')
     expect(tes1.locator("[data-input]")).to_have_value("src")
