@@ -153,6 +153,8 @@ def _procedure_info_by_control(conn: sqlite3.Connection) -> dict[str, list[dict]
             )
             proc_info.append({
                 "procedure_id": proc.procedure_id,
+                "code": proc.code,
+                "assertion": proc.assertion,
                 "title": proc.title,
                 "narrative": proc.narrative,
                 "test_code": resolve_test_code(transient),

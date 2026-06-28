@@ -59,6 +59,19 @@ JOIN_MODE_CHOICES: list[tuple[str, str]] = [
 _EMPTY_GRAPH: dict[str, Any] = {"nodes": []}
 _XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
+# Stable, position-indexed palette for procedures (the Builder panel dot, the
+# per-Test selector chips, and the Flowchart box outlines all index into this).
+# Kept here (route module) because it is presentation-only; the colors are plain
+# hex so the SVG/inline styles can use them directly (the CSS *tokens* still drive
+# the surrounding chrome — learning 0005). If you ever duplicate this palette,
+# keep both copies in sync.
+_PROC_PALETTE = ["#4f7cff", "#18a999", "#d9822b", "#9b5de5", "#e5556e", "#3aa0c2"]
+
+
+def procedure_color(position: int) -> str:
+    """The stable chip/outline color for the procedure at *position* (wraps)."""
+    return _PROC_PALETTE[position % len(_PROC_PALETTE)]
+
 
 def _now_iso() -> str:
     from datetime import UTC, datetime
@@ -167,6 +180,32 @@ def _diagram(pipeline: Pipeline, counts: dict[str, int]) -> dict[str, Any]:
     lanes = _assign_lanes(pipeline, order)
     lane_count = (max(lanes.values()) + 1) if lanes else 1
 
+    # Per-procedure colors: each box takes its FIRST owning procedure's color and
+    # the diagram carries a small legend. Best-effort — an incomplete graph yields
+    # no colors, never a 500 (learning 0013).
+    proc_color_by_node: dict[str, str] = {}
+    legend: list[dict[str, Any]] = []
+    try:
+        from controlflow_sdk.pipeline.procedures import (
+            derived_membership,
+            effective_procedures,
+        )
+
+        eff = effective_procedures(pipeline)
+        color_by_pid = {p.id: procedure_color(i) for i, p in enumerate(eff)}
+        pos_by_pid = {p.id: i for i, p in enumerate(eff)}
+        legend = [
+            {"code": p.code or f"P{i + 1}", "name": p.name, "color": color_by_pid[p.id]}
+            for i, p in enumerate(eff)
+        ]
+        for nid, pids in derived_membership(pipeline).items():
+            if pids:
+                first = min(pids, key=lambda p: pos_by_pid.get(p, 1 << 30))
+                proc_color_by_node[nid] = color_by_pid[first]
+    except Exception:  # noqa: BLE001 — incomplete graph → no colors, never 500 (0013)
+        proc_color_by_node = {}
+        legend = []
+
     boxes = [
         {
             "id": n.id,
@@ -177,6 +216,7 @@ def _diagram(pipeline: Pipeline, counts: dict[str, int]) -> dict[str, Any]:
             "row": i,
             "lane": lanes[n.id],
             "terminal": n.id in terminal_ids,
+            "proc_color": proc_color_by_node.get(n.id),
         }
         for i, n in enumerate(order)
     ]
@@ -188,7 +228,10 @@ def _diagram(pipeline: Pipeline, counts: dict[str, int]) -> dict[str, Any]:
         for n in order
         for src in n.inputs
     ]
-    return {"boxes": boxes, "edges": edges, "rows": len(order), "lanes": lane_count}
+    return {
+        "boxes": boxes, "edges": edges, "rows": len(order),
+        "lanes": lane_count, "procedures": legend,
+    }
 
 
 def _assign_lanes(pipeline: Pipeline, order: list[Any]) -> dict[str, int]:
@@ -465,6 +508,75 @@ def _ai_apply_error(
 # Render the editor
 # ---------------------------------------------------------------------------
 
+def _procedure_context(pipeline: Pipeline | None) -> dict[str, Any]:
+    """Procedure view-model for the Builder panel, per-Test selector and chips.
+
+    Returns three keys used by ``_procedures_panel.html`` / ``_pipe_node.html``:
+
+    - ``procedures`` — the *effective* procedures (author-defined plus one-per-orphan
+      terminal), each with its position color; this is the panel + the selector list.
+    - ``node_procedures`` — ``{node_id: [{id, code, color}]}`` derived membership chips.
+    - ``selected_procedure_for`` — ``{test_node_id: effective_owning_procedure_id}``.
+      Pre-selecting the **effective** owner (not just ``config['procedure_id']``) is
+      what makes a legacy/auto-derived control round-trip on save instead of resetting
+      every Test to "unassigned" (the auto procedure's id is reflected, then persisted).
+
+    Best-effort: an incomplete / unparseable graph yields empty data, never a 500
+    (learning 0013).
+    """
+    empty: dict[str, Any] = {
+        "procedures": [], "node_procedures": {}, "selected_procedure_for": {}
+    }
+    if pipeline is None:
+        return empty
+    try:
+        from controlflow_sdk.pipeline.procedures import (
+            derived_membership,
+            effective_procedures,
+            tests_for_procedure,
+        )
+
+        eff = effective_procedures(pipeline)
+        color_by_pid = {p.id: procedure_color(i) for i, p in enumerate(eff)}
+        pos_by_pid = {p.id: i for i, p in enumerate(eff)}
+        procedures = [
+            {
+                "id": p.id,
+                "code": p.code or f"P{i + 1}",
+                "name": p.name,
+                "assertion": p.assertion,
+                "failure_threshold_pct": p.failure_threshold_pct,
+                "failure_threshold_count": p.failure_threshold_count,
+                "color": color_by_pid[p.id],
+            }
+            for i, p in enumerate(eff)
+        ]
+        code_by_pid = {p["id"]: p["code"] for p in procedures}
+        mem = derived_membership(pipeline)
+        node_procedures = {
+            nid: [
+                {
+                    "id": pid,
+                    "code": code_by_pid.get(pid, pid),
+                    "color": color_by_pid.get(pid, "#888"),
+                }
+                for pid in sorted(pids, key=lambda p: pos_by_pid.get(p, 1 << 30))
+            ]
+            for nid, pids in mem.items()
+        }
+        selected_procedure_for: dict[str, str] = {}
+        for p in eff:
+            for t in tests_for_procedure(pipeline, p.id):
+                selected_procedure_for[t.id] = p.id
+        return {
+            "procedures": procedures,
+            "node_procedures": node_procedures,
+            "selected_procedure_for": selected_procedure_for,
+        }
+    except Exception:  # noqa: BLE001 — incomplete graph → no panel data, never 500 (0013)
+        return empty
+
+
 def _editor_context(
     request: Request, conn: sqlite3.Connection, root: Any, control_id: str,
     *, save_errors: list[str] | None = None,
@@ -537,6 +649,7 @@ def _editor_context(
         # from), not the stored graph — the stored graph may be empty/absent for a
         # rule_spec or fresh control, so submitting it would silently discard edits.
         builder_graph_json = json.dumps(builder_graph)
+        cards_pipeline = builder_parsed
     else:
         # Order the raw node dicts topologically for the cards (falls back to
         # as-stored when the graph can't be parsed yet).
@@ -547,10 +660,13 @@ def _editor_context(
             else [_raw_card_vm(n, node_errors or {}) for n in graph.get("nodes", [])]
         )
         builder_graph_json = json.dumps(graph)
+        cards_pipeline = parsed
 
     from controlflow_sdk.plane.routes.ai import _ai_configured
 
     return {
+        # Procedure panel + per-Test selector + derived chips (best-effort; 0013).
+        **_procedure_context(cards_pipeline),
         "project": repo.get_project(conn) or {"name": ""},
         "control": control,
         "control_id": control_id,
@@ -910,6 +1026,8 @@ def register(
                             "sources": sources,
                             "op_choices": OP_CHOICES,
                             "join_mode_choices": JOIN_MODE_CHOICES,
+                            # Keep the per-Test selector + chips after the swap (0013).
+                            **_procedure_context(err_parsed),
                         },
                         status_code=422,
                     )
@@ -958,6 +1076,8 @@ def register(
                         "sources": sources,
                         "op_choices": OP_CHOICES,
                         "join_mode_choices": JOIN_MODE_CHOICES,
+                        # Keep the per-Test selector + chips after the swap.
+                        **_procedure_context(builder_parsed),
                     },
                 )
             return RedirectResponse(f"/controls/{control_id}/logic/builder", status_code=303)
@@ -1128,6 +1248,8 @@ def register(
                     "sources": sources,
                     "op_choices": OP_CHOICES,
                     "join_mode_choices": JOIN_MODE_CHOICES,
+                    # Keep the per-Test selector + chips after the swap.
+                    **_procedure_context(builder_parsed),
                 },
                 # The JS picks up the merged graph from this HX-Trigger event.
                 headers={"HX-Trigger": json.dumps(

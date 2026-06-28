@@ -147,6 +147,17 @@ Go to **Controls → New control**. Fill in the metadata form:
 - **Framework references** (e.g. NIST 800-53 `AC-5`, `AC-2`)
 - **Source bindings** — select one or more sources from your project
 
+### Procedures — grouping checks within a control
+
+A control's test logic can be organized into **named procedures** via the **Procedures panel** in the
+Logic tab. Each procedure has a short code (P1, P2, …), a human name, and a free-text assertion (e.g.
+"Segregation of Duties"); individual Test nodes are then assigned to a procedure using the
+**"Procedure ▾"** selector. When a procedure covers multiple Test nodes, their violations are merged by
+item-key (with a "failed check(s)" annotation) and population is counted as **distinct items
+examined** — producing a single rolled-up result per procedure, each evaluated against its own
+threshold. Per-procedure colors carry through the Builder canvas, the Flowchart SVG legend, and the
+rendered workpaper sections.
+
 ### The no-code rule builder
 
 For single-source controls you can define the test logic without writing Python using the **rule

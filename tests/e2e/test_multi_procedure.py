@@ -214,30 +214,33 @@ def test_author_run_export_two_procedure_control(
     expect(page).to_have_url(re.compile(r"/controls/fork/runs/"))
 
     # ── 8. Assert the run view (main document) ──────────────────────────────
-    #    Both branches flag A1 → aggregate: Records tested=2.
-    #    The union aggregate concatenates violations from both procedures (A1
-    #    flagged once per branch) → Failed=2.
+    #    Both branches flag A1 → aggregate: Records tested=2 (distinct examined).
+    #    The control-level aggregate DEDUPLICATES violations by item-key across
+    #    procedures (_merge_violations): both branches flag A1, but A1 is one
+    #    distinct item → Failed=1 (run.failed == len(merged violations)).
     #    Branch B (tes1) fails implicit-zero threshold → "Operated with
     #    deficiencies".
     tiles = page.locator(".tile")
     expect(tiles.filter(has_text="Records tested").locator(".tile-value")).to_have_text("2")
-    expect(tiles.filter(has_text="Failed").locator(".tile-value")).to_have_text("2")
+    expect(tiles.filter(has_text="Failed").locator(".tile-value")).to_have_text("1")
     expect(page.get_by_text("Operated with deficiencies")).to_be_visible()
 
     # ── 9. Assert the workpaper iframe: two procedure sections ──────────────
     #    The workpaper is embedded in an <iframe srcdoc> so we access it via
-    #    frame_locator.  Per _emit_procedures() in render/html.py, each
-    #    procedure renders as <h3>P{i}: {title} <badge class="badge pass/fail">
-    #    PASS/FAIL</span></h3>.
+    #    frame_locator.  Per _emit_procedures() in render/html.py each procedure
+    #    renders as <h3>{code} &middot; {title} <badge>PASS/FAIL</span></h3> when it
+    #    carries a code (the auto procedures now do — P1/P2), else the legacy
+    #    <h3>P{i}: {title} …</h3>. The regexes below match the "P1"/"P2" prefix and
+    #    the title without pinning the separator, so they accept both formats.
     wp = page.frame_locator("iframe.workpaper-frame")
 
-    # Branch A: "P1: High pass rate PASS" (1 exception ≤ threshold_count=5)
-    p1_heading = wp.get_by_role("heading", name=re.compile(r"P1:.*High pass rate"))
+    # Branch A: "P1 · High pass rate PASS" (1 exception ≤ threshold_count=5)
+    p1_heading = wp.get_by_role("heading", name=re.compile(r"P1.*High pass rate"))
     expect(p1_heading).to_be_visible()
     expect(p1_heading.locator(".badge.pass")).to_be_visible()
 
-    # Branch B: "P2: Zero tolerance FAIL" (1 exception, implicit-zero threshold)
-    p2_heading = wp.get_by_role("heading", name=re.compile(r"P2:.*Zero tolerance"))
+    # Branch B: "P2 · Zero tolerance FAIL" (1 exception, implicit-zero threshold)
+    p2_heading = wp.get_by_role("heading", name=re.compile(r"P2.*Zero tolerance"))
     expect(p2_heading).to_be_visible()
     expect(p2_heading.locator(".badge.fail")).to_be_visible()
 

@@ -212,7 +212,9 @@
       "description": "A single test procedure within a workpaper (Procedure.to_dict() shape).",
       "required": ["title", "narrative", "test_code", "result"],
       "properties": {
+        "code": { "type": "string" },
         "title": { "type": "string" },
+        "assertion": { "type": "string" },
         "narrative": { "type": "string" },
         "test_code": { "type": "string" },
         "result": { "$ref": "#/$defs/run" }

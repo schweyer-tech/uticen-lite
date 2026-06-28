@@ -925,7 +925,14 @@ def _emit_procedures(emit, wp: Workpaper) -> None:
             if passed
             else '<span class="badge fail">FAIL</span>'
         )
-        emit(f"<h3>P{i}: {_e(proc.title)} {badge}</h3>")
+        # Heading: show code prefix when present (guard keeps N≤1 byte-identical when empty).
+        if proc.code:
+            emit(f"<h3>{_e(proc.code)} &middot; {_e(proc.title)} {badge}</h3>")
+        else:
+            emit(f"<h3>P{i}: {_e(proc.title)} {badge}</h3>")
+        # Assertion subtitle — suppressed when empty (byte-identical guard).
+        if proc.assertion:
+            emit(f'<p class="assert">Assertion: {_e(proc.assertion)}</p>')
         emit(f"<p>{_e(proc.narrative)}</p>")
 
         # collapsible code block (the single header "Generated" date suffices —
@@ -955,18 +962,34 @@ def _emit_procedures(emit, wp: Workpaper) -> None:
                 f'<span class="muted">{_e(threshold_text)} {_e(result_text)}</span></p>'
             )
 
-        # per-procedure violations table
+        # per-procedure violations table (with "Failed check(s)" column when any v has checks)
         if run.violations:
+            has_checks = any(v.details.get("checks") for v in run.violations)
             emit("<table>")
-            emit("<thead><tr><th>Item Key</th><th>Severity</th><th>Description</th></tr></thead>")
+            if has_checks:
+                emit(
+                    "<thead><tr>"
+                    "<th>Item Key</th><th>Severity</th><th>Description</th>"
+                    "<th>Failed check(s)</th>"
+                    "</tr></thead>"
+                )
+            else:
+                emit(
+                    "<thead><tr><th>Item Key</th><th>Severity</th><th>Description</th></tr></thead>"
+                )
             emit("<tbody>")
             for v in run.violations:
                 sev_cls = _severity_class(str(v.severity))
+                checks_raw: list[str] = v.details.get("checks") or []
+                checks_cell = (
+                    f"<td>{_e(', '.join(checks_raw))}</td>" if has_checks else ""
+                )
                 emit(
                     "<tr>"
                     f'<td class="mono">{_e(v.item_key)}</td>'
                     f'<td class="{_e(sev_cls)}">{_e(v.severity)}</td>'
                     f"<td>{_e(v.description)}</td>"
+                    f"{checks_cell}"
                     "</tr>"
                 )
             emit("</tbody></table>")

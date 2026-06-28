@@ -220,8 +220,16 @@ def _render_procedures(lines: list[str], wp: Workpaper) -> None:
     for i, proc in enumerate(wp.procedures, start=1):
         run = proc.result
         status = "PASS" if run.failed == 0 else "FAIL"
-        lines.append(f"### P{i}: {proc.title} — {status}")
+        # Heading: show code prefix when present (guard keeps N≤1 byte-identical when empty).
+        if proc.code:
+            lines.append(f"### {proc.code}: {proc.title} — {status}")
+        else:
+            lines.append(f"### P{i}: {proc.title} — {status}")
         lines.append("")
+        # Assertion subtitle — suppressed when empty (byte-identical guard).
+        if proc.assertion:
+            lines.append(f"_Assertion: {proc.assertion}_")
+            lines.append("")
         lines.append(proc.narrative)
         lines.append("")
         lines.append("```python")
@@ -244,13 +252,20 @@ def _render_procedures(lines: list[str], wp: Workpaper) -> None:
             )
             lines.append("")
         if run.violations:
-            lines.append("| Item Key | Severity | Description |")
-            lines.append("| --- | --- | --- |")
+            has_checks = any(v.details.get("checks") for v in run.violations)
+            if has_checks:
+                lines.append("| Item Key | Severity | Description | Failed checks |")
+                lines.append("| --- | --- | --- | --- |")
+            else:
+                lines.append("| Item Key | Severity | Description |")
+                lines.append("| --- | --- | --- |")
             for v in run.violations:
                 key = _md_cell(v.item_key)
                 sev = _md_cell(v.severity)
                 desc = _md_cell(v.description)
-                lines.append(f"| {key} | {sev} | {desc} |")
+                checks_raw: list[str] = v.details.get("checks") or []
+                checks_cell = f" | {_md_cell(', '.join(checks_raw))}" if has_checks else ""
+                lines.append(f"| {key} | {sev} | {desc}{checks_cell} |")
             lines.append("")
 
 

@@ -48,16 +48,19 @@ class CompileResult:
 
 @dataclass(frozen=True)
 class CompiledProcedure:
-    """One compiled artifact for a single terminal (procedure) in a pipeline.
+    """One compiled artifact for an effective procedure in a pipeline.
 
-    For a multi-terminal pipeline, each terminal compiles independently via a
-    sub-pipeline that contains only that terminal's ancestors.
+    For a multi-check procedure the result is compiled from the union sub-pipeline
+    of all its Test nodes. For a single-check procedure it may be a rule_spec or
+    a python string (the same as the pre-procedure per-terminal path).
     """
 
     procedure_id: str
     title: str
     narrative: str
     result: CompileResult
+    code: str = ""
+    assertion: str = ""
 
 
 def compile_pipeline(pipeline: Pipeline) -> CompileResult:
@@ -74,38 +77,60 @@ def compile_pipeline(pipeline: Pipeline) -> CompileResult:
     return CompileResult(test_kind="python", test_code=_emit_python(pipeline))
 
 
-def _subpipeline_for(pipeline: Pipeline, terminal: Node) -> Pipeline:
-    """Extract the sub-pipeline that contains only *terminal* and its ancestors."""
-    keep: dict[str, Node] = {}
+def _subpipeline_for_terminals(pipeline: Pipeline, terminals: list[Node]) -> Pipeline:
+    """Sub-pipeline = the union of the ancestor closures of *terminals*.
+
+    Declared node order is preserved for determinism. Procedure defs are dropped
+    from the slice (the slice compiles to violations only)."""
+    keep: set[str] = set()
 
     def visit(nid: str) -> None:
         if nid in keep:
             return
-        n = pipeline.node(nid)
-        keep[nid] = n
-        for src in n.inputs:
+        keep.add(nid)
+        for src in pipeline.node(nid).inputs:
             visit(src)
 
-    visit(terminal.id)
-    # preserve declared order for determinism
+    for t in terminals:
+        visit(t.id)
     return Pipeline(nodes=[n for n in pipeline.nodes if n.id in keep])
 
 
-def compile_pipeline_procedures(pipeline: Pipeline) -> list[CompiledProcedure]:
-    """Compile each terminal in *pipeline* to its own :class:`CompiledProcedure`.
+def _subpipeline_for(pipeline: Pipeline, terminal: Node) -> Pipeline:
+    """Back-compat single-terminal slice (now a thin wrapper)."""
+    return _subpipeline_for_terminals(pipeline, [terminal])
 
-    Returns one entry per terminal in ``pipeline.terminals`` order. Each procedure
-    is compiled independently from the sub-pipeline that contains only that
-    terminal and its ancestors — conditions from other branches never leak in.
+
+def compile_pipeline_procedures(pipeline: Pipeline) -> list[CompiledProcedure]:
+    """Compile each **effective procedure** to a :class:`CompiledProcedure`.
+
+    A procedure may own several Test nodes; its ``result`` is compiled from the
+    union sub-pipeline of those tests (the existing multi-terminal ``_out_<id>``
+    union emit produces one ``test()`` returning the concatenation of the checks'
+    violations). Falls back to one-procedure-per-terminal when none are defined.
     """
-    out = []
-    for t in pipeline.terminals:
-        sub = _subpipeline_for(pipeline, t)
-        title = t.config.get("title") or f"Test {t.id}"
-        out.append(CompiledProcedure(
-            procedure_id=t.id, title=str(title), narrative=t.narrative,
-            result=compile_pipeline(sub),
-        ))
+    from controlflow_sdk.pipeline.procedures import (
+        effective_procedures,
+        tests_for_procedure,
+    )
+
+    out: list[CompiledProcedure] = []
+    for proc in effective_procedures(pipeline):
+        tests = tests_for_procedure(pipeline, proc.id)
+        if not tests:
+            continue
+        sub = _subpipeline_for_terminals(pipeline, tests)
+        title = proc.name or (tests[0].config.get("title") or f"Test {tests[0].id}")
+        out.append(
+            CompiledProcedure(
+                procedure_id=proc.id,
+                title=str(title),
+                narrative=proc.narrative or tests[0].narrative,
+                result=compile_pipeline(sub),
+                code=proc.code,
+                assertion=proc.assertion,
+            )
+        )
     return out
 
 

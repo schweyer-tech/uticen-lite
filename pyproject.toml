@@ -57,6 +57,9 @@ packages = ["controlflow_sdk"]
 # register the `browser` marker so it does not emit PytestUnknownMarkWarning.
 # The CI e2e job overrides the ignore by targeting the dir: `pytest tests/e2e`.
 addopts = "--ignore=tests/e2e"
+# Restrict to test_ prefix so imported helpers (e.g. tests_for_procedure) are
+# not mistakenly collected as tests when they appear in a test module namespace.
+python_functions = ["test_*"]
 markers = [
   "browser: end-to-end Playwright browser test (opt-in; excluded from the fast unit lane)",
 ]

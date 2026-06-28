@@ -59,10 +59,30 @@ class Node:
 
 
 @dataclass(frozen=True)
+class ProcedureDef:
+    """A first-class, author-defined procedure grouping over a control's Test nodes.
+
+    Stored inside the (store-only) pipeline JSON beside ``nodes``. ``id`` is the
+    stable internal key Test nodes reference via ``config["procedure_id"]``.
+    Threshold/verdict are render+store-only; never serialized to the bundle (0015).
+    """
+
+    id: str
+    code: str = ""
+    name: str = ""
+    assertion: str = ""
+    narrative: str = ""
+    failure_threshold_pct: float | None = None
+    failure_threshold_count: int | None = None
+    position: int = 0
+
+
+@dataclass(frozen=True)
 class Pipeline:
     """An ordered DAG of :class:`Node` with one or more terminal Test nodes."""
 
     nodes: list[Node]
+    procedures: list[ProcedureDef] = field(default_factory=list)
 
     def node(self, node_id: str) -> Node:
         for n in self.nodes:
@@ -156,7 +176,32 @@ def parse_pipeline(raw: dict) -> Pipeline:
     _validate_inputs(nodes, seen_ids)
     _reject_cycles(nodes)  # before terminal analysis: a cycle confounds sink detection
     _validate_terminal(nodes)
-    return Pipeline(nodes=nodes)
+
+    raw_procs = raw.get("procedures", [])
+    if not isinstance(raw_procs, list):
+        raise PipelineError("'procedures' must be a list when present")
+    procedures = [_parse_procedure(rp) for rp in raw_procs]
+    proc_ids = {p.id for p in procedures}
+    if len(proc_ids) != len(procedures):
+        raise PipelineError("duplicate procedure id")
+    # Test nodes may reference a procedure; an unknown ref is tolerated (degrades to
+    # an auto procedure at compile/run) — do NOT raise (learning 0013).
+    return Pipeline(nodes=nodes, procedures=procedures)
+
+
+def _parse_procedure(rp: dict) -> ProcedureDef:
+    if not isinstance(rp, dict) or not rp.get("id"):
+        raise PipelineError("each procedure needs an 'id'")
+    return ProcedureDef(
+        id=str(rp["id"]),
+        code=str(rp.get("code", "")),
+        name=str(rp.get("name", "")),
+        assertion=str(rp.get("assertion", "")),
+        narrative=str(rp.get("narrative", "")),
+        failure_threshold_pct=rp.get("failure_threshold_pct"),
+        failure_threshold_count=rp.get("failure_threshold_count"),
+        position=int(rp.get("position", 0)),
+    )
 
 
 def _parse_node(rn: dict) -> Node:

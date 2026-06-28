@@ -101,6 +101,8 @@ def _build_workpaper(
             if proc_run is None:
                 continue  # no run yet for this procedure — skip (no result)
             procedures.append({
+                "code": pi.get("code", ""),
+                "assertion": pi.get("assertion", ""),
                 "narrative": pi["narrative"],
                 "result": proc_run,
                 "test_code": pi["test_code"],
@@ -131,6 +133,8 @@ def _build_workpaper(
     # Use the most recent run (last entry) as the workpaper's canonical result.
     latest_run = runs[-1]
     procedure = {
+        "code": "",
+        "assertion": "",
         "narrative": control.narrative,
         "result": latest_run,
         "test_code": test_code,

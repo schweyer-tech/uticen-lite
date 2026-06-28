@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import importlib.resources
+import json
+
 from controlflow_sdk.schema.validate import validate_bundle
 
 # ---------------------------------------------------------------------------
@@ -162,3 +165,40 @@ def test_project_name_is_required():
     errors = validate_bundle(doc)
     assert errors, "Expected validation errors for missing project.name"
     assert any("name" in e for e in errors), f"Expected 'name' in errors, got: {errors}"
+
+
+def test_procedure_with_code_and_assertion_validates():
+    """A procedure carrying code/assertion passes — they are optional, not required."""
+    proc_with_extras = {
+        "title": "Manual JE Review",
+        "narrative": "we tested…",
+        "test_code": "def test(pop): ...",
+        "result": _VALID_RUN,
+        "code": "P1",
+        "assertion": "Segregation of Duties",
+    }
+    workpaper = {**_VALID_WORKPAPER, "procedures": [proc_with_extras]}
+    doc = {**_VALID_BUNDLE, "controls": [{**_VALID_CONTROL, "workpaper": workpaper}]}
+    errors = validate_bundle(doc)
+    assert errors == [], f"Procedure with code/assertion should validate, got: {errors}"
+
+
+def test_procedure_required_fields_unchanged():
+    """procedure.required stays [title, narrative, test_code, result]; code/assertion optional."""
+    schema_bytes = (
+        importlib.resources.files("controlflow_sdk.schema")
+        .joinpath("bundle.schema.json")
+        .read_bytes()
+    )
+    schema = json.loads(schema_bytes)
+    proc_required = schema["$defs"]["procedure"]["required"]
+    assert set(proc_required) == {"title", "narrative", "test_code", "result"}, (
+        f"procedure required changed unexpectedly: {proc_required}"
+    )
+    # code and assertion must NOT be in required
+    assert "code" not in proc_required
+    assert "assertion" not in proc_required
+    # but they should be in properties (optional)
+    proc_props = schema["$defs"]["procedure"].get("properties", {})
+    assert "code" in proc_props, "code missing from procedure.properties"
+    assert "assertion" in proc_props, "assertion missing from procedure.properties"

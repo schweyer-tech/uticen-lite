@@ -32,6 +32,8 @@ class ProcedureSpec:
     title: str
     narrative: str
     test_code: str
+    code: str = ""
+    assertion: str = ""
     threshold: Threshold = field(default_factory=Threshold)
 
 
@@ -49,6 +51,8 @@ class Procedure:
     narrative: str
     test_code: str
     result: RunRecord
+    code: str = ""
+    assertion: str = ""
     threshold: Threshold = field(default_factory=Threshold)
 
     @property
@@ -61,9 +65,11 @@ class Procedure:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return the bundle-facing dict — threshold and determination are excluded."""
+        """Bundle-facing dict — threshold/determination excluded (0015); code/assertion additive."""
         return {
+            "code": self.code,
             "title": self.title,
+            "assertion": self.assertion,
             "narrative": self.narrative,
             "test_code": self.test_code,
             "result": self.result.to_dict(),
@@ -321,7 +327,9 @@ class Workpaper:
 
         built: list[Procedure] = [
             Procedure(
+                code=spec.code,
                 title=spec.title,
+                assertion=spec.assertion,
                 narrative=spec.narrative,
                 test_code=spec.test_code,
                 result=run,

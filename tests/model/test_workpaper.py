@@ -238,7 +238,8 @@ class TestProcedureDetermination:
         d = proc.to_dict()
         assert "threshold" not in d
         assert "determination" not in d
-        assert set(d.keys()) == {"title", "narrative", "test_code", "result"}
+        # code/assertion are additive (Task 4); threshold/determination remain excluded.
+        assert set(d.keys()) == {"code", "title", "assertion", "narrative", "test_code", "result"}
 
 
 class TestWorkpaperRollUp:
