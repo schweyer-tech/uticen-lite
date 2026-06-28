@@ -577,6 +577,41 @@ def _procedure_context(pipeline: Pipeline | None) -> dict[str, Any]:
         return empty
 
 
+def _card_bands(
+    cards_pipeline: Pipeline | None,
+    node_vms: list[dict[str, Any]],
+    proc_ctx: dict[str, Any],
+) -> dict[str, Any]:
+    """Group the ordered node view-models into a shared Inputs band + per-procedure
+    bands for the sectioned Builder. Best-effort: an unparsable graph (or any failure)
+    puts every card in the Inputs band so the page still renders (learning 0013)."""
+    vm_by_id = {vm["id"]: vm for vm in node_vms}
+    fallback = {"shared": {"key": "__inputs__", "nodes": node_vms}, "procedures": []}
+    if cards_pipeline is None:
+        return fallback
+    try:
+        from controlflow_sdk.pipeline.procedures import group_nodes_by_band
+
+        grouped = group_nodes_by_band(cards_pipeline)
+        proc_by_id = {p["id"]: p for p in proc_ctx.get("procedures", [])}
+        _proc_defaults: dict[str, Any] = {
+            "code": "", "name": "", "assertion": "",
+            "failure_threshold_pct": None, "failure_threshold_count": None, "color": "#888",
+        }
+        procedures = [
+            {
+                "key": band["id"],
+                "proc": proc_by_id.get(band["id"], {"id": band["id"], **_proc_defaults}),
+                "nodes": [vm_by_id[nid] for nid in band["node_ids"] if nid in vm_by_id],
+            }
+            for band in grouped["procedures"]
+        ]
+        shared_nodes = [vm_by_id[nid] for nid in grouped["shared"] if nid in vm_by_id]
+        return {"shared": {"key": "__inputs__", "nodes": shared_nodes}, "procedures": procedures}
+    except Exception:  # noqa: BLE001 — incomplete graph → one Inputs band, never 500 (0013)
+        return fallback
+
+
 def _editor_context(
     request: Request, conn: sqlite3.Connection, root: Any, control_id: str,
     *, save_errors: list[str] | None = None,
@@ -664,15 +699,17 @@ def _editor_context(
 
     from controlflow_sdk.plane.routes.ai import _ai_configured
 
+    proc_ctx = _procedure_context(cards_pipeline)
     return {
         # Procedure panel + per-Test selector + derived chips (best-effort; 0013).
-        **_procedure_context(cards_pipeline),
+        **proc_ctx,
         "project": repo.get_project(conn) or {"name": ""},
         "control": control,
         "control_id": control_id,
         "active": "pipeline",
         "graph_json": builder_graph_json,
         "nodes": ordered_nodes,
+        "bands": _card_bands(cards_pipeline, ordered_nodes, proc_ctx),
         "diagram": diagram,
         "generated_python": generated,
         "sources": sources,
@@ -1017,6 +1054,7 @@ def register(
                         if err_parsed is not None
                         else [_raw_card_vm(n, node_errors) for n in graph.get("nodes", [])]
                     )
+                    proc_ctx = _procedure_context(err_parsed)
                     return templates.TemplateResponse(
                         request,
                         "partials/_pipe_cards.html",
@@ -1027,7 +1065,8 @@ def register(
                             "op_choices": OP_CHOICES,
                             "join_mode_choices": JOIN_MODE_CHOICES,
                             # Keep the per-Test selector + chips after the swap (0013).
-                            **_procedure_context(err_parsed),
+                            **proc_ctx,
+                            "bands": _card_bands(err_parsed, err_nodes, proc_ctx),
                         },
                         status_code=422,
                     )
@@ -1067,6 +1106,7 @@ def register(
                     if builder_parsed is not None
                     else [_raw_card_vm(n, {}) for n in graph.get("nodes", [])]
                 )
+                proc_ctx = _procedure_context(builder_parsed)
                 return templates.TemplateResponse(
                     request,
                     "partials/_pipe_cards.html",
@@ -1077,7 +1117,8 @@ def register(
                         "op_choices": OP_CHOICES,
                         "join_mode_choices": JOIN_MODE_CHOICES,
                         # Keep the per-Test selector + chips after the swap.
-                        **_procedure_context(builder_parsed),
+                        **proc_ctx,
+                        "bands": _card_bands(builder_parsed, ordered_nodes, proc_ctx),
                     },
                 )
             return RedirectResponse(f"/controls/{control_id}/logic/builder", status_code=303)
@@ -1239,6 +1280,7 @@ def register(
                 else [_raw_card_vm(n, {}) for n in merged_graph.get("nodes", [])]
             )
 
+            proc_ctx = _procedure_context(builder_parsed)
             return templates.TemplateResponse(
                 request,
                 "partials/_pipe_cards.html",
@@ -1249,7 +1291,8 @@ def register(
                     "op_choices": OP_CHOICES,
                     "join_mode_choices": JOIN_MODE_CHOICES,
                     # Keep the per-Test selector + chips after the swap.
-                    **_procedure_context(builder_parsed),
+                    **proc_ctx,
+                    "bands": _card_bands(builder_parsed, ordered_nodes, proc_ctx),
                 },
                 # The JS picks up the merged graph from this HX-Trigger event.
                 headers={"HX-Trigger": json.dumps(
