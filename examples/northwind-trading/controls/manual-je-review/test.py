@@ -43,7 +43,7 @@ def test(pop):  # noqa: ANN001, ANN201
         elif reviewer_missing:  # P2 · Reviewer assigned
             violations.append({
                 "item_key": str(row["entry_id"]),
-                "description": "No independent reviewer assigned",
+                "description": "No independent reviewer assigned to entry {entry_id}",
                 "severity": "high",
                 "details": {"prepared_by": prepared_by},
             })

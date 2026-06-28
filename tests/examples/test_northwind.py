@@ -118,3 +118,18 @@ def test_northwind_runs_and_builds(tmp_path: Path) -> None:
     assert {p["assertion"] for p in gl1_procs} == {
         "Segregation of duties", "Authorization / approval evidence"
     }, gl1_procs
+    # Each procedure's distinct-items-examined population = 5 (the post-materiality set).
+    for proc in gl1_procs:
+        assert proc["result"]["total"] == 5, (
+            f"Finance.GL.1 {proc['code']}: expected population (result.total) = 5, "
+            f"got {proc['result']['total']}"
+        )
+    # P1 flags 2 self-review exceptions (JE-V01, JE-V03); P2 flags 1 missing-reviewer (JE-V02).
+    p1 = next(p for p in gl1_procs if p["code"] == "P1")
+    p2 = next(p for p in gl1_procs if p["code"] == "P2")
+    assert p1["result"]["failed"] == 2, (
+        f"Finance.GL.1 P1: expected 2 failed, got {p1['result']['failed']}"
+    )
+    assert p2["result"]["failed"] == 1, (
+        f"Finance.GL.1 P2: expected 1 failed, got {p2['result']['failed']}"
+    )
