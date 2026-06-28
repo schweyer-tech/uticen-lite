@@ -25,6 +25,7 @@ from fastapi.templating import Jinja2Templates
 
 from controlflow_sdk.store import repo
 from controlflow_sdk.store.db import connect
+from controlflow_sdk.store.import_service import reset_to_demo
 
 
 def register(
@@ -64,5 +65,17 @@ def register(
                 created_at=project.get("created_at", "") or "",
             )
             return RedirectResponse(url="/settings", status_code=303)
+        finally:
+            conn.close()
+
+    @app.post("/settings/reset-demo")
+    async def reset_demo(request: Request) -> RedirectResponse:
+        # Destructive recovery: wipe the engagement and reload the Northwind demo.
+        # Per-handler connection (learning 0002).
+        root = request.app.state.project_root
+        conn = connect(root)
+        try:
+            reset_to_demo(conn, root)
+            return RedirectResponse(url="/", status_code=303)
         finally:
             conn.close()

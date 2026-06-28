@@ -596,3 +596,82 @@ def test_run_control_executes_a_rule(tmp_path: Path):
     assert run.failed == 1
     assert run.violations[0].item_key == "U1"
     assert run.provenance[0].source_id == "users"
+
+
+# ---------------------------------------------------------------------------
+# Corrupted-state degradation: ordinary authoring mistakes must surface as
+# RunnerError (never a raw ValueError/TypeError/FileNotFoundError/ArrowInvalid),
+# so the web Run button and `cflow run` both degrade to a friendly page (0013).
+# ---------------------------------------------------------------------------
+
+
+def _rule_control(rule_spec: dict, binding: SourceBinding | None = None) -> ControlDef:
+    return ControlDef(
+        id="sod", title="SoD", objective="o", narrative="n",
+        framework_refs=FrameworkRefs(), risk=None,
+        sources=[binding or _users_binding()],
+        rule_spec=rule_spec,
+    )
+
+
+class TestRunControlCorruptedState:
+    def test_cross_source_unknown_other_source_raises_runner_error(self, tmp_path: Path):
+        """A cross-source condition naming a deleted source → RunnerError, not ValueError."""
+        from controlflow_sdk.runner import RunnerError, run_control
+
+        root = _csv(tmp_path)
+        binding = _users_binding()
+        control = _rule_control(
+            {
+                "logic": "all",
+                "conditions": [
+                    {"op": "not_exists_in", "column": "user_id",
+                     "other_source": "ghost", "this_key": "user_id",
+                     "other_key": "employee_id"},
+                ],
+                "severity": "high",
+                "description_template": "User {user_id}",
+                "item_key_column": "user_id",
+            },
+            binding,
+        )
+        with pytest.raises(RunnerError, match="sod"):
+            run_control(control, {"users": binding}, root, "2026-03-31T00:00:00+00:00")
+
+    def test_comparison_on_text_column_raises_runner_error(self, tmp_path: Path):
+        """A gt/lt comparison against a text column (type mismatch) → RunnerError, not TypeError."""
+        from controlflow_sdk.runner import RunnerError, run_control
+
+        root = _csv(tmp_path)
+        binding = _users_binding()
+        control = _rule_control(
+            {
+                "logic": "all",
+                "conditions": [{"column": "user_id", "op": "gt", "value": 5}],
+                "severity": "high",
+                "description_template": "User {user_id}",
+                "item_key_column": "user_id",
+            },
+            binding,
+        )
+        with pytest.raises(RunnerError, match="sod"):
+            run_control(control, {"users": binding}, root, "2026-03-31T00:00:00+00:00")
+
+    def test_missing_source_file_raises_runner_error(self, tmp_path: Path):
+        """A bound source whose backing file is gone → RunnerError, not FileNotFoundError."""
+        from controlflow_sdk.runner import RunnerError, run_control
+
+        # tmp_path has no data/users.csv on disk → adapter.load() raises FileNotFoundError.
+        binding = _users_binding()
+        control = _rule_control(
+            {
+                "logic": "all",
+                "conditions": [{"column": "can_create", "op": "eq", "value": True}],
+                "severity": "high",
+                "description_template": "User {user_id}",
+                "item_key_column": "user_id",
+            },
+            binding,
+        )
+        with pytest.raises(RunnerError, match="users"):
+            run_control(control, {"users": binding}, tmp_path, "2026-03-31T00:00:00+00:00")

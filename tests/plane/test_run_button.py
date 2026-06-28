@@ -9,6 +9,9 @@ should also be available on the drilled down control page."
 import io
 import json
 
+from controlflow_sdk.store import repo
+from controlflow_sdk.store.db import connect
+
 
 def _make_source(client, sid="users", csv=b"user_id,can_create\nU1,true\n"):
     client.post(
@@ -82,3 +85,95 @@ def test_control_editor_has_run_button(client):
     assert 'action="/controls/sod/run"' in page.text
     # exactly ONE Run form — guards against the duplicate-block merge artifact
     assert page.text.count('action="/controls/sod/run"') == 1
+
+
+# ---------------------------------------------------------------------------
+# Corrupted persisted state from ordinary authoring mistakes must degrade to a
+# friendly 422 page — never a raw 500 (2026-06-27 review, learning 0013).
+# ---------------------------------------------------------------------------
+
+
+def _corrupt_rule_control(client, rule_spec, source_ids=("users",), cid="bad"):
+    """Persist a control whose rule_spec evaluates to an error, bypassing the builder."""
+    conn = connect(client.app.state.project_root)
+    try:
+        repo.upsert_control(
+            conn, id=cid, title="Bad", objective="o", narrative="n",
+            framework_refs={}, test_kind="rule", rule_spec=rule_spec,
+            failure_threshold_count=0,
+        )
+        repo.set_control_sources(conn, cid, list(source_ids))
+    finally:
+        conn.close()
+
+
+def test_run_cross_source_unknown_source_is_friendly_not_500(client):
+    # A cross-source condition whose other_source was deleted/renamed → ValueError.
+    _make_source(client, "users", b"user_id\nU1\nU2\n")
+    _corrupt_rule_control(client, {
+        "logic": "all",
+        "conditions": [{"op": "not_exists_in", "column": "user_id",
+                        "other_source": "ghost", "this_key": "user_id",
+                        "other_key": "employee_id"}],
+        "severity": "high", "description_template": "User {user_id}",
+        "item_key_column": "user_id"})
+    resp = client.post("/controls/bad/run", follow_redirects=False)
+    assert resp.status_code == 422, resp.text
+
+
+def test_run_comparison_on_text_column_is_friendly_not_500(client):
+    # A gt comparison on a text column (type mismatch) → pandas TypeError.
+    _make_source(client, "users", b"user_id\nU1\nU2\n")
+    _corrupt_rule_control(client, {
+        "logic": "all",
+        "conditions": [{"column": "user_id", "op": "gt", "value": 5}],
+        "severity": "high", "description_template": "User {user_id}",
+        "item_key_column": "user_id"})
+    resp = client.post("/controls/bad/run", follow_redirects=False)
+    assert resp.status_code == 422, resp.text
+
+
+def test_run_invalid_regex_is_friendly_not_500(client):
+    # An invalid regex pattern → ArrowInvalid / re.error during evaluation.
+    _make_source(client, "users", b"user_id\nU1\nU2\n")
+    _corrupt_rule_control(client, {
+        "logic": "all",
+        "conditions": [{"column": "user_id", "op": "regex", "value": "("}],
+        "severity": "high", "description_template": "User {user_id}",
+        "item_key_column": "user_id"})
+    resp = client.post("/controls/bad/run", follow_redirects=False)
+    assert resp.status_code == 422, resp.text
+
+
+def test_run_missing_data_file_is_friendly_not_500(client):
+    # A bound source whose backing CSV is gone from disk → FileNotFoundError.
+    _make_source(client, "users", b"user_id,can_create\nU1,true\n")
+    (client.app.state.project_root / "data" / "users.csv").unlink()
+    _corrupt_rule_control(client, {
+        "logic": "all",
+        "conditions": [{"column": "can_create", "op": "eq", "value": True}],
+        "severity": "high", "description_template": "User {user_id}",
+        "item_key_column": "user_id"})
+    resp = client.post("/controls/bad/run", follow_redirects=False)
+    assert resp.status_code == 422, resp.text
+
+
+def test_run_unexpected_error_is_friendly_not_500(client, monkeypatch):
+    # Layer-2 backstop: even an unforeseen exception must not 500 the Run button.
+    _rule_control(client)
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("unexpected failure")
+
+    monkeypatch.setattr(
+        "controlflow_sdk.plane.routes.runs.run_control_in_store", boom
+    )
+    resp = client.post("/controls/sod/run", follow_redirects=False)
+    assert resp.status_code == 422, resp.text
+
+
+def test_run_view_missing_run_is_friendly_not_500(client):
+    # A run-view for a non-existent run_id must degrade, never 500.
+    _rule_control(client)
+    resp = client.get("/controls/sod/runs/deadbeefdeadbeef")
+    assert resp.status_code != 500, resp.text

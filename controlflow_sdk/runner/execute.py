@@ -163,10 +163,17 @@ def run_control(
     sources_by_id: dict[str, Population] = {}
 
     for binding in control.sources:
-        src_binding = sources[binding.id]
-        adapter = source_for(src_binding, root)
-        pop = adapter.load()
-        raw_prov: dict[str, Any] = adapter.provenance()
+        try:
+            src_binding = sources[binding.id]
+            adapter = source_for(src_binding, root)
+            pop = adapter.load()
+            raw_prov: dict[str, Any] = adapter.provenance()
+        except Exception as exc:
+            # A missing file, an unknown binding, or any adapter parse failure must
+            # surface as a friendly RunnerError naming the control and source (0013).
+            raise RunnerError(
+                f"Control '{control.id}': couldn't load source '{binding.id}': {exc}"
+            ) from exc
         prov_records.append(
             SourceProvenance(
                 source_id=src_binding.id,
@@ -187,13 +194,22 @@ def run_control(
     primary: Population = populations[0]
 
     # ── 3. Load and execute the author callable OR evaluate the rule spec ────
+    raw_result: Any
     if control.rule_spec is not None:
         from controlflow_sdk.rules.evaluate import evaluate_rule
         from controlflow_sdk.rules.spec import parse_rule_spec
 
-        raw_result: Any = evaluate_rule(
-            parse_rule_spec(control.rule_spec), primary, sources_by_id
-        )
+        try:
+            raw_result = evaluate_rule(
+                parse_rule_spec(control.rule_spec), primary, sources_by_id
+            )
+        except Exception as exc:
+            # Authoring mistakes (unknown cross-source, a comparison op on a text
+            # column, a bad regex, a missing column) must degrade, never 500 (0013).
+            tb_summary = _clean_traceback_summary(exc)
+            raise RunnerError(
+                f"Control '{control.id}': rule evaluation failed:\n{tb_summary}"
+            ) from exc
     else:
         test_fn = load_test_callable(control)
 

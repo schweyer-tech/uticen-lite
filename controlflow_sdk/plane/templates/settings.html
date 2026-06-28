@@ -53,4 +53,23 @@
     <a class="btn" href="/settings/updates">Manage updates</a>
   </div>
 </div>
+
+<div class="card">
+  <h2>Danger zone</h2>
+  <p class="lead">
+    Reset this engagement to the bundled Northwind demo. Use this to recover a
+    clean, runnable state after experimenting.
+  </p>
+  <div class="banner banner-error" role="alert">
+    <strong>This permanently deletes the current engagement.</strong>
+    Its sources, controls, and runs are erased and replaced with the Northwind
+    demo data. This cannot be undone.
+  </div>
+  <form method="post" action="/settings/reset-demo"
+        onsubmit="return confirm('This deletes the current engagement and reloads the Northwind demo data. Continue?')">
+    <div class="page-actions">
+      <button class="btn" type="submit">Reset to demo data</button>
+    </div>
+  </form>
+</div>
 {% endblock %}

@@ -236,3 +236,85 @@ def load_demo(conn: sqlite3.Connection, root: Path) -> tuple[int, int]:
         shutil.copy2(csv, dest_data / csv.name)
 
     return counts
+
+
+def reset_to_demo(conn: sqlite3.Connection, root: Path) -> tuple[int, int]:
+    """Restore *root*'s engagement to a pristine Northwind demo.
+
+    A user experimenting in the control plane can corrupt the engagement (delete a
+    bound source, leave a half-edited control, accumulate stale extracts) until runs
+    fail. This is the one-click recovery: it wipes the store and stale files, then
+    reloads the demo via :func:`load_demo` — except it preserves the two *app
+    settings* that are about the install, not the engagement: the AI selection
+    (``system["ai"]``) and the launch update-check toggle
+    (``system["check_updates_on_launch"]``).
+
+    Unlike :func:`load_demo` (which only UPSERTs), this clears first, so leftover
+    junk cannot survive the reset:
+
+    1. Snapshot the preserved ``system`` keys from the current project.
+    2. Wipe every user table — enumerated from ``sqlite_master`` so future
+       migrations that add tables are covered automatically — with foreign-key
+       enforcement off during the bulk delete.
+    3. Clear stale files: empty ``root/data/`` (the demo re-copies its CSVs) and
+       drop ``root/target/`` (stale workpapers/evidence). Missing dirs are ignored.
+    4. Reload the demo with :func:`load_demo`.
+    5. Restore the preserved ``system`` keys onto the reloaded demo project.
+
+    The caller owns migration and the connection.
+
+    Args:
+        conn: An open, migrated connection to the target engagement store.
+        root: The engagement directory whose store/files should be reset.
+
+    Returns:
+        ``(n_controls, n_sources)`` reloaded (from :func:`load_demo`).
+    """
+    # 1. Snapshot install-level settings that outlive the engagement.
+    existing = repo.get_project(conn) or {}
+    old_system = existing.get("system") or {}
+    preserved = {k: old_system[k] for k in ("ai", "check_updates_on_launch") if k in old_system}
+
+    # 2. Wipe every user table. PRAGMA foreign_keys toggles only outside a
+    #    transaction, so commit first; enumerating from sqlite_master keeps this
+    #    correct as future migrations add tables.
+    conn.commit()
+    conn.execute("PRAGMA foreign_keys = OFF")
+    tables = [
+        r[0]
+        for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        ).fetchall()
+    ]
+    for table in tables:
+        conn.execute(f'DELETE FROM "{table}"')
+    conn.commit()
+    conn.execute("PRAGMA foreign_keys = ON")
+
+    # 3. Clear stale files under root (be defensive about missing dirs).
+    data_dir = Path(root) / "data"
+    if data_dir.is_dir():
+        for child in data_dir.iterdir():
+            if child.is_dir() and not child.is_symlink():
+                shutil.rmtree(child, ignore_errors=True)
+            else:
+                child.unlink(missing_ok=True)
+    shutil.rmtree(Path(root) / "target", ignore_errors=True)
+
+    # 4. Reload the pristine demo.
+    counts = load_demo(conn, root)
+
+    # 5. Restore the preserved settings onto the reloaded demo project.
+    if preserved:
+        demo = repo.get_project(conn) or {}
+        system = dict(demo.get("system") or {})
+        system.update(preserved)
+        repo.upsert_project(
+            conn,
+            name=demo.get("name", "") or "",
+            framework=demo.get("framework"),
+            system=system,
+            created_at=demo.get("created_at", "") or "",
+        )
+
+    return counts
