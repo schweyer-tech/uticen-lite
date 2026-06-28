@@ -87,6 +87,11 @@
       <input id="f-cnt" type="number" name="failure_threshold_count"
              value="{{ control.failure_threshold_count if control and control.failure_threshold_count is not none else '' }}">
     </div>
+    <div class="field">
+      <label for="f-rationale">Threshold rationale</label>
+      <span class="hint">Optional. Why this tolerance is acceptable — captured for the audit file.</span>
+      <textarea id="f-rationale" name="failure_threshold_rationale" rows="3">{{ control.failure_threshold_rationale if control and control.failure_threshold_rationale else '' }}</textarea>
+    </div>
   </div>
 
   <div class="card">

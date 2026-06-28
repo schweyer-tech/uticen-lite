@@ -274,6 +274,7 @@ def _save_pipeline_graph(
         pipeline=graph,
         failure_threshold_pct=control["failure_threshold_pct"],
         failure_threshold_count=control["failure_threshold_count"],
+        failure_threshold_rationale=control["failure_threshold_rationale"],
     )
     # Union Import-node sources (primary) with other_source values from
     # cross-source conditions — Import sources come first (they are the primary
@@ -408,6 +409,7 @@ def _save_from_form(conn: sqlite3.Connection, form: Any, original_id: str | None
     nist = [s.strip() for s in str(form.get("framework_nist", "")).split(",") if s.strip()]
     pct = form.get("failure_threshold_pct")
     cnt = form.get("failure_threshold_count")
+    rationale = str(form.get("failure_threshold_rationale", "")).strip() or None
     source_ids = list(form.getlist("source_ids"))
 
     # Preserve existing logic for updates; use empty logic for new controls.
@@ -444,6 +446,7 @@ def _save_from_form(conn: sqlite3.Connection, form: Any, original_id: str | None
         pipeline=pipeline,
         failure_threshold_pct=float(pct) if pct else None,
         failure_threshold_count=int(cnt) if cnt else None,
+        failure_threshold_rationale=rationale,
     )
     repo.set_control_sources(conn, cid, source_ids)
     return cid
@@ -696,6 +699,7 @@ def register(
                 pipeline=existing["pipeline"],
                 failure_threshold_pct=existing["failure_threshold_pct"],
                 failure_threshold_count=existing["failure_threshold_count"],
+                failure_threshold_rationale=existing["failure_threshold_rationale"],
             )
             repo.set_control_sources(conn, control_id, existing["source_ids"])
             return RedirectResponse(f"/controls/{control_id}", status_code=303)

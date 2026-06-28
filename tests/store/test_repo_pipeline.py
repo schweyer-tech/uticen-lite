@@ -26,7 +26,7 @@ def test_migration_adds_pipeline_column_and_bumps_store_version(tmp_path: Path):
     cols = {r[1] for r in conn.execute("PRAGMA table_info(controls)").fetchall()}
     assert "pipeline" in cols
     # Store schema bumped past the previous version (NOT the bundle schema_version).
-    assert SCHEMA_VERSION == 6
+    assert SCHEMA_VERSION == 7
 
 
 def test_v3_store_upgrades_to_pipeline_without_data_loss(tmp_path: Path):

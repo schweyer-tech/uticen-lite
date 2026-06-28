@@ -269,7 +269,9 @@ def upsert_control(
     framework_refs: dict, test_kind: str, rule_spec: dict | None = None,
     test_code: str | None = None, pipeline: dict | None = None,
     failure_threshold_pct: float | None = None,
-    failure_threshold_count: int | None = None, created_at: str = "", updated_at: str = "",
+    failure_threshold_count: int | None = None,
+    failure_threshold_rationale: str | None = None,
+    created_at: str = "", updated_at: str = "",
 ) -> None:
     """Upsert a control.
 
@@ -282,18 +284,21 @@ def upsert_control(
         """INSERT INTO controls
              (id, title, objective, narrative, framework_refs,
               failure_threshold_pct, failure_threshold_count,
+              failure_threshold_rationale,
               test_kind, rule_spec, test_code, pipeline, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              title=excluded.title, objective=excluded.objective,
              narrative=excluded.narrative, framework_refs=excluded.framework_refs,
              failure_threshold_pct=excluded.failure_threshold_pct,
              failure_threshold_count=excluded.failure_threshold_count,
+             failure_threshold_rationale=excluded.failure_threshold_rationale,
              test_kind=excluded.test_kind, rule_spec=excluded.rule_spec,
              test_code=excluded.test_code, pipeline=excluded.pipeline,
              updated_at=excluded.updated_at""",
         (id, title, objective, narrative, json.dumps(framework_refs),
-         failure_threshold_pct, failure_threshold_count, test_kind,
+         failure_threshold_pct, failure_threshold_count, failure_threshold_rationale,
+         test_kind,
          json.dumps(rule_spec) if rule_spec is not None else None,
          test_code, json.dumps(pipeline) if pipeline is not None else None,
          created_at, updated_at),
@@ -334,8 +339,9 @@ def rename_control_id(conn: sqlite3.Connection, current_id: str, new_id: str) ->
             """INSERT INTO controls
                  (id, title, objective, narrative, framework_refs,
                   failure_threshold_pct, failure_threshold_count,
+                  failure_threshold_rationale,
                   test_kind, rule_spec, test_code, pipeline, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 new_id,
                 control["title"],
@@ -344,6 +350,7 @@ def rename_control_id(conn: sqlite3.Connection, current_id: str, new_id: str) ->
                 control["framework_refs"],
                 control["failure_threshold_pct"],
                 control["failure_threshold_count"],
+                control["failure_threshold_rationale"],
                 control["test_kind"],
                 control["rule_spec"],
                 control["test_code"],

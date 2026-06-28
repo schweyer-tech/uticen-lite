@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 # Forward-only, idempotent DDL. Index = target user_version.
 _STEPS: list[str] = [
@@ -141,6 +141,14 @@ _STEPS: list[str] = [
         record_path     TEXT,
         last_fetched_at TEXT
     );
+    """,
+    # --- step 7 -> user_version 7 -------------------------------------------
+    # Author rationale for a control's failure threshold (audit justification for
+    # why the tolerance is set where it is). Store + render concern only: like the
+    # thresholds themselves it is NEVER serialized into the bundle (learning 0015),
+    # so this bumps the STORE user_version only, not the bundle schema_version.
+    """
+    ALTER TABLE controls ADD COLUMN failure_threshold_rationale TEXT;
     """,
 ]
 
