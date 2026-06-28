@@ -6,7 +6,7 @@ from collections.abc import Callable, Generator
 from datetime import datetime
 from typing import Any
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -502,6 +502,42 @@ def register(
                 "all_sources": repo.list_sources(conn),
                 "ai_enabled": _ai_configured(conn),
             },
+        )
+
+    @app.post("/controls/{control_id}/sources", response_class=HTMLResponse)
+    def update_control_sources(
+        control_id: str,
+        request: Request,
+        action: str = Form(...),
+        source_id: str = Form(...),
+    ) -> HTMLResponse:
+        """Add/remove a single source binding and re-render the bound-sources
+        fragment in place (HTMX swap), so the page never reloads or scrolls to
+        the top (2026-06-27 review). Writing handler → per-handler conn (0002)."""
+        root = request.app.state.project_root
+        conn = connect(root)
+        try:
+            existing = repo.get_control(conn, control_id)
+            if existing is not None:
+                current = list(existing["source_ids"])
+                if action == "add" and source_id not in current:
+                    current.append(source_id)
+                elif action == "remove":
+                    current = [s for s in current if s != source_id]
+                # Never drop a binding the logic requires (pipeline imports /
+                # cross-source refs) — mirrors the metadata-save reconciliation.
+                for sid in _required_source_ids(existing):
+                    if sid not in current:
+                        current.append(sid)
+                repo.set_control_sources(conn, control_id, current)
+            control = repo.get_control(conn, control_id)
+            sources = repo.list_sources(conn)
+        finally:
+            conn.close()
+        return templates.TemplateResponse(
+            request,
+            "partials/_bound_sources.html",
+            {"control": control, "sources": sources},
         )
 
     # Register the specific sub-route BEFORE the /{control_id} catch-all so it

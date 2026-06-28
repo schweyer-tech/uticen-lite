@@ -8,7 +8,7 @@
 </div>
 {% if error %}<div class="callout callout-warn">{{ error }}</div>{% endif %}
 
-<div class="tabbar">
+<div class="tabs">
   <a class="tab {{ '' if mode == 'url' else 'active' }}" href="/sources/new">Upload file</a>
   <a class="tab {{ 'active' if mode == 'url' else '' }}" href="/sources/from-url">Fetch from URL</a>
 </div>
