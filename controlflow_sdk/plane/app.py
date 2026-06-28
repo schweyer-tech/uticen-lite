@@ -42,7 +42,7 @@ def create_app(project_root: Path) -> FastAPI:
     migrate(conn)
     conn.close()
 
-    app = FastAPI(title="ControlFlow Control Plane")
+    app = FastAPI(title="Uticen Lite")
     app.state.project_root = project_root
     app.mount("/static", StaticFiles(directory=str(_HERE / "static")), name="static")
 

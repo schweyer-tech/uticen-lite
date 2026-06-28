@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Control Plane{% endblock %}</title>
+  <title>{% block title %}Uticen Lite{% endblock %}</title>
+  <link rel="icon" type="image/png" href="/static/uticen-icon.png">
   <script>
     /* Apply the saved theme before first paint to avoid a flash. */
     (function () {
@@ -22,8 +23,8 @@
   <header class="app-header">
     <div class="app-header-inner">
       <a class="brand" href="/">
-        <span class="brand-mark">ControlFlow</span>
-        <span class="brand-sub">Control Plane</span>
+        <img class="brand-logo" src="/static/uticen-logo.png" alt="Uticen" height="28">
+        <span class="brand-sub">Lite</span>
       </a>
       {% if project and project.name %}
       <nav class="app-nav">
@@ -52,7 +53,7 @@
   </dialog>
   <main>{% block body %}{% endblock %}</main>
   <footer class="app-footer">
-    ControlFlow Control Plane · local authoring surface · created by
+    Uticen Lite · local authoring surface · created by
     <a href="https://schweyer.tech">schweyer.tech</a>
   </footer>
   <script>

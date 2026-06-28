@@ -1,4 +1,4 @@
-/* ControlFlow Control Plane — shares the workpaper design system so the
+/* Uticen Lite — shares the workpaper design system so the
    authoring surface and the documents it produces feel like one product.
    Tokens mirror controlflow_sdk/render/html.py (the workpaper renderer). */
 
@@ -80,8 +80,9 @@ a:hover { color: var(--accent-hover); }
   max-width: 1120px; margin: 0 auto;
   padding: 0 24px; height: 56px;
 }
-.brand { display: inline-flex; align-items: baseline; gap: 8px; white-space: nowrap; }
+.brand { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
 .brand:hover { color: inherit; }
+.brand-logo { height: 28px; width: auto; display: block; border-radius: 6px; }
 .brand-mark { font-size: 15px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em; }
 .brand-sub {
   font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;

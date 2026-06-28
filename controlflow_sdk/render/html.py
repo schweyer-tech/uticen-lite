@@ -1,6 +1,6 @@
 """Render a Workpaper to a self-contained HTML document.
 
-The output is **structurally equivalent and visually close** to ControlFlow's
+The output is **structurally equivalent and visually close** to Uticen's
 in-app workpaper view (same section model/order, sticky results bar, jump-nav
 sidebar, shared design tokens) — not a pixel-exact mirror of the React app.
 

@@ -8,7 +8,7 @@ from pathlib import Path
 def launch_banner(host: str, port: int) -> str:
     url = f"http://{host}:{port}"
     return (
-        f"ControlFlow Control Plane — {url}\n"
+        f"Uticen Lite — {url}\n"
         f"  launch with:  controlplane   (or)   python -m controlflow_sdk.plane"
     )
 
