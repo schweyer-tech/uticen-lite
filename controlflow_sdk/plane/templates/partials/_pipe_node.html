@@ -3,7 +3,8 @@
      data-node="{{ node.id }}" data-type="{{ node.type }}">
   <div class="pipe-card-head">
     <span class="pipe-kind k-{{ node.type }}">{{ node.type.replace('_', ' ') }}</span>
-    <span class="pipe-id">{{ node.id }}</span>
+    <span class="pipe-id">{{ node.title or node.id }}</span>
+    {% if node.title %}<span class="pipe-id-sub mono">{{ node.id }}</span>{% endif %}
     {% if node.count is not none %}
     <a class="pipe-count pipe-count-btn" target="_blank" rel="noopener"
        href="/controls/{{ control_id }}/logic/step/{{ node.id }}/data"
@@ -16,6 +17,13 @@
   </div>
 
   <div class="pipe-body">
+    {# Name: a human-readable display title for this node (rename). 2026-06-27 review. #}
+    <div class="pipe-row">
+      <label>Name</label>
+      <input type="text" data-node-title style="flex:1;min-width:240px;"
+             placeholder="{{ node.id }}" value="{{ node.title }}">
+    </div>
+
     {# Inputs: which upstream stream(s) this node consumes (Join names TWO by id). #}
     {% if node.type != 'import' %}
     <div class="pipe-row">
@@ -186,14 +194,19 @@
       <label>Code</label>
       <textarea data-code rows="6" style="flex:1;min-width:320px;font-family:var(--font-mono);font-size:12px;"
                 placeholder="# only `rows` is in scope — no file/source access">{{ node.config.get('code', '') }}</textarea>
+      <button type="button" class="btn btn-sm btn-ghost pipe-expand"
+              title="Expand with syntax highlighting" onclick="openFieldModal(this, 'code')">⤢</button>
     </div>
     {% endif %}
 
-    {# Narrative (why this step exists) — workpaper metadata. #}
-    <div class="pipe-row">
+    {# Narrative (why this step exists) — workpaper metadata. Wraps + expands;
+       pop out to a modal for the full text. 2026-06-27 review. #}
+    <div class="pipe-row pipe-row-field">
       <label>Narrative</label>
-      <input type="text" data-narrative style="flex:1;min-width:240px;"
-             placeholder="Why this step exists" value="{{ node.narrative }}">
+      <textarea data-narrative class="pipe-textarea" rows="2"
+                placeholder="Why this step exists">{{ node.narrative }}</textarea>
+      <button type="button" class="btn btn-sm btn-ghost pipe-expand" title="Expand to edit"
+              onclick="openFieldModal(this, 'narrative')">⤢</button>
     </div>
 
     {% if node.errors %}

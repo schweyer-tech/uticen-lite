@@ -180,7 +180,7 @@ def _ancestor_closure(pipeline: Pipeline, node: Node) -> list[Node]:
 
 
 def _canonical_node(node: Node) -> dict[str, Any]:
-    """The data-affecting fields of a node (narrative is a comment — excluded)."""
+    """The data-affecting fields of a node (narrative and title are cosmetic — excluded)."""
     return {
         "id": node.id, "type": node.type, "config": node.config,
         "inputs": list(node.inputs), "source_id": node.source_id,

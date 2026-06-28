@@ -1,9 +1,31 @@
 {% extends "base.html" %}
 {% block title %}{{ project.name }} — Logic Builder: {{ control.title if control else control_id }}{% endblock %}
 {% block head %}
+<link rel="stylesheet" href="/static/codemirror.min.css">
 <style>
   /* ── stacked node cards ─────────────────────────────────────────────── */
   .pipe-cards { display: flex; flex-direction: column; gap: 0; }
+  /* Wrapping/expandable field textareas + pop-out modal (2026-06-27 review) */
+  .pipe-textarea {
+    flex: 1; min-width: 240px; resize: vertical; min-height: 38px;
+    font-family: inherit; font-size: 13px; line-height: 1.4;
+  }
+  .pipe-row-field { align-items: flex-start; }
+  .pipe-expand { flex: 0 0 auto; }
+  .field-modal {
+    width: min(820px, 92vw); border: 1px solid var(--border-strong);
+    border-radius: var(--radius-card); background: var(--bg-surface-1);
+    color: var(--text-primary); padding: 0;
+  }
+  .field-modal::backdrop { background: rgba(0, 0, 0, 0.5); }
+  .field-modal-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .field-modal-head { display: flex; align-items: center; justify-content: space-between; }
+  .field-modal-head h3 { margin: 0; }
+  .field-modal-text {
+    width: 100%; min-height: 320px; resize: vertical;
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.5;
+  }
+  .field-modal .CodeMirror { height: 360px; border: 1px solid var(--border-strong); border-radius: 6px; }
   .pipe-card {
     background: var(--bg-surface-1); border: 1px solid var(--border-default);
     border-radius: var(--radius-card); padding: 14px 16px; position: relative;
@@ -23,6 +45,7 @@
   .pipe-kind.k-custom_python { background: var(--bg-surface-3); color: var(--text-secondary); }
   .pipe-kind.k-test { background: var(--status-success-muted); color: var(--status-success); }
   .pipe-id { font-family: var(--font-mono); font-size: 12px; color: var(--text-tertiary); }
+  .pipe-id-sub { font-size: 11px; color: var(--text-tertiary); opacity: 0.7; }
   .pipe-count {
     margin-left: auto; font-family: var(--font-mono); font-size: 12px;
     color: var(--text-secondary); white-space: nowrap;
@@ -169,7 +192,24 @@
   </div>
 </form>
 
+{# Pop-out editor modal for narrative / Python code (2026-06-27 review). #}
+<dialog id="field-modal" class="field-modal">
+  <div class="field-modal-body">
+    <div class="field-modal-head">
+      <h3 id="field-modal-title">Edit</h3>
+      <button type="button" class="btn btn-sm btn-ghost" data-field-cancel aria-label="Close">×</button>
+    </div>
+    <textarea id="field-modal-text" class="field-modal-text"></textarea>
+    <div class="page-actions">
+      <button type="button" class="btn btn-primary" data-field-save>Save</button>
+      <button type="button" class="btn btn-ghost" data-field-cancel>Cancel</button>
+    </div>
+  </div>
+</dialog>
+
 <!-- The whole graph as JSON; the editor script mutates it and the cards read it. -->
+<script src="/static/codemirror.min.js"></script>
+<script src="/static/codemirror-python.min.js"></script>
 <script id="graph-data" type="application/json">{{ graph_json | safe }}</script>
 <script>
   (function () {
@@ -182,7 +222,9 @@
       document.querySelectorAll('[data-node]').forEach(function (card) {
         var id = card.getAttribute('data-node');
         var type = card.getAttribute('data-type');
-        var node = { id: id, type: type, narrative: '', config: {}, inputs: [] };
+        var node = { id: id, type: type, title: '', narrative: '', config: {}, inputs: [] };
+        var titleEl = card.querySelector('[data-node-title]');
+        if (titleEl) { node.title = titleEl.value; }
         var narr = card.querySelector('[data-narrative]');
         if (narr) { node.narrative = narr.value; }
         if (type === 'import') {
@@ -329,7 +371,7 @@
     }
 
     function newNode(type) {
-      var node = { id: genId(type), type: type, narrative: '', config: {}, inputs: [] };
+      var node = { id: genId(type), type: type, title: '', narrative: '', config: {}, inputs: [] };
       if (type === 'import') { node.source_id = null; }
       if (type === 'custom_python') { node.config.flavor = 'transform'; node.config.code = 'rows = rows'; }
       if (type === 'filter' || type === 'test') { node.config.logic = 'all'; node.config.conditions = []; }
@@ -450,6 +492,49 @@
         reload();  // serialize + autosaveSubmit to refresh row counts
       });
     }
+
+    // ── Pop-out field editor (narrative / Python code) ───────────────────
+    // The expand buttons live inside cards (re-rendered on autosave), so they
+    // call this page-level function via inline onclick. Saving writes back to
+    // the inline field and reloads (serialize + scroll-preserving autosave).
+    var _fmTarget = null, _fmCM = null;
+    function openFieldModal(btn, kind) {
+      var card = btn.closest('.pipe-card');
+      if (!card) { return; }
+      _fmTarget = card.querySelector(kind === 'code' ? '[data-code]' : '[data-narrative]');
+      if (!_fmTarget) { return; }
+      var ta = document.getElementById('field-modal-text');
+      ta.value = _fmTarget.value;
+      document.getElementById('field-modal-title').textContent =
+        (kind === 'code') ? 'Edit Python code' : 'Edit narrative';
+      document.getElementById('field-modal').showModal();
+      if (kind === 'code' && window.CodeMirror) {
+        _fmCM = window.CodeMirror.fromTextArea(ta, {
+          mode: 'python', lineNumbers: true, indentUnit: 4, matchBrackets: true
+        });
+        setTimeout(function () { if (_fmCM) { _fmCM.refresh(); } }, 0);
+      }
+    }
+    function closeFieldModal() {
+      if (_fmCM) { _fmCM.toTextArea(); _fmCM = null; }
+      var dlg = document.getElementById('field-modal');
+      if (dlg.open) { dlg.close(); }
+      _fmTarget = null;
+    }
+    function saveFieldModal() {
+      if (_fmTarget) {
+        _fmTarget.value = _fmCM ? _fmCM.getValue()
+                                : document.getElementById('field-modal-text').value;
+      }
+      closeFieldModal();
+      reload();  // persist the change + re-render the cards
+    }
+    window.openFieldModal = openFieldModal;  // reachable from inline onclick
+    document.querySelectorAll('[data-field-cancel]').forEach(function (b) {
+      b.addEventListener('click', closeFieldModal);
+    });
+    var fmSave = document.querySelector('[data-field-save]');
+    if (fmSave) { fmSave.addEventListener('click', saveFieldModal); }
 
   })();
 </script>

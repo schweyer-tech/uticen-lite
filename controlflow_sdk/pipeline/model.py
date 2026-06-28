@@ -52,6 +52,7 @@ class Node:
     id: str
     type: str
     narrative: str = ""
+    title: str = ""  # human-readable display name (rename); non-data, excluded from cache key
     config: dict[str, Any] = field(default_factory=dict)
     inputs: list[str] = field(default_factory=list)
     source_id: str | None = None
@@ -173,6 +174,7 @@ def _parse_node(rn: dict) -> Node:
     if not isinstance(config, dict):
         raise PipelineError(f"node {node_id!r} config must be an object")
     narrative = str(rn.get("narrative", "") or "")
+    title = str(rn.get("title", "") or "")
 
     if node_type == "import":
         source_id = rn.get("source_id")
@@ -180,7 +182,7 @@ def _parse_node(rn: dict) -> Node:
             raise PipelineError(f"import node {node_id!r} requires a source_id")
         if inputs:
             raise PipelineError(f"import node {node_id!r} must have no inputs")
-        return Node(id=node_id, type="import", narrative=narrative,
+        return Node(id=node_id, type="import", narrative=narrative, title=title,
                     config=config, inputs=[], source_id=str(source_id))
 
     if node_type == "join":
@@ -204,7 +206,7 @@ def _parse_node(rn: dict) -> Node:
     if node_type != "import" and not inputs:
         raise PipelineError(f"node {node_id!r} of type {node_type!r} requires inputs")
 
-    return Node(id=node_id, type=node_type, narrative=narrative,
+    return Node(id=node_id, type=node_type, narrative=narrative, title=title,
                 config=config, inputs=list(inputs))
 
 
