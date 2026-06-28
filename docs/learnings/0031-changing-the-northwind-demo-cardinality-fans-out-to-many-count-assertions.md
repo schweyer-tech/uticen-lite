@@ -42,6 +42,18 @@ its seeded exception counts), before trusting the suite:
    API must be committed as a frozen CSV (one-time snapshot-to-file, [0025]), so CI never
    hits the network and the exception count is stable to assert.
 
+**Corollary — to add a capability showcase to the demo, prefer CONVERTING an existing
+control over ADDING a new one.** Converting keeps the control/source counts (and their
+≥5-file `== N` assertions, the README/PRODUCT-MAP count prose, and the wheel's packaged
+control/CSV counts) **stable**, confining the fan-out to that one control's own
+run/population/shape assertions — usually just `tests/examples/test_northwind.py` (its
+`EXPECTED` count, the bundle run-count, any per-procedure assertions) plus
+`tests/cli/test_build_cmd.py`'s build-summary run count. (2026-06-28: converting
+`manual-je-review` to two procedures left every `== 9` count untouched and only moved the
+bundle run count 9→11 via the per-procedure + aggregate fan-out [[0035]].) Keep the demo's
+seeded exception **total** unchanged where possible (re-attribute, don't add exceptions) so
+the grand-total assertion holds.
+
 ## Reference
 
 - `tests/examples/test_northwind.py` (`EXPECTED` dict + exception total + manifest counts).

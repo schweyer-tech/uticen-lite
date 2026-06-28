@@ -14,11 +14,11 @@ All data is **frozen as of 2026-03-31** — the control execution date. This ens
 
 ## The Controls
 
-Eight production-ready audit controls span financial, IT access, and procurement domains:
+Nine production-ready audit controls span financial, IT access, and procurement domains:
 
 | Control ID | Domain | Data Sources | NIST Ref | What It Flags | Exceptions |
 |---|---|---|---|---|---|
-| **manual-je-review** | Financial | journal_entries | AC-5 | Manual journal entries ≥$50k that are self-reviewed or lack a reviewer | 3 |
+| **manual-je-review** | Financial | journal_entries | AC-5 | **Two-procedure** showcase — **P1 · Independent Review** (self-reviewed material JE, Custom Python) + **P2 · Reviewer Assigned** (no reviewer assigned, no-code) — both over the \|amount\| ≥ $50k population | 3 |
 | **closed-period-postings** | Financial | journal_entries, closed_periods | — | Journal entries posted to accounting periods marked as closed | 2 |
 | **three-way-match** | Financial/Procurement | payments, invoices, purchase_orders | — | Payments without a matching approved PO (±1% tolerance) | 4 |
 | **terminated-access** | IT Access | access_accounts, employees | AC-2 | Active system accounts owned by terminated employees | 3 |
