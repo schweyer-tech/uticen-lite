@@ -670,27 +670,38 @@ legend {
 .pipe-count-btn { cursor: pointer; background: none; border: 0; font: inherit; color: inherit; padding: 0; text-decoration: none; }
 .pipe-count-btn:hover strong { text-decoration: underline; }
 
-/* ── Procedures panel + derived chips (Logic Builder) ─────────────────────────
-   Author-defined procedures (P1..Pn) grouping a control's Test steps. Colors are
-   routed through design tokens (learning 0005); the per-procedure accent (dot /
-   chip border) is an inline hex from procedure_color() in the route module. The
-   panel inputs carry a second class `.proc-in` so `.proc-panel .proc-in`
-   out-specifies the global `input[type="text"]` field block (learning 0032). */
-.proc-panel h3 { margin-top: 0; }
-.proc-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
-.proc-row:last-child { margin-bottom: 0; }
-.proc-dot {
-  width: 12px; height: 12px; border-radius: 3px; flex: 0 0 auto;
-  background: var(--border-strong);
+/* ── Procedure sections + Inputs band (Logic Builder) ─────────────────────────
+   The flat card stack groups into a shared "Inputs" band + one collapsible
+   <details> section per procedure whose header is the procedure editor. The
+   header inputs carry `.proc-in` under `.proc-head` so they out-specify the
+   global input field block (learning 0032). Accent colors are inline hex from
+   procedure_color(); the chrome routes through design tokens (learning 0005). */
+.band-inputs, .proc-section {
+  border: 1px solid var(--border-default); border-radius: var(--radius-card);
+  background: var(--bg-surface-2); margin-bottom: 14px; padding: 0 14px 8px;
 }
-.proc-panel .proc-in {
+.band-head {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 12px 0 10px; cursor: pointer; list-style: none;
+}
+.band-head::-webkit-details-marker { display: none; }
+.band-head::before {
+  content: "▸"; color: var(--text-tertiary); font-size: 12px; transition: transform .12s;
+}
+details[open] > .band-head::before { transform: rotate(90deg); }
+.band-title { font-weight: 600; font-size: 14px; }
+.band-sub { font-size: 12px; }
+.band-body { padding-bottom: 6px; }
+.proc-empty { font-size: 12px; margin: 8px 0; }
+.proc-head { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; flex: 1; }
+.proc-dot { width: 12px; height: 12px; border-radius: 3px; flex: 0 0 auto; background: var(--border-strong); }
+.proc-head .proc-in {
   font-size: 13px; padding: 5px 8px; margin: 0; width: auto;
   background: var(--bg-input); color: var(--text-primary);
   border: 1px solid var(--border-default); border-radius: var(--radius-input);
 }
-.proc-panel .proc-in:focus {
-  outline: none; border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px var(--accent-muted);
+.proc-head .proc-in:focus {
+  outline: none; border-color: var(--accent-primary); box-shadow: 0 0 0 3px var(--accent-muted);
 }
 #proc-add { margin-top: 4px; }
 .proc-chip {

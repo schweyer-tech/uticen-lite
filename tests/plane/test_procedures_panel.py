@@ -80,9 +80,9 @@ def test_legacy_control_preselects_effective_owner(client):
     graph["nodes"][1]["config"].pop("procedure_id")
     _save(client, graph)
     page = client.get("/controls/c1/logic/builder").text
-    # The panel pre-renders one auto procedure row, and the Test selector pre-selects
-    # a real (non-empty) option — NOT the "— unassigned —" empty value.
-    assert "data-proc-row" in page
+    # The Builder pre-renders one auto procedure SECTION header, and the Test selector
+    # pre-selects a real (non-empty) option — NOT the "— unassigned —" empty value.
+    assert "data-proc-head" in page
     assert 'value="tst" selected' in page  # auto procedure id == terminal id
 
 

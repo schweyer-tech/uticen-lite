@@ -1043,8 +1043,18 @@ def test_flowchart_shows_narrative_truncated_with_full_text_on_hover(client):
 
 def test_builder_has_per_gap_insert_affordances_not_only_bottom_toolbar(client):
     """Steps can be inserted at any position: an insert control sits at every gap
-    (top, between each pair of cards, bottom), each carrying the up/down node ids
-    it splices between — replacing the old single bottom-only add toolbar."""
+    inside each band (before each card, between pairs, and a trailing zone per
+    band) — replacing the old single bottom-only add toolbar. The sectioned
+    Builder groups cards into a shared Inputs band + one section per procedure, so
+    the per-gap count is one zone before each card plus one end zone per non-empty
+    band."""
+    from controlflow_sdk.pipeline.model import parse_pipeline
+    from controlflow_sdk.plane.routes.pipeline import (
+        _card_bands,
+        _card_vm,
+        _procedure_context,
+    )
+
     _seed_terminated_access(client)
     _make_control(client, "C1")
     assert _save_pipeline(client, "C1", _terminated_access_graph()).status_code in (302, 303)
@@ -1055,11 +1065,18 @@ def test_builder_has_per_gap_insert_affordances_not_only_bottom_toolbar(client):
     # Insert affordances exist, positioned by up/down ids.
     assert "data-insert-toggle" in body
     assert "data-insert" in body
-    # One insert zone per gap: N cards → N+1 zones (top + between + bottom).
-    # Count zone elements by class (the substring "data-insert-toggle" also
-    # appears once in the page's delegation JS, so don't substring-count that).
+    # Per-gap zones live INSIDE #pipe-cards. The "Add procedure" JS also contains a
+    # `pipe-insert-empty` literal (the new-section template), so scope the count to
+    # the cards region to exclude it.
+    cards = body[body.index('id="pipe-cards"'):body.index('class="page-actions"')]
+    # Banded layout: one zone before each card + one end zone per non-empty band.
+    pipe = parse_pipeline(_terminated_access_graph())
+    vms = [_card_vm(n, pipe, {}, {}, {}) for n in pipe.topological()]
+    bands = _card_bands(pipe, vms, _procedure_context(pipe))
+    nonempty_bands = (1 if bands["shared"]["nodes"] else 0) + sum(
+        1 for b in bands["procedures"] if b["nodes"])
     n_nodes = len(_terminated_access_graph()["nodes"])
-    assert len(re.findall(r'class="pipe-insert pipe-insert-', body)) == n_nodes + 1
+    assert len(re.findall(r'class="pipe-insert pipe-insert-', cards)) == n_nodes + nonempty_bands
     # Each node type is offerable from an insert menu.
     for t in ("import", "filter", "join", "custom_python", "test"):
         assert f'data-type="{t}"' in body
