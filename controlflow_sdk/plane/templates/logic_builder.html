@@ -344,15 +344,31 @@
         '<summary class="band-head proc-head-row">' +
         '<span class="proc-dot"></span>' +
         '<span class="proc-head" data-proc-head data-proc-id="' + pid + '">' +
-        '<input class="proc-in" data-proc-code style="width:54px" aria-label="Code">' +
-        '<input class="proc-in" data-proc-name placeholder="Name" style="flex:1;min-width:160px" aria-label="Name">' +
-        '<input class="proc-in" data-proc-assert placeholder="Assertion / category" style="flex:1;min-width:160px" aria-label="Assertion">' +
-        '<input class="proc-in" data-proc-pct placeholder="thr %" style="width:64px" aria-label="Threshold percent">' +
-        '<input class="proc-in" data-proc-count placeholder="count" style="width:64px" aria-label="Threshold count">' +
-        '<button type="button" class="btn btn-sm btn-ghost" data-proc-del aria-label="Remove procedure">✕</button>' +
+        '<div class="proc-title-row">' +
+        '<input class="proc-in proc-code-badge" data-proc-code placeholder="P1" aria-label="Code">' +
+        '<input class="proc-in proc-name-title" type="text" data-proc-name placeholder="Procedure name" aria-label="Procedure name">' +
+        '<button type="button" class="proc-name-pencil" data-proc-name-edit aria-label="Edit procedure name"></button>' +
+        '<button type="button" class="btn btn-sm btn-ghost proc-del-btn" data-proc-del aria-label="Remove procedure">✕</button>' +
+        '</div>' +
+        '<div class="proc-fields-row">' +
+        '<label class="proc-field-label">Assertion ' +
+        '<span class="proc-help" tabindex="0" role="img" aria-label="What is an assertion?" ' +
+        'title="The audit assertion this procedure verifies — the specific claim it proves about the control (e.g. \\'Segregation of duties\\', \\'Authorization\\', \\'Completeness\\', \\'Existence\\'). Shown as the procedure\\'s subtitle in the workpaper.">ⓘ</span>' +
+        '</label>' +
+        '<input class="proc-in proc-assert-in" data-proc-assert placeholder="e.g. Segregation of duties" aria-label="Assertion">' +
+        '<span class="proc-threshold">' +
+        '<span class="proc-field-label">Fail if</span>' +
+        '<input class="proc-in proc-thr-in" data-proc-pct placeholder="—" aria-label="Threshold percent">' +
+        '<span class="proc-field-label">% or</span>' +
+        '<input class="proc-in proc-thr-in" data-proc-count placeholder="—" aria-label="Threshold count">' +
+        '<span class="proc-field-label">items</span>' +
+        '</span></div>' +
+        '<div class="proc-narrative-row">' +
+        '<label class="proc-field-label">Narrative</label>' +
         '<textarea class="proc-in proc-narr" data-proc-narrative rows="2" ' +
-        'placeholder="Procedure narrative — what this procedure tests and why" ' +
+        'placeholder="What this procedure tests and why" ' +
         'aria-label="Procedure narrative"></textarea>' +
+        '</div>' +
         '</span></summary>' +
         '<div class="band-body"><p class="muted proc-empty">No test yet — insert a ' +
         '<strong>Test</strong> below to give this procedure a result.</p>' +
@@ -366,6 +382,15 @@
     }
     var cardsRoot = document.getElementById('pipe-cards');
     cardsRoot.addEventListener('click', function (e) {
+      var pencil = e.target.closest('[data-proc-name-edit]');
+      if (pencil) {
+        e.preventDefault();        // don't toggle the <details>
+        e.stopPropagation();
+        var head = pencil.closest('[data-proc-head]');
+        var nameInput = head && head.querySelector('[data-proc-name]');
+        if (nameInput) { nameInput.focus(); }
+        return;
+      }
       var add = e.target.closest('#proc-add');
       if (add) {
         var pid = 'p_' + Math.random().toString(36).slice(2, 8);

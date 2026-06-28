@@ -246,6 +246,26 @@ def test_test_node_card_has_no_procedure_identity_fields(client):
     assert "data-severity" in page
 
 
+def test_builder_get_renders_procedure_title_layout(client):
+    """The procedure header renders as a titled card: a big title-styled name input
+    with a pencil, an Assertion label + tooltip, the 'Fail if' threshold, and a
+    Narrative label — all data-proc-* attributes unchanged."""
+    _seed_with_procedure(client)
+    page = client.get("/controls/c1/logic/builder").text
+    # Name is the big title input + a focus pencil.
+    assert "proc-name-title" in page
+    assert "data-proc-name-edit" in page
+    # Assertion label + explanatory tooltip copy.
+    assert "audit assertion this procedure verifies" in page
+    # Threshold relabel + narrative label.
+    assert "Fail if" in page
+    assert "proc-narrative-row" in page
+    # Attributes the serializer reads are still present.
+    for attr in ("data-proc-code", "data-proc-name", "data-proc-assert",
+                 "data-proc-pct", "data-proc-count", "data-proc-narrative"):
+        assert attr in page
+
+
 def test_builder_get_degrades_gracefully_on_partial_pipeline(
     client: TestClient, engagement: Path
 ) -> None:
