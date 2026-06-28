@@ -30,6 +30,15 @@
 </ul>
 {% endif %}
 <svg viewBox="0 0 {{ width }} {{ height }}" role="img" aria-label="Pipeline flowchart">
+  {# Swimlane band backgrounds (drawn first → behind edges/boxes). A band spans the
+     inclusive row range row_start..row_end of the boxes it groups. #}
+  {% for band in diagram.bands %}
+    {% set by1 = pad + (band.row_start * (box_h + gap_y)) - 6 %}
+    {% set by2 = pad + (band.row_end * (box_h + gap_y)) + box_h + 6 %}
+    <rect class="fc-band{% if band.color %} fc-band-proc{% endif %}" x="2" y="{{ by1 }}"
+          width="{{ width - 4 }}" height="{{ by2 - by1 }}" rx="10"
+          style="{% if band.color %}stroke:{{ band.color }}{% endif %}" />
+  {% endfor %}
   {% for edge in diagram.edges %}
     {% set fx = pad + (edge.from_lane * lane_pitch) + (box_w / 2) %}
     {% set tx = pad + (edge.to_lane * lane_pitch) + (box_w / 2) %}
@@ -49,6 +58,15 @@
   {% for box in diagram.boxes %}
     {% set x = pad + (box.lane * lane_pitch) %}
     {% set y = pad + (box.row * (box_h + gap_y)) %}
+    {% if box.summary %}
+    {# Collapsed-procedure summary: a single dashed box standing in for the band's
+       private steps. NOT a step-inspector link (it maps to no single node). #}
+    <g class="fc-box fc-summary">
+      <rect x="{{ x }}" y="{{ y }}" width="{{ box_w }}" height="{{ box_h }}" rx="8"
+            style="{% if box.proc_color %}stroke:{{ box.proc_color }}{% endif %}" />
+      <text x="{{ x + 12 }}" y="{{ y + 28 }}">{{ box.label }}</text>
+    </g>
+    {% else %}
     <a href="/controls/{{ control_id }}/logic/step/{{ box.id }}/data"
        target="_blank" rel="noopener" style="cursor:pointer;">
     <g class="fc-box{% if box.terminal %} fc-terminal{% endif %}">
@@ -60,5 +78,21 @@
       {% if box.narrative %}<text class="fc-narr" x="{{ x + 12 }}" y="{{ y + 56 }}">{{ box.narrative | truncate(34, True, '…', 0) }}</text>{% endif %}
     </g>
     </a>
+    {% endif %}
+  {% endfor %}
+  {# Band header labels + collapse toggles, drawn last so the clickable toggle sits
+     ON TOP of the boxes (an opaque box rect would otherwise swallow the click).
+     The Inputs band is not collapsible (plain text, no hx-get). #}
+  {% for band in diagram.bands %}
+    {% set by1 = pad + (band.row_start * (box_h + gap_y)) - 6 %}
+    {% if band.key == '__inputs__' %}
+    <text class="fc-band-label" x="12" y="{{ by1 + 16 }}">▾ {{ band.label }}</text>
+    {% else %}
+    <a href="/controls/{{ control_id }}/logic/flowchart?collapsed={{ band.toggle_collapsed }}"
+       hx-get="/controls/{{ control_id }}/logic/flowchart?collapsed={{ band.toggle_collapsed }}"
+       hx-target="#flowchart-card" hx-swap="outerHTML">
+      <text class="fc-band-label" x="12" y="{{ by1 + 16 }}">{{ '▸' if band.collapsed else '▾' }} {{ band.label }}</text>
+    </a>
+    {% endif %}
   {% endfor %}
 </svg>

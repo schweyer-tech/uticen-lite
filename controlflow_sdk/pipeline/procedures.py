@@ -4,6 +4,8 @@ and per-node derived membership. No store, no render, no pandas — Pyodide-safe
 
 from __future__ import annotations
 
+from typing import Any
+
 from controlflow_sdk.pipeline.model import Node, Pipeline, ProcedureDef
 
 
@@ -102,3 +104,34 @@ def derived_membership(pipeline: Pipeline) -> dict[str, set[str]]:
             for nid in _ancestors(pipeline, t.id):
                 out[nid].add(proc.id)
     return out
+
+
+def group_nodes_by_band(pipeline: Pipeline) -> dict[str, Any]:
+    """Partition node ids into a shared "Inputs" band + one band per effective procedure.
+
+    - ``import`` nodes always sit in the shared band (the data the author brings in).
+    - A non-import node belonging to exactly ONE procedure (derived membership ``{P}``)
+      sits in ``P``'s band — the nodes private to that procedure's branch.
+    - Everything else (membership 0 — orphan/unassigned — or ≥2 — shared upstream
+      steps) sits in the shared band.
+
+    Bands preserve topological order within each band, and ``procedures`` is ordered by
+    effective-procedure position. The flattened order ``shared + each procedure's nodes``
+    is always a valid topological order (a node private to one procedure can never depend
+    on a node private to another — that node would be shared). Pure / pandas-free.
+    """
+    eff = effective_procedures(pipeline)
+    by_proc: dict[str, list[str]] = {p.id: [] for p in eff}
+    membership = derived_membership(pipeline)
+    shared: list[str] = []
+    for node in pipeline.topological():
+        pids = membership.get(node.id, set())
+        if node.type != "import" and len(pids) == 1:
+            (only,) = tuple(pids)
+            (by_proc[only] if only in by_proc else shared).append(node.id)
+        else:
+            shared.append(node.id)
+    return {
+        "shared": shared,
+        "procedures": [{"id": p.id, "node_ids": by_proc[p.id]} for p in eff],
+    }

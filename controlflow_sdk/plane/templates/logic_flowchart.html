@@ -12,6 +12,12 @@
   .fc-box:hover rect { stroke: var(--accent-primary); }
   .fc-box { cursor: default; }
   .fc-edge { stroke: var(--border-strong); stroke-width: 2; fill: none; }
+  /* Swimlane bands (shared Inputs band + one per procedure) + collapse toggles. */
+  .fc-band { fill: var(--bg-surface-1); stroke: var(--border-default); stroke-width: 1; opacity: 0.5; }
+  .fc-band-proc { opacity: 0.35; }
+  .fc-band-label { fill: var(--text-secondary); font-family: var(--font-sans); font-size: 12px; font-weight: 600; cursor: pointer; }
+  .fc-summary rect { fill: var(--bg-surface-3); stroke-dasharray: 4 3; }
+  .fc-summary text { fill: var(--text-secondary); font-family: var(--font-sans); font-size: 12px; }
   /* Procedure legend above the SVG (per-procedure outline colors). */
   .fc-legend {
     list-style: none; display: flex; flex-wrap: wrap; gap: 14px;
@@ -36,7 +42,7 @@
 {% if diagram %}
 <div class="card">
   <div class="card-head"><h2>Pipeline flowchart</h2></div>
-  <div class="flowchart">{% include "partials/_pipe_diagram.html" %}</div>
+  {% include "partials/_pipe_diagram_card.html" %}
 </div>
 {% else %}
 <div class="card">

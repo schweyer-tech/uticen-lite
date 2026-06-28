@@ -164,9 +164,6 @@
   </div>
 </div>
 {% else %}
-<div class="card">
-  {% include "partials/_procedures_panel.html" %}
-</div>
 <form method="post" action="/controls/{{ control_id }}/logic/builder" id="pipeline-form">
   <input type="hidden" name="pipeline_json" id="pipeline-json" value="">
 
@@ -297,22 +294,22 @@
         nodes.push(node);
       });
       graph.nodes = nodes;
-      serializeProcedures();  // read the Procedures panel into graph.procedures too
+      serializeProcedures();  // read the section headers into graph.procedures too
     }
 
-    // Read every Procedures-panel row into graph.procedures. The panel lives
-    // OUTSIDE #pipe-cards so it survives the HTMX cards-swap; reading it on every
-    // serialize() keeps procedure edits riding along with each save/autosave.
+    // Read every procedure SECTION header into graph.procedures. Each header is
+    // the <summary> of a <details> section inside #pipe-cards; reading them on
+    // every serialize() keeps procedure edits riding along with each save/autosave.
     function serializeProcedures() {
-      var rows = document.querySelectorAll('[data-proc-row]');
-      graph.procedures = Array.prototype.map.call(rows, function (row, i) {
-        var pct = (row.querySelector('[data-proc-pct]') || {}).value || '';
-        var cnt = (row.querySelector('[data-proc-count]') || {}).value || '';
+      var heads = document.querySelectorAll('[data-proc-head]');
+      graph.procedures = Array.prototype.map.call(heads, function (head, i) {
+        var pct = (head.querySelector('[data-proc-pct]') || {}).value || '';
+        var cnt = (head.querySelector('[data-proc-count]') || {}).value || '';
         return {
-          id: row.getAttribute('data-proc-id'),
-          code: (row.querySelector('[data-proc-code]') || {}).value || ('P' + (i + 1)),
-          name: (row.querySelector('[data-proc-name]') || {}).value || '',
-          assertion: (row.querySelector('[data-proc-assert]') || {}).value || '',
+          id: head.getAttribute('data-proc-id'),
+          code: (head.querySelector('[data-proc-code]') || {}).value || ('P' + (i + 1)),
+          name: (head.querySelector('[data-proc-name]') || {}).value || '',
+          assertion: (head.querySelector('[data-proc-assert]') || {}).value || '',
           failure_threshold_pct: pct === '' ? null : Number(pct),
           failure_threshold_count: cnt === '' ? null : Number(cnt),
           position: i
@@ -320,10 +317,10 @@
       });
     }
 
-    // ── Procedures panel: add / remove rows + keep every Test's Procedure ▾ in
-    // sync. A new procedure is selectable on the Test cards immediately (we inject
-    // its <option> into each [data-procedure]) — no server round-trip needed; the
-    // mapping is persisted when the author clicks Save (serializeProcedures()).
+    // ── Procedure section headers: add / remove sections + keep every Test's
+    // "Belongs to" ▾ in sync. A new procedure is selectable on the Test cards
+    // immediately (we inject its <option> into each [data-procedure]) — no server
+    // round-trip needed; the mapping is persisted on Save (serializeProcedures()).
     function procOptionLabel(code, name) {
       return (code || '') + ' · ' + (name || '');
     }
@@ -344,53 +341,65 @@
       document.querySelectorAll('[data-procedure] option[value="' + pid + '"]')
         .forEach(function (opt) { opt.parentNode.removeChild(opt); });
     }
-    function newProcedureRow(pid, code) {
-      var row = document.createElement('div');
-      row.className = 'proc-row';
-      row.setAttribute('data-proc-row', '');
-      row.setAttribute('data-proc-id', pid);
-      row.innerHTML =
+    // A new procedure is an empty <details> SECTION appended before the Add button
+    // (inside #pipe-cards). Its header carries the procedure editor; its body has a
+    // single Test insert zone so the author can give the procedure a terminal.
+    function newProcedureSection(pid, code) {
+      var sec = document.createElement('details');
+      sec.className = 'proc-section';
+      sec.setAttribute('data-proc-section', '');
+      sec.setAttribute('data-band-key', pid);
+      sec.setAttribute('open', '');
+      sec.innerHTML =
+        '<summary class="band-head proc-head-row">' +
         '<span class="proc-dot"></span>' +
+        '<span class="proc-head" data-proc-head data-proc-id="' + pid + '">' +
         '<input class="proc-in" data-proc-code style="width:54px" aria-label="Code">' +
         '<input class="proc-in" data-proc-name placeholder="Name" style="flex:1;min-width:160px" aria-label="Name">' +
         '<input class="proc-in" data-proc-assert placeholder="Assertion / category" style="flex:1;min-width:160px" aria-label="Assertion">' +
         '<input class="proc-in" data-proc-pct placeholder="thr %" style="width:64px" aria-label="Threshold percent">' +
         '<input class="proc-in" data-proc-count placeholder="count" style="width:64px" aria-label="Threshold count">' +
-        '<button type="button" class="btn btn-sm btn-ghost" data-proc-del aria-label="Remove procedure">✕</button>';
-      row.querySelector('[data-proc-code]').value = code;
-      return row;
+        '<button type="button" class="btn btn-sm btn-ghost" data-proc-del aria-label="Remove procedure">✕</button>' +
+        '</span></summary>' +
+        '<div class="band-body"><p class="muted proc-empty">No test yet — insert a ' +
+        '<strong>Test</strong> below to give this procedure a result.</p>' +
+        '<div class="pipe-insert pipe-insert-empty">' +
+        '<button type="button" class="pipe-insert-toggle" data-insert-toggle aria-label="Insert a step here">+</button>' +
+        '<div class="pipe-insert-menu"><span class="pipe-insert-hint">Insert step</span>' +
+        '<button type="button" class="btn btn-sm btn-add" data-insert data-type="test" data-up="" data-down="" data-proc="' + pid + '">Test</button>' +
+        '</div></div></div>';
+      sec.querySelector('[data-proc-code]').value = code;
+      return sec;
     }
-    var procList = document.getElementById('proc-list');
-    var procAdd = document.getElementById('proc-add');
-    if (procAdd && procList) {
-      procAdd.addEventListener('click', function () {
+    var cardsRoot = document.getElementById('pipe-cards');
+    cardsRoot.addEventListener('click', function (e) {
+      var add = e.target.closest('#proc-add');
+      if (add) {
         var pid = 'p_' + Math.random().toString(36).slice(2, 8);
-        var n = procList.querySelectorAll('[data-proc-row]').length + 1;
+        var n = cardsRoot.querySelectorAll('[data-proc-head]').length + 1;
         var code = 'P' + n;
-        procList.appendChild(newProcedureRow(pid, code));
+        add.parentNode.insertBefore(newProcedureSection(pid, code), add);
         addProcedureOption(pid, code, '');
-      });
-      // Delete + live label sync are delegated so server- and JS-rendered rows
-      // both work (and survive across re-renders of the rows).
-      procList.addEventListener('click', function (e) {
-        var del = e.target.closest('[data-proc-del]');
-        if (!del) { return; }
-        var row = del.closest('[data-proc-row]');
-        if (!row) { return; }
-        removeProcedureOption(row.getAttribute('data-proc-id'));
-        row.parentNode.removeChild(row);
-      });
-      procList.addEventListener('input', function (e) {
-        if (!e.target.matches('[data-proc-code], [data-proc-name]')) { return; }
-        var row = e.target.closest('[data-proc-row]');
-        if (!row) { return; }
-        updateProcedureOption(
-          row.getAttribute('data-proc-id'),
-          (row.querySelector('[data-proc-code]') || {}).value || '',
-          (row.querySelector('[data-proc-name]') || {}).value || ''
-        );
-      });
-    }
+        return;
+      }
+      var del = e.target.closest('[data-proc-del]');
+      if (del) {
+        var sec = del.closest('[data-proc-section]');
+        if (sec) {
+          removeProcedureOption(sec.getAttribute('data-band-key'));
+          sec.parentNode.removeChild(sec);
+        }
+        return;
+      }
+    });
+    cardsRoot.addEventListener('input', function (e) {
+      if (!e.target.matches('[data-proc-code], [data-proc-name]')) { return; }
+      var head = e.target.closest('[data-proc-head]');
+      if (!head) { return; }
+      updateProcedureOption(head.getAttribute('data-proc-id'),
+        (head.querySelector('[data-proc-code]') || {}).value || '',
+        (head.querySelector('[data-proc-name]') || {}).value || '');
+    });
 
     // ── autosave: post the graph and swap only #pipe-cards ───────────────
     // Callers must set jsonField.value = JSON.stringify(graph) before calling.
@@ -420,6 +429,7 @@
           cardsEl.innerHTML = result.html;
           window.scrollTo(0, scrollY);
           bindCards(cardsEl);
+          restoreCollapse();  // re-apply persisted collapse state after the swap
           if (!result.ok) {
             if (statusEl) {
               statusEl.textContent = 'Validation error';
@@ -480,9 +490,18 @@
     // ('' at the very top/bottom). For non-import steps we wire up→new and then
     // re-point the downstream card from up→new, so the new step lands *between*
     // them (a clean splice). An import is a new root, so it's never spliced.
-    function insertStep(upId, downId, type) {
+    function insertStep(upId, downId, type, procId) {
       serialize();
       var node = newNode(type);
+      if (type === 'test' && procId) { node.config.procedure_id = procId; }
+      // An empty procedure section's insert zone has no upstream card (data-up="").
+      // Default any non-import step's upstream to the LAST shared (Inputs-band) node
+      // so a Test added into an empty section is a VALID wired terminal — an unwired
+      // terminal fails parse_pipeline and the save 500s/422s (e2e-documented).
+      if (!upId && type !== 'import') {
+        var shared = document.querySelectorAll('[data-band-key="__inputs__"] [data-node]');
+        if (shared.length) { upId = shared[shared.length - 1].getAttribute('data-node'); }
+      }
       var splice = (type !== 'import');
       if (splice && upId) { node.inputs = [upId]; }
       graph.nodes.push(node);
@@ -513,7 +532,7 @@
       var ins = e.target.closest('[data-insert]');
       if (ins) {
         insertStep(ins.getAttribute('data-up'), ins.getAttribute('data-down'),
-                   ins.getAttribute('data-type'));
+                   ins.getAttribute('data-type'), ins.getAttribute('data-proc'));
       }
     });
 
@@ -576,10 +595,48 @@
           });
         }
       });
+      // Changing a Test's "Belongs to" re-groups it: serialize + autosave so the
+      // server re-renders the card under its new procedure section.
+      scope.querySelectorAll('[data-procedure]').forEach(function (sel) {
+        if (sel._procBound) { return; }
+        sel._procBound = true;
+        sel.addEventListener('change', function () {
+          serialize();
+          jsonField.value = JSON.stringify(graph);
+          autosaveSubmit();   // re-render regroups the card under its new section
+        });
+      });
     }
 
     // Initial bind on page load.
     bindCards(document);
+
+    // ── <details> collapse persistence (per control + band) ──────────────────
+    // Each band/section persists its open/closed state to localStorage so the
+    // author's collapse choices survive an HTMX cards-swap and a page reload.
+    var COLLAPSE_PREFIX = 'cflow.logic.collapse.' + {{ control_id | tojson }} + '.';
+    function restoreCollapse() {
+      document.querySelectorAll('[data-band-key]').forEach(function (d) {
+        var v = null;
+        try { v = window.localStorage.getItem(COLLAPSE_PREFIX + d.getAttribute('data-band-key')); }
+        catch (e) { v = null; }
+        if (v === 'closed') { d.removeAttribute('open'); }
+        else if (v === 'open') { d.setAttribute('open', ''); }
+      });
+    }
+    document.addEventListener('toggle', function (e) {
+      var d = e.target;
+      if (!d.matches || !d.matches('[data-band-key]')) { return; }
+      try {
+        window.localStorage.setItem(COLLAPSE_PREFIX + d.getAttribute('data-band-key'),
+                                    d.open ? 'open' : 'closed');
+      } catch (err) { /* localStorage unavailable — collapse just won't persist */ }
+    }, true);
+    // Typing in a header input must not toggle its <details> section.
+    document.addEventListener('click', function (e) {
+      if (e.target.closest('.proc-head') && e.target.closest('summary')) { e.preventDefault(); }
+    });
+    restoreCollapse();
 
     // Recalculate button: re-serialize and refresh row counts
     var recalcBtn = document.getElementById('recalc-btn');

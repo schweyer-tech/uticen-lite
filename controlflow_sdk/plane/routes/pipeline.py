@@ -139,7 +139,11 @@ def _input_columns_for(
     return stream_columns.get(node.inputs[0], [])
 
 
-def _diagram(pipeline: Pipeline, counts: dict[str, int]) -> dict[str, Any]:
+def _diagram(
+    pipeline: Pipeline,
+    counts: dict[str, int],
+    collapsed: frozenset[str] = frozenset(),
+) -> dict[str, Any]:
     """A view-model for the multi-lane server-rendered SVG flowchart (top-down).
 
     One box per node with a ``row`` (vertical position, top→bottom) and a ``lane``
@@ -150,12 +154,22 @@ def _diagram(pipeline: Pipeline, counts: dict[str, int]) -> dict[str, Any]:
     ``(from_row, from_lane) → (to_row, to_lane)`` so the template can draw a
     straight in-lane spine and a converging connector across lanes.
 
+    Nodes are grouped into **swimlane bands** (``bands``): a shared "Inputs" band
+    on top feeding one band per effective procedure, ordered by procedure position
+    (Task 1's :func:`group_nodes_by_band`). A procedure whose id is in *collapsed*
+    (and has ≥1 private node) contributes a single **summary box** instead of its
+    private boxes; edges into a collapsed private node redirect to the summary and
+    edges leaving one are dropped (the summary is a sink). Band grouping is
+    best-effort: any failure falls back to the ungrouped layout with ``bands: []``
+    so the flowchart still renders (never 500 — learning 0013).
+
     Layout is **presentation-only** — it never reorders execution. Compile/run
     still use :meth:`Pipeline.topological`; this view-model only positions boxes.
     """
     # Vertical order: DFS post-order from each terminal so a node's inputs sit
     # contiguously above it (each branch stays together). Then any node not
-    # reachable from any terminal, in topological order, for determinism.
+    # reachable from any terminal, in topological order, for determinism. Used for
+    # lane assignment and as the ungrouped fallback order.
     order: list[Any] = []
     seen: set[str] = set()
 
@@ -182,9 +196,13 @@ def _diagram(pipeline: Pipeline, counts: dict[str, int]) -> dict[str, Any]:
 
     # Per-procedure colors: each box takes its FIRST owning procedure's color and
     # the diagram carries a small legend. Best-effort — an incomplete graph yields
-    # no colors, never a 500 (learning 0013).
+    # no colors, never a 500 (learning 0013). The pid→code/name/color maps also
+    # drive the band headers + collapsed summary labels below.
     proc_color_by_node: dict[str, str] = {}
     legend: list[dict[str, Any]] = []
+    color_by_pid: dict[str, str] = {}
+    code_by_pid: dict[str, str] = {}
+    name_by_pid: dict[str, str] = {}
     try:
         from controlflow_sdk.pipeline.procedures import (
             derived_membership,
@@ -194,43 +212,181 @@ def _diagram(pipeline: Pipeline, counts: dict[str, int]) -> dict[str, Any]:
         eff = effective_procedures(pipeline)
         color_by_pid = {p.id: procedure_color(i) for i, p in enumerate(eff)}
         pos_by_pid = {p.id: i for i, p in enumerate(eff)}
+        code_by_pid = {p.id: (p.code or f"P{i + 1}") for i, p in enumerate(eff)}
+        name_by_pid = {p.id: p.name for p in eff}
         legend = [
-            {"code": p.code or f"P{i + 1}", "name": p.name, "color": color_by_pid[p.id]}
-            for i, p in enumerate(eff)
+            {"code": code_by_pid[p.id], "name": p.name, "color": color_by_pid[p.id]}
+            for p in eff
         ]
         for nid, pids in derived_membership(pipeline).items():
             if pids:
                 first = min(pids, key=lambda p: pos_by_pid.get(p, 1 << 30))
                 proc_color_by_node[nid] = color_by_pid[first]
     except Exception:  # noqa: BLE001 — incomplete graph → no colors, never 500 (0013)
-        proc_color_by_node = {}
-        legend = []
+        proc_color_by_node, legend = {}, []
+        color_by_pid, code_by_pid, name_by_pid = {}, {}, {}
 
-    boxes = [
-        {
+    def _real_box(n: Any, row: int, lane: int) -> dict[str, Any]:
+        return {
             "id": n.id,
             "type": n.type,
             "label": n.title or _node_label(n),
             "narrative": n.narrative or "",
             "count": counts.get(n.id),
-            "row": i,
-            "lane": lanes[n.id],
+            "row": row,
+            "lane": lane,
             "terminal": n.id in terminal_ids,
             "proc_color": proc_color_by_node.get(n.id),
         }
-        for i, n in enumerate(order)
-    ]
-    edges = [
-        {
-            "from_row": index[src], "to_row": index[n.id],
-            "from_lane": lanes[src], "to_lane": lanes[n.id],
-        }
-        for n in order
-        for src in n.inputs
-    ]
+
+    # Ungrouped fallback view-model (DFS post-order) — returned verbatim if band
+    # grouping fails so the flowchart never 500s (learning 0013).
+    fallback: dict[str, Any] = {
+        "boxes": [_real_box(n, i, lanes[n.id]) for i, n in enumerate(order)],
+        "edges": [
+            {
+                "from_row": index[src], "to_row": index[n.id],
+                "from_lane": lanes[src], "to_lane": lanes[n.id],
+            }
+            for n in order
+            for src in n.inputs
+        ],
+        "rows": len(order), "lanes": lane_count, "procedures": legend, "bands": [],
+    }
+
+    try:
+        return _band_diagram(
+            pipeline, order, lanes, collapsed, legend, _real_box,
+            color_by_pid, code_by_pid, name_by_pid,
+        )
+    except Exception:  # noqa: BLE001 — band grouping best-effort; never 500 (0013)
+        return fallback
+
+
+def _band_diagram(
+    pipeline: Pipeline,
+    order: list[Any],
+    lanes: dict[str, int],
+    collapsed: frozenset[str],
+    legend: list[dict[str, Any]],
+    real_box: Callable[[Any, int, int], dict[str, Any]],
+    color_by_pid: dict[str, str],
+    code_by_pid: dict[str, str],
+    name_by_pid: dict[str, str],
+) -> dict[str, Any]:
+    """Band-grouped (swimlane) view-model with the collapse transform applied.
+
+    Render order is ``shared`` then each procedure band (Task 1's grouping), so each
+    band occupies a CONTIGUOUS ``row`` range. A collapsed procedure (id in *collapsed*
+    with ≥1 private node) contributes one synthetic summary id in place of its private
+    nodes; the summary takes the **min lane** of the band's real nodes (it stands where
+    the band stood). Raises on any malformed input — the caller falls back (never 500).
+    """
+    from controlflow_sdk.pipeline.procedures import group_nodes_by_band
+
+    grouped = group_nodes_by_band(pipeline)
+    shared_ids: list[str] = list(grouped["shared"])
+    proc_bands: list[dict[str, Any]] = list(grouped["procedures"])
+    node_ids_by_pid = {b["id"]: list(b["node_ids"]) for b in proc_bands}
+
+    # Render order + per-render-id band key + collapsed-private → summary id map.
+    render_order: list[str] = list(shared_ids)
+    band_of: dict[str, str] = {nid: "__inputs__" for nid in shared_ids}
+    collapsed_private: dict[str, str] = {}
+    summary_lane: dict[str, int] = {}
+    for band in proc_bands:
+        pid = band["id"]
+        node_ids = node_ids_by_pid[pid]
+        if pid in collapsed and node_ids:
+            sid = "__sum__" + pid
+            render_order.append(sid)
+            band_of[sid] = pid
+            summary_lane[sid] = min(
+                (lanes[nid] for nid in node_ids if nid in lanes), default=0
+            )
+            for nid in node_ids:
+                collapsed_private[nid] = sid
+        else:
+            render_order.extend(node_ids)
+            for nid in node_ids:
+                band_of[nid] = pid
+
+    row_by_render = {rid: i for i, rid in enumerate(render_order)}
+
+    def _lane_of(rid: str) -> int:
+        return summary_lane[rid] if rid in summary_lane else lanes.get(rid, 0)
+
+    # Boxes: real nodes as before, plus one summary box per collapsed band.
+    boxes: list[dict[str, Any]] = []
+    for rid in render_order:
+        row = row_by_render[rid]
+        if rid in summary_lane:
+            pid = band_of[rid]
+            n_steps = len(node_ids_by_pid[pid])
+            boxes.append({
+                "id": rid, "summary": True, "band": pid, "type": "procedure",
+                "label": f"{code_by_pid.get(pid, pid)} · {name_by_pid.get(pid, '')}"
+                         f" — {n_steps} step{'s' if n_steps != 1 else ''}",
+                "count": None, "row": row, "lane": _lane_of(rid),
+                "terminal": False, "proc_color": color_by_pid.get(pid),
+            })
+        else:
+            boxes.append(real_box(pipeline.node(rid), row, _lane_of(rid)))
+
+    # Edges: redirect a target that is a collapsed private node to its summary; drop
+    # edges whose source is collapsed (the summary is a sink); de-duplicate.
+    seen_edges: set[tuple[str, str]] = set()
+    edges: list[dict[str, Any]] = []
+    for n in order:
+        for src in n.inputs:
+            if src in collapsed_private:
+                continue
+            tgt = collapsed_private.get(n.id, n.id)
+            if src == tgt or src not in row_by_render or tgt not in row_by_render:
+                continue
+            if (src, tgt) in seen_edges:
+                continue
+            seen_edges.add((src, tgt))
+            edges.append({
+                "from_row": row_by_render[src], "to_row": row_by_render[tgt],
+                "from_lane": _lane_of(src), "to_lane": _lane_of(tgt),
+            })
+
+    # Bands: Inputs first, then each non-empty procedure band, with its inclusive
+    # row range and a toggle target (this band's id added/removed from the set).
+    rows_by_band: dict[str, list[int]] = {}
+    for rid in render_order:
+        rows_by_band.setdefault(band_of[rid], []).append(row_by_render[rid])
+
+    def _toggle(pid: str) -> str:
+        s = set(collapsed)
+        s.discard(pid) if pid in s else s.add(pid)
+        return ",".join(sorted(s))
+
+    bands: list[dict[str, Any]] = []
+    if rows_by_band.get("__inputs__"):
+        rs = rows_by_band["__inputs__"]
+        bands.append({
+            "key": "__inputs__", "label": "Inputs & shared steps", "color": None,
+            "collapsed": False, "row_start": min(rs), "row_end": max(rs),
+            "toggle_collapsed": "",
+        })
+    for band in proc_bands:
+        pid = band["id"]
+        prows = rows_by_band.get(pid)
+        if not prows:
+            continue
+        bands.append({
+            "key": pid,
+            "label": f"{code_by_pid.get(pid, pid)} · {name_by_pid.get(pid, '')}",
+            "color": color_by_pid.get(pid), "collapsed": pid in collapsed,
+            "row_start": min(prows), "row_end": max(prows), "toggle_collapsed": _toggle(pid),
+        })
+
+    lane_count = (max((b["lane"] for b in boxes), default=0) + 1) if boxes else 1
     return {
-        "boxes": boxes, "edges": edges, "rows": len(order),
-        "lanes": lane_count, "procedures": legend,
+        "boxes": boxes, "edges": edges, "rows": len(render_order),
+        "lanes": lane_count, "procedures": legend, "bands": bands,
     }
 
 
@@ -509,12 +665,12 @@ def _ai_apply_error(
 # ---------------------------------------------------------------------------
 
 def _procedure_context(pipeline: Pipeline | None) -> dict[str, Any]:
-    """Procedure view-model for the Builder panel, per-Test selector and chips.
+    """Procedure view-model for the Builder section headers, per-Test selector and chips.
 
-    Returns three keys used by ``_procedures_panel.html`` / ``_pipe_node.html``:
+    Returns three keys used by ``_pipe_cards.html`` section headers / ``_pipe_node.html``:
 
     - ``procedures`` — the *effective* procedures (author-defined plus one-per-orphan
-      terminal), each with its position color; this is the panel + the selector list.
+      terminal), each with its position color; this is the section-header + selector list.
     - ``node_procedures`` — ``{node_id: [{id, code, color}]}`` derived membership chips.
     - ``selected_procedure_for`` — ``{test_node_id: effective_owning_procedure_id}``.
       Pre-selecting the **effective** owner (not just ``config['procedure_id']``) is
@@ -575,6 +731,41 @@ def _procedure_context(pipeline: Pipeline | None) -> dict[str, Any]:
         }
     except Exception:  # noqa: BLE001 — incomplete graph → no panel data, never 500 (0013)
         return empty
+
+
+def _card_bands(
+    cards_pipeline: Pipeline | None,
+    node_vms: list[dict[str, Any]],
+    proc_ctx: dict[str, Any],
+) -> dict[str, Any]:
+    """Group the ordered node view-models into a shared Inputs band + per-procedure
+    bands for the sectioned Builder. Best-effort: an unparsable graph (or any failure)
+    puts every card in the Inputs band so the page still renders (learning 0013)."""
+    vm_by_id = {vm["id"]: vm for vm in node_vms}
+    fallback = {"shared": {"key": "__inputs__", "nodes": node_vms}, "procedures": []}
+    if cards_pipeline is None:
+        return fallback
+    try:
+        from controlflow_sdk.pipeline.procedures import group_nodes_by_band
+
+        grouped = group_nodes_by_band(cards_pipeline)
+        proc_by_id = {p["id"]: p for p in proc_ctx.get("procedures", [])}
+        _proc_defaults: dict[str, Any] = {
+            "code": "", "name": "", "assertion": "",
+            "failure_threshold_pct": None, "failure_threshold_count": None, "color": "#888",
+        }
+        procedures = [
+            {
+                "key": band["id"],
+                "proc": proc_by_id.get(band["id"], {"id": band["id"], **_proc_defaults}),
+                "nodes": [vm_by_id[nid] for nid in band["node_ids"] if nid in vm_by_id],
+            }
+            for band in grouped["procedures"]
+        ]
+        shared_nodes = [vm_by_id[nid] for nid in grouped["shared"] if nid in vm_by_id]
+        return {"shared": {"key": "__inputs__", "nodes": shared_nodes}, "procedures": procedures}
+    except Exception:  # noqa: BLE001 — incomplete graph → one Inputs band, never 500 (0013)
+        return fallback
 
 
 def _editor_context(
@@ -664,15 +855,17 @@ def _editor_context(
 
     from controlflow_sdk.plane.routes.ai import _ai_configured
 
+    proc_ctx = _procedure_context(cards_pipeline)
     return {
         # Procedure panel + per-Test selector + derived chips (best-effort; 0013).
-        **_procedure_context(cards_pipeline),
+        **proc_ctx,
         "project": repo.get_project(conn) or {"name": ""},
         "control": control,
         "control_id": control_id,
         "active": "pipeline",
         "graph_json": builder_graph_json,
         "nodes": ordered_nodes,
+        "bands": _card_bands(cards_pipeline, ordered_nodes, proc_ctx),
         "diagram": diagram,
         "generated_python": generated,
         "sources": sources,
@@ -915,12 +1108,25 @@ def register(
     def logic_flowchart(
         control_id: str,
         request: Request,
+        collapsed: str = "",
         conn: sqlite3.Connection = Depends(get_conn),
     ) -> HTMLResponse:
         root = request.app.state.project_root
         ctx = _editor_context(request, conn, root, control_id)
         ctx["active"] = "logic"
         ctx["logic_tab"] = "flowchart"
+        # Re-render the diagram with the requested procedure bands collapsed. The
+        # base context already built an (uncollapsed) diagram; only recompute when
+        # a non-empty collapse set is requested and there is a pipeline to view.
+        collapsed_ids = frozenset(c for c in collapsed.split(",") if c)
+        if collapsed_ids and ctx.get("diagram") is not None:
+            parsed = _pipeline_for_view(repo.get_control(conn, control_id))
+            if parsed is not None:
+                ctx["diagram"] = _diagram(parsed, _row_counts(conn, root, parsed), collapsed_ids)
+        ctx["collapsed"] = ",".join(sorted(collapsed_ids))
+        # HTMX fragment request → return just the swappable flowchart card.
+        if request.headers.get("HX-Request"):
+            return templates.TemplateResponse(request, "partials/_pipe_diagram_card.html", ctx)
         return templates.TemplateResponse(request, "logic_flowchart.html", ctx)
 
     @app.get("/controls/{control_id}/logic/python", response_class=HTMLResponse)
@@ -1017,6 +1223,7 @@ def register(
                         if err_parsed is not None
                         else [_raw_card_vm(n, node_errors) for n in graph.get("nodes", [])]
                     )
+                    proc_ctx = _procedure_context(err_parsed)
                     return templates.TemplateResponse(
                         request,
                         "partials/_pipe_cards.html",
@@ -1027,7 +1234,8 @@ def register(
                             "op_choices": OP_CHOICES,
                             "join_mode_choices": JOIN_MODE_CHOICES,
                             # Keep the per-Test selector + chips after the swap (0013).
-                            **_procedure_context(err_parsed),
+                            **proc_ctx,
+                            "bands": _card_bands(err_parsed, err_nodes, proc_ctx),
                         },
                         status_code=422,
                     )
@@ -1067,6 +1275,7 @@ def register(
                     if builder_parsed is not None
                     else [_raw_card_vm(n, {}) for n in graph.get("nodes", [])]
                 )
+                proc_ctx = _procedure_context(builder_parsed)
                 return templates.TemplateResponse(
                     request,
                     "partials/_pipe_cards.html",
@@ -1077,7 +1286,8 @@ def register(
                         "op_choices": OP_CHOICES,
                         "join_mode_choices": JOIN_MODE_CHOICES,
                         # Keep the per-Test selector + chips after the swap.
-                        **_procedure_context(builder_parsed),
+                        **proc_ctx,
+                        "bands": _card_bands(builder_parsed, ordered_nodes, proc_ctx),
                     },
                 )
             return RedirectResponse(f"/controls/{control_id}/logic/builder", status_code=303)
@@ -1239,6 +1449,7 @@ def register(
                 else [_raw_card_vm(n, {}) for n in merged_graph.get("nodes", [])]
             )
 
+            proc_ctx = _procedure_context(builder_parsed)
             return templates.TemplateResponse(
                 request,
                 "partials/_pipe_cards.html",
@@ -1249,7 +1460,8 @@ def register(
                     "op_choices": OP_CHOICES,
                     "join_mode_choices": JOIN_MODE_CHOICES,
                     # Keep the per-Test selector + chips after the swap.
-                    **_procedure_context(builder_parsed),
+                    **proc_ctx,
+                    "bands": _card_bands(builder_parsed, ordered_nodes, proc_ctx),
                 },
                 # The JS picks up the merged graph from this HX-Trigger event.
                 headers={"HX-Trigger": json.dumps(

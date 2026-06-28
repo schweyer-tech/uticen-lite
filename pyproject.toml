@@ -65,4 +65,8 @@ markers = [
 ]
 filterwarnings = [
   "ignore:Using .httpx. with .starlette.testclient.:starlette.exceptions.StarletteDeprecationWarning",
+  # Third-party: uvicorn imports websockets.server which is deprecated in websockets 14.x.
+  # These arise in the e2e live-server fixture and are outside project code.
+  "ignore:websockets.legacy is deprecated:DeprecationWarning",
+  "ignore:websockets.server.WebSocketServerProtocol is deprecated:DeprecationWarning",
 ]

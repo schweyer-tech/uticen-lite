@@ -129,16 +129,13 @@
        round-trips on save instead of resetting to "unassigned". #}
     {% if procedures is defined %}
     <div class="pipe-row">
-      <label>Procedure</label>
+      <label>Belongs to</label>
       <select data-procedure>
         <option value="">— unassigned —</option>
         {% for p in procedures %}
         <option value="{{ p.id }}" {% if selected_procedure_for.get(node.id) == p.id %}selected{% endif %}>{{ p.code }} · {{ p.name }}</option>
         {% endfor %}
       </select>
-      {% for chip in node_procedures.get(node.id, []) %}
-      <span class="proc-chip" style="border-color:{{ chip.color }}">{{ chip.code }}</span>
-      {% endfor %}
     </div>
     {% endif %}
     <div class="pipe-row">
@@ -228,7 +225,7 @@
 
     {# Support steps (Import/Filter/Join/Custom) show the derived procedure chips
        read-only — they belong to the union of procedures their terminals own. #}
-    {% if node.type != 'test' and node_procedures is defined and node_procedures.get(node.id) %}
+    {% if node.type != 'test' and band_shared|default(false) and node_procedures is defined and node_procedures.get(node.id) %}
     <div class="pipe-row pipe-chips">
       {% for chip in node_procedures.get(node.id, []) %}
       <span class="proc-chip" style="border-color:{{ chip.color }}">{{ chip.code }}</span>

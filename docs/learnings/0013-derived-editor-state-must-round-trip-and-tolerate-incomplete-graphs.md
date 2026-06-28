@@ -62,10 +62,17 @@ When an editor renders a DERIVED, scaffolded, or otherwise non-stored representa
    the inner call leaves the loads able to 500.
 4. **Relocating a UI surface relocates its features.** Re-home every affordance the old surface
    carried (buttons, escape hatches), not just the primary widget.
+5. **Don't let an "add step" affordance CREATE an invalid graph.** A terminal (Test) node with no
+   input fails `parse_pipeline`, so the save 422s and the just-added card vanishes on the
+   re-render. An insert affordance that can place a terminal with no adjacent upstream (e.g. into a
+   brand-new/empty procedure section) must default the new terminal's upstream to a valid existing
+   node (the last shared/Inputs-band node) so it is always wired — degrading on incomplete graphs
+   (rule 3) is the backstop, but the editor should not manufacture the invalid state in the first
+   place. (2026-06-28, collapsible procedure sections.)
 
 Guard each with a test that exercises the *rendered/in-progress* path: save-a-derived-graph
 persists; a cross-source rule authored in the editor actually RUNS; an incomplete condition GETs
-200 not 500.
+200 not 500; a Test inserted into an empty section saves wired (no 422).
 
 ## Reference
 
