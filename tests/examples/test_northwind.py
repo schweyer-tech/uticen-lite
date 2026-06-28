@@ -61,7 +61,11 @@ def test_northwind_runs_and_builds(tmp_path: Path) -> None:
     for cid in EXPECTED:
         runs = repo.list_runs_for(conn, cid)
         assert runs, f"No run found in store for control '{cid}'"
-        by_control[cid] = runs[0]["failed"]
+        # Multi-procedure controls persist per-procedure runs + a control-level
+        # aggregate (empty procedure_id); pick the aggregate for the control's
+        # headline failed count. Single-procedure controls have one run → fallback.
+        agg = next((r for r in runs if not r.get("procedure_id")), runs[0])
+        by_control[cid] = agg["failed"]
 
     for cid, expected_n in EXPECTED.items():
         actual = by_control.get(cid)
@@ -70,12 +74,12 @@ def test_northwind_runs_and_builds(tmp_path: Path) -> None:
             f"Control '{cid}': expected {expected_n} violation(s), got {actual}"
         )
 
-    # Exactly the 8 expected controls.
+    # Exactly the 9 expected controls.
     assert set(by_control.keys()) == set(EXPECTED.keys()), (
         f"Unexpected controls in run results: {set(by_control.keys()) ^ set(EXPECTED.keys())}"
     )
 
-    # Total exceptions across the population are unchanged at 18.
+    # Total exceptions across the population are unchanged at 20.
     assert sum(by_control.values()) == 20, "Northwind seeded exception total drifted from 20"
 
     # 2b. Threshold flips a failing control to PASS ----------------------------
@@ -102,6 +106,15 @@ def test_northwind_runs_and_builds(tmp_path: Path) -> None:
     assert len(manifest["controls"]) == 9, (
         f"Expected 9 controls in manifest, got {len(manifest['controls'])}"
     )
-    assert sum(len(c["runs"]) for c in manifest["controls"]) == 9, (
-        "Expected exactly 9 run entries across all controls in the bundle"
+    # Finance.GL.1 now fans out to 2 per-procedure runs + 1 aggregate = 3; the
+    # other 8 controls persist 1 run each (learning 0035) → 11 total.
+    assert sum(len(c["runs"]) for c in manifest["controls"]) == 11, (
+        "Expected 11 run entries (Finance.GL.1 multi-procedure: 2 per-proc + 1 aggregate)"
     )
+    # Finance.GL.1's workpaper now carries TWO procedures (P1 SoD + P2 authorization).
+    gl1 = next(c for c in manifest["controls"] if c["id"] == "Finance.GL.1")
+    gl1_procs = gl1["workpaper"]["procedures"]
+    assert [p["code"] for p in gl1_procs] == ["P1", "P2"], gl1_procs
+    assert {p["assertion"] for p in gl1_procs} == {
+        "Segregation of duties", "Authorization / approval evidence"
+    }, gl1_procs

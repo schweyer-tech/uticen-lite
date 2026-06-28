@@ -100,9 +100,10 @@ class TestBuildHappyPath:
         out_zip = tmp_path / "bundle.zip"
         main(["build", str(root), "--out", str(out_zip), "--at", FIXED_AT])
         out = capsys.readouterr().out
-        # Summary line: "  BUNDLE  <path>  9 controls / 9 runs"
+        # Summary line: "  BUNDLE  <path>  9 controls / 11 runs"
+        # Finance.GL.1 fans out to 2 per-procedure + 1 aggregate = 3 runs; other 8 = 1 each → 11.
         assert "9 controls" in out
-        assert "9 runs" in out
+        assert "11 runs" in out
 
 
 # ---------------------------------------------------------------------------
