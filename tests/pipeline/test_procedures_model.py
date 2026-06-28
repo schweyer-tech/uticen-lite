@@ -1,4 +1,4 @@
-from controlflow_sdk.pipeline.model import ProcedureDef, parse_pipeline
+from controlflow_sdk.pipeline.model import parse_pipeline
 from controlflow_sdk.pipeline.procedures import (
     derived_membership,
     effective_procedures,
@@ -12,18 +12,21 @@ def _two_proc_pipeline() -> dict:
         "nodes": [
             {"id": "imp", "type": "import", "source_id": "je"},
             {"id": "f1", "type": "filter", "inputs": ["imp"],
-             "config": {"logic": "all", "conditions": [{"column": "kind", "op": "eq", "value": "manual"}]}},
+             "config": {"logic": "all",
+                        "conditions": [{"column": "kind", "op": "eq", "value": "manual"}]}},
             {"id": "t1", "type": "test", "inputs": ["f1"],
              "config": {"logic": "all", "item_key_column": "je_id", "procedure_id": "p1",
                         "conditions": [{"column": "preparer", "op": "eq", "value": "approver"}]}},
             {"id": "f2", "type": "filter", "inputs": ["imp"],
-             "config": {"logic": "all", "conditions": [{"column": "posted", "op": "eq", "value": "late"}]}},
+             "config": {"logic": "all",
+                        "conditions": [{"column": "posted", "op": "eq", "value": "late"}]}},
             {"id": "t2", "type": "test", "inputs": ["f2"],
              "config": {"logic": "all", "item_key_column": "je_id", "procedure_id": "p2",
                         "conditions": [{"column": "posted", "op": "eq", "value": "late"}]}},
         ],
         "procedures": [
-            {"id": "p1", "code": "P1", "name": "Manual JE Review", "assertion": "Segregation of Duties",
+            {"id": "p1", "code": "P1", "name": "Manual JE Review",
+             "assertion": "Segregation of Duties",
              "failure_threshold_count": 0, "position": 0},
             {"id": "p2", "code": "P2", "name": "Late Posting", "assertion": "Cutoff",
              "failure_threshold_pct": 1.0, "position": 1},
