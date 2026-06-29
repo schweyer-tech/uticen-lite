@@ -59,7 +59,7 @@
 
 {% for band in bands.procedures %}
 <details class="proc-section" data-proc-section data-band-key="{{ band.key }}"
-         style="border-left-color:{{ band.proc.color }}" open>
+         style="--proc:{{ band.proc.color }}" open>
   <summary class="band-head proc-head-row">
     <span class="band-caret" aria-hidden="true">▸</span>
     <span class="proc-head" data-proc-head data-proc-id="{{ band.proc.id }}">

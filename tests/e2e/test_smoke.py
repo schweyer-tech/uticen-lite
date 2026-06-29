@@ -422,6 +422,70 @@ def test_flowchart_band_collapse_roundtrip(page: Page, live_server: str) -> None
 
 
 @pytest.mark.browser
+def test_add_procedure_button_builds_the_new_card_shape(page: Page, live_server: str) -> None:
+    """Clicking ＋ Add procedure builds a section structurally identical to a
+    server-rendered one, with no inline-script pageerror (learning 0040)."""
+    base = live_server
+    errors: list[str] = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    csv_bytes = b"user_id\nU1\nU2\n"
+
+    # ── Minimal setup: source + control + pipeline with one procedure ────────
+    page.goto(base + "/sources/new")
+    page.fill("#s-id", "addsrc")
+    page.set_input_files(
+        "#s-file",
+        files=[{"name": "add.csv", "mimeType": "text/csv", "buffer": csv_bytes}],
+    )
+    page.fill("#s-asof", "2026-01-31")
+    page.click("button[type=submit]")
+    expect(page).to_have_url(base + "/sources/addsrc")
+
+    page.goto(base + "/controls/new")
+    page.fill("#f-id", "addtest")
+    page.fill("#f-title", "Add-procedure e2e control")
+    page.check("input[name='source_ids'][value='addsrc']")
+    page.click("button[type=submit]")
+    expect(page).to_have_url(base + "/controls/addtest")
+
+    graph_with_proc = json.dumps({
+        "nodes": [
+            {"id": "src", "type": "import", "source_id": "addsrc", "inputs": [], "config": {}},
+            {"id": "tst", "type": "test", "inputs": ["src"], "narrative": "", "config": {
+                "logic": "all", "procedure_id": "p1",
+                "conditions": [{"column": "user_id", "op": "not_empty"}],
+                "item_key_column": "user_id",
+            }},
+        ],
+        "procedures": [{"id": "p1", "code": "P1", "name": "Procedure Alpha", "position": 0}],
+    })
+    page.evaluate(
+        """async (args) => {
+            const fd = new FormData();
+            fd.append('pipeline_json', args.graph);
+            await fetch(args.url, {method: 'POST', body: fd, redirect: 'manual'});
+        }""",
+        {"url": f"{base}/controls/addtest/logic/builder", "graph": graph_with_proc},
+    )
+    page.goto(base + "/controls/addtest/logic/builder")
+    page.wait_for_load_state("load")
+
+    # ── Click ＋ Add procedure; the new section must match the server shape ───
+    before = page.locator("details[data-proc-section]").count()
+    page.get_by_role("button", name="Add procedure").click()
+    new = page.locator("details[data-proc-section]").last
+    expect(new.locator(".band-caret")).to_have_count(1)
+    expect(new.locator("[data-proc-head]")).to_have_count(1)
+    for sel in ("[data-proc-code]", "[data-proc-name]", "[data-proc-assert]",
+                "[data-proc-pct]", "[data-proc-count]", "[data-proc-narrative]",
+                "[data-proc-name-edit]", "[data-proc-del]"):
+        expect(new.locator(sel)).to_have_count(1)
+    expect(new.get_by_text("Tolerance", exact=True)).to_be_visible()
+    assert page.locator("details[data-proc-section]").count() == before + 1
+    assert errors == []
+
+
+@pytest.mark.browser
 def test_add_source_has_upload_and_url_modes(page: Page, live_server: str) -> None:
     """Smoke-check that the add-source page shows both modes and the URL form's
     secrets warning (learning 0012 — add-source form restructured in place with

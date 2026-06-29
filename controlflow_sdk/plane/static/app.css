@@ -707,8 +707,8 @@ legend {
   border: 1px solid var(--border-default); border-radius: var(--radius-card);
   background: var(--bg-surface-2); margin-bottom: 14px; padding: 0 14px 8px;
 }
-/* Per-procedure accent: a left stripe (color set inline from procedure_color()). */
-.proc-section { border-left: 3px solid var(--border-strong); }
+/* Per-procedure accent: a left stripe (color set via --proc custom property from procedure_color()). */
+.proc-section { border-left: 3px solid var(--proc, var(--border-strong)); }
 
 .band-head {
   /* Top-align so the caret sits on the identity row, not centered on the tall column. */
@@ -744,6 +744,8 @@ details[open] > .band-head > .band-caret { transform: rotate(90deg); }
   width: 46px; text-align: center; font-weight: 600; font-size: 11px;
   font-family: var(--font-mono); letter-spacing: .02em; padding: 3px 6px;
   border-radius: 5px;
+  color: var(--proc, var(--text-secondary));
+  border-color: var(--proc, var(--border-default));
 }
 /* Name as an in-place heading. The `input.` qualifier raises specificity to (0,2,1)
    so it beats the later global `input[type="text"]` block (0,1,1) — learning 0032. */
