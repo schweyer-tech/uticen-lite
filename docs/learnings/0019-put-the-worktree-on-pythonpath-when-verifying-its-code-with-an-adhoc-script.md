@@ -15,13 +15,13 @@ superseded_by: null
 Background sessions isolate work in a git worktree (`.claude/worktrees/...`), but the package is
 installed **editable** (`pip install -e`) pointing at the **main checkout**. To screenshot a worktree
 template change, a standalone render script (`python "$JOB_DIR/tmp/render.py"`) imported
-`controlflow_sdk` — and got the **main checkout's** old templates, rendering zero copy-rows even though
+`uticen_lite` — and got the **main checkout's** old templates, rendering zero copy-rows even though
 the worktree had them and the worktree tests passed.
 
 ## What went wrong
 
 `python /abs/path/script.py` prepends the **script's own directory** to `sys.path`, not the current
-working directory — so `import controlflow_sdk` falls through to the editable install (the main
+working directory — so `import uticen_lite` falls through to the editable install (the main
 checkout). `python -m pytest` and `python -m module` did the right thing because `-m` prepends **cwd**,
 which (run from the worktree) shadowed the editable install with the worktree's source. The two
 invocation styles resolve the package from different trees.
@@ -39,6 +39,6 @@ the *wrong* tree looks identical to a failure to apply the change.
 ## Reference
 
 - Standard bg-session isolation: `EnterWorktree` → `.claude/worktrees/...`; package installed editable.
-- Symptom this cycle: render of `controlflow_sdk/plane/templates/upgrading.html` showed 0 copy-rows
+- Symptom this cycle: render of `uticen_lite/plane/templates/upgrading.html` showed 0 copy-rows
   until `PYTHONPATH="$PWD"` pointed at the worktree.
 - Related: [[0018]] (other process rules for the finishing/verification loop).

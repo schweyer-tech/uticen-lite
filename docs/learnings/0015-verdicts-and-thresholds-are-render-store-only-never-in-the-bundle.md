@@ -27,7 +27,7 @@ concerns — **never serialize them into any bundle dict**. To add per-X verdict
 per-anything): store the **inputs** (counts, thresholds) in store-only state and **compute the verdict at
 render time**; keep `schema_version` frozen and the bundle carrying only raw results + the procedures
 array. The bundle stays the trust/contract boundary — it transports evidence, not opinions about it. If a
-consumer (the ControlFlow app) ever genuinely needs the verdict in the bundle, that is a **coordinated
+consumer (the Uticen app) ever genuinely needs the verdict in the bundle, that is a **coordinated
 `schema_version` bump on both sides**, never a unilateral field add. Corollary: when adding a per-X
 breakdown, group the existing store rows by the new key (here `runs.procedure_id`) and emit one
 `procedure` per group — do not invent a new bundle shape.
@@ -36,8 +36,8 @@ breakdown, group the existing store rows by the new key (here `runs.procedure_id
 
 - `contract/bundle.schema.json` — `$defs/run`, `$defs/procedure` (`{title, narrative, test_code,
   result}`), `$defs/workpaper.procedures` (unbounded, no threshold).
-- `controlflow_sdk/model/workpaper.py` — `Procedure.determination`, `Workpaper.determination` (any-fails
+- `uticen_lite/model/workpaper.py` — `Procedure.determination`, `Workpaper.determination` (any-fails
   roll-up); `Procedure.to_dict()` deliberately omits `threshold`/`determination`.
-- `controlflow_sdk/bundle/assemble.py` (`_build_workpaper` groups runs by `procedure_id`);
-  `controlflow_sdk/store/migrations.py` (store-only `runs.procedure_id`).
+- `uticen_lite/bundle/assemble.py` (`_build_workpaper` groups runs by `procedure_id`);
+  `uticen_lite/store/migrations.py` (store-only `runs.procedure_id`).
 - Extends the cardinal rule [[0001]] and [[0010]] (store-only state compiles to the existing artifact).

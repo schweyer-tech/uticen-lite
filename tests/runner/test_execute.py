@@ -1,4 +1,4 @@
-"""Tests for controlflow_sdk.runner.execute — TDD (write first, implement second).
+"""Tests for uticen_lite.runner.execute — TDD (write first, implement second).
 
 Fixture layout (built via tmp_path):
   <root>/
@@ -18,8 +18,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from controlflow_sdk.model.control import ControlDef, FrameworkRefs, SourceBinding
-from controlflow_sdk.model.run import RunRecord
+from uticen_lite.model.control import ControlDef, FrameworkRefs, SourceBinding
+from uticen_lite.model.run import RunRecord
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -102,8 +102,8 @@ def _load_control_and_sources(
     root: Path,
 ) -> tuple[ControlDef, dict[str, SourceBinding]]:
     """Discover the control and return (control_def, sources_dict)."""
-    from controlflow_sdk.project import discover_controls
-    from controlflow_sdk.project.loader import load_sources
+    from uticen_lite.project import discover_controls
+    from uticen_lite.project.loader import load_sources
 
     sources = load_sources(root)
     controls = discover_controls(root, sources=sources)
@@ -119,7 +119,7 @@ def _load_control_and_sources(
 class TestRunControlFullPopulation:
     def test_run_record_population_size(self, tmp_path: Path) -> None:
         """run_control returns a RunRecord whose population_size equals the CSV row count."""
-        from controlflow_sdk.runner import run_control
+        from uticen_lite.runner import run_control
 
         root = _build_project(tmp_path)
         control, sources = _load_control_and_sources(root)
@@ -134,7 +134,7 @@ class TestRunControlFullPopulation:
 
     def test_run_record_failed_count(self, tmp_path: Path) -> None:
         """Exactly one row violates amount > 15 (TX-002 with amount=20)."""
-        from controlflow_sdk.runner import run_control
+        from uticen_lite.runner import run_control
 
         root = _build_project(tmp_path)
         control, sources = _load_control_and_sources(root)
@@ -148,7 +148,7 @@ class TestRunControlFullPopulation:
 
     def test_violation_item_key_matches_offending_row(self, tmp_path: Path) -> None:
         """The single violation's item_key must be 'TX-002' (the row with amount=20)."""
-        from controlflow_sdk.runner import run_control
+        from uticen_lite.runner import run_control
 
         root = _build_project(tmp_path)
         control, sources = _load_control_and_sources(root)
@@ -163,7 +163,7 @@ class TestRunControlFullPopulation:
 
     def test_provenance_sha256_populated(self, tmp_path: Path) -> None:
         """provenance[0].sha256 must be a 64-char lowercase hex string."""
-        from controlflow_sdk.runner import run_control
+        from uticen_lite.runner import run_control
 
         root = _build_project(tmp_path)
         control, sources = _load_control_and_sources(root)
@@ -181,7 +181,7 @@ class TestRunControlFullPopulation:
 
     def test_control_id_preserved(self, tmp_path: Path) -> None:
         """The returned RunRecord must carry the control's id."""
-        from controlflow_sdk.runner import run_control
+        from uticen_lite.runner import run_control
 
         root = _build_project(tmp_path)
         control, sources = _load_control_and_sources(root)
@@ -195,7 +195,7 @@ class TestRunControlFullPopulation:
 
     def test_executed_at_preserved(self, tmp_path: Path) -> None:
         """executed_at is passed through unchanged — runner never calls datetime.now()."""
-        from controlflow_sdk.runner import run_control
+        from uticen_lite.runner import run_control
 
         ts = "2026-06-16T12:34:56Z"
         root = _build_project(tmp_path)
@@ -212,7 +212,7 @@ class TestRunControlFullPopulation:
 class TestRunControlErrorHandling:
     def test_non_list_return_raises_runner_error(self, tmp_path: Path) -> None:
         """A test() returning a dict (not a list) raises RunnerError mentioning the control id."""
-        from controlflow_sdk.runner import RunnerError, run_control
+        from uticen_lite.runner import RunnerError, run_control
 
         root = _build_project(tmp_path, test_py_content=_TEST_PY_RETURNS_DICT)
         control, sources = _load_control_and_sources(root)
@@ -226,13 +226,13 @@ class TestRunControlErrorHandling:
 
     def test_runner_error_is_exception(self) -> None:
         """RunnerError must be a subclass of Exception."""
-        from controlflow_sdk.runner import RunnerError
+        from uticen_lite.runner import RunnerError
 
         assert issubclass(RunnerError, Exception)
 
     def test_test_function_exception_wrapped_in_runner_error(self, tmp_path: Path) -> None:
         """If test() raises an exception, it's wrapped in RunnerError with the control id."""
-        from controlflow_sdk.runner import RunnerError, run_control
+        from uticen_lite.runner import RunnerError, run_control
 
         crashing_test = textwrap.dedent("""\
             def test(pop):
@@ -252,10 +252,10 @@ class TestRunControlErrorHandling:
         """RunnerError must NOT contain SDK-internal or site-packages frames.
 
         The message must still name the control id and the exception text,
-        but SDK frames (controlflow_sdk/runner/execute.py, site-packages) must
+        but SDK frames (uticen_lite/runner/execute.py, site-packages) must
         be absent so the user sees only their own test.py context.
         """
-        from controlflow_sdk.runner import RunnerError, run_control
+        from uticen_lite.runner import RunnerError, run_control
 
         crashing_test = textwrap.dedent("""\
             def test(pop):
@@ -275,12 +275,12 @@ class TestRunControlErrorHandling:
         assert "amount_check" in msg
         assert "intentional crash for frame test" in msg
         # Must NOT contain SDK-internal paths
-        assert "controlflow_sdk/runner/execute.py" not in msg
+        assert "uticen_lite/runner/execute.py" not in msg
         assert "site-packages" not in msg
 
     def test_malformed_violation_raises_runner_error(self, tmp_path: Path) -> None:
         """A violation missing 'description' is rejected and raises RunnerError."""
-        from controlflow_sdk.runner import RunnerError, run_control
+        from uticen_lite.runner import RunnerError, run_control
 
         bad_violation_test = textwrap.dedent("""\
             def test(pop):
@@ -376,8 +376,8 @@ def _load_two_source_control(
     root: Path,
 ) -> tuple:
     """Discover the two-source control and return (control_def, sources_dict)."""
-    from controlflow_sdk.project import discover_controls
-    from controlflow_sdk.project.loader import load_sources
+    from uticen_lite.project import discover_controls
+    from uticen_lite.project.loader import load_sources
 
     sources = load_sources(root)
     controls = discover_controls(root, sources=sources)
@@ -388,7 +388,7 @@ def _load_two_source_control(
 class TestRunControlMultiSource:
     def test_single_arg_test_unchanged(self, tmp_path: Path) -> None:
         """A 1-arg test(pop) control still runs correctly and flags the right rows."""
-        from controlflow_sdk.runner import run_control
+        from uticen_lite.runner import run_control
 
         root = _build_project(tmp_path)
         control, sources = _load_control_and_sources(root)
@@ -403,7 +403,7 @@ class TestRunControlMultiSource:
 
     def test_two_arg_test_receives_all_sources_keyed_by_id(self, tmp_path: Path) -> None:
         """A 2-arg test(pop, sources) receives a dict with both source ids."""
-        from controlflow_sdk.runner import run_control
+        from uticen_lite.runner import run_control
 
         two_arg_test = textwrap.dedent("""\
             def test(pop, sources):
@@ -423,7 +423,7 @@ class TestRunControlMultiSource:
 
     def test_two_arg_test_can_join_across_sources(self, tmp_path: Path) -> None:
         """A 2-arg test can join primary + secondary and flag unapproved orders."""
-        from controlflow_sdk.runner import run_control
+        from uticen_lite.runner import run_control
 
         join_test = textwrap.dedent("""\
             def test(pop, sources):
@@ -507,8 +507,8 @@ class TestRunControlMultiSource:
         (ctrl_dir / "control.yaml").write_text(orders_control_yaml)
         (ctrl_dir / "test.py").write_text(join_test)
 
-        from controlflow_sdk.project import discover_controls
-        from controlflow_sdk.project.loader import load_sources
+        from uticen_lite.project import discover_controls
+        from uticen_lite.project.loader import load_sources
 
         sources = load_sources(tmp_path)
         controls = discover_controls(tmp_path, sources=sources)
@@ -526,7 +526,7 @@ class TestRunControlMultiSource:
 
     def test_two_arg_test_that_raises_still_wrapped_as_runner_error(self, tmp_path: Path) -> None:
         """A 2-arg test that raises is wrapped as RunnerError."""
-        from controlflow_sdk.runner import RunnerError, run_control
+        from uticen_lite.runner import RunnerError, run_control
 
         crashing_two_arg = textwrap.dedent("""\
             def test(pop, sources):
@@ -573,7 +573,7 @@ def _users_binding() -> SourceBinding:
 
 
 def test_run_control_executes_a_rule(tmp_path: Path):
-    from controlflow_sdk.runner import run_control
+    from uticen_lite.runner import run_control
 
     root = _csv(tmp_path)
     binding = _users_binding()
@@ -596,3 +596,82 @@ def test_run_control_executes_a_rule(tmp_path: Path):
     assert run.failed == 1
     assert run.violations[0].item_key == "U1"
     assert run.provenance[0].source_id == "users"
+
+
+# ---------------------------------------------------------------------------
+# Corrupted-state degradation: ordinary authoring mistakes must surface as
+# RunnerError (never a raw ValueError/TypeError/FileNotFoundError/ArrowInvalid),
+# so the web Run button and `uticen-lite run` both degrade to a friendly page (0013).
+# ---------------------------------------------------------------------------
+
+
+def _rule_control(rule_spec: dict, binding: SourceBinding | None = None) -> ControlDef:
+    return ControlDef(
+        id="sod", title="SoD", objective="o", narrative="n",
+        framework_refs=FrameworkRefs(), risk=None,
+        sources=[binding or _users_binding()],
+        rule_spec=rule_spec,
+    )
+
+
+class TestRunControlCorruptedState:
+    def test_cross_source_unknown_other_source_raises_runner_error(self, tmp_path: Path):
+        """A cross-source condition naming a deleted source → RunnerError, not ValueError."""
+        from uticen_lite.runner import RunnerError, run_control
+
+        root = _csv(tmp_path)
+        binding = _users_binding()
+        control = _rule_control(
+            {
+                "logic": "all",
+                "conditions": [
+                    {"op": "not_exists_in", "column": "user_id",
+                     "other_source": "ghost", "this_key": "user_id",
+                     "other_key": "employee_id"},
+                ],
+                "severity": "high",
+                "description_template": "User {user_id}",
+                "item_key_column": "user_id",
+            },
+            binding,
+        )
+        with pytest.raises(RunnerError, match="sod"):
+            run_control(control, {"users": binding}, root, "2026-03-31T00:00:00+00:00")
+
+    def test_comparison_on_text_column_raises_runner_error(self, tmp_path: Path):
+        """A gt/lt comparison against a text column (type mismatch) → RunnerError, not TypeError."""
+        from uticen_lite.runner import RunnerError, run_control
+
+        root = _csv(tmp_path)
+        binding = _users_binding()
+        control = _rule_control(
+            {
+                "logic": "all",
+                "conditions": [{"column": "user_id", "op": "gt", "value": 5}],
+                "severity": "high",
+                "description_template": "User {user_id}",
+                "item_key_column": "user_id",
+            },
+            binding,
+        )
+        with pytest.raises(RunnerError, match="sod"):
+            run_control(control, {"users": binding}, root, "2026-03-31T00:00:00+00:00")
+
+    def test_missing_source_file_raises_runner_error(self, tmp_path: Path):
+        """A bound source whose backing file is gone → RunnerError, not FileNotFoundError."""
+        from uticen_lite.runner import RunnerError, run_control
+
+        # tmp_path has no data/users.csv on disk → adapter.load() raises FileNotFoundError.
+        binding = _users_binding()
+        control = _rule_control(
+            {
+                "logic": "all",
+                "conditions": [{"column": "can_create", "op": "eq", "value": True}],
+                "severity": "high",
+                "description_template": "User {user_id}",
+                "item_key_column": "user_id",
+            },
+            binding,
+        )
+        with pytest.raises(RunnerError, match="users"):
+            run_control(control, {"users": binding}, tmp_path, "2026-03-31T00:00:00+00:00")

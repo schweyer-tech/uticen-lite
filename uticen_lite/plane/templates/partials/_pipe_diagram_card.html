@@ -1,0 +1,3 @@
+{# HTMX-swappable wrapper around the SVG flowchart so a band collapse toggle
+   replaces just the chart (hx-target="#flowchart-card", hx-swap="outerHTML"). #}
+<div id="flowchart-card" class="flowchart">{% include "partials/_pipe_diagram.html" %}</div>

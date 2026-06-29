@@ -1,6 +1,6 @@
-"""Test the public API surface of controlflow_sdk."""
+"""Test the public API surface of uticen_lite."""
 
-from controlflow_sdk import ColumnMeta, Population, Severity, Violation
+from uticen_lite import ColumnMeta, Population, Severity, Violation
 
 
 def test_violation_import_and_to_dict() -> None:

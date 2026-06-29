@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Can't run {{ control_id }} — {{ project.name }}{% endblock %}
+{% block body %}
+<a class="crumb" href="/controls/{{ control_id }}">← {{ control_id }}</a>
+<div class="page-head"><h1>This control isn't ready to run yet</h1></div>
+<div class="banner banner-error" role="alert">
+  <p>We couldn't run <span class="mono">{{ control_id }}</span>. Make sure it has a
+  bound data source and authored logic, then try again.</p>
+  {% if message %}<p class="muted mono">{{ message }}</p>{% endif %}
+</div>
+<div class="page-actions">
+  <a class="btn btn-primary" href="/controls/{{ control_id }}/logic/builder">Author logic</a>
+  <a class="btn btn-ghost" href="/controls/{{ control_id }}">Back to control</a>
+</div>
+{% endblock %}

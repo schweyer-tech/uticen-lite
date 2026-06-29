@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import pandas as pd
 
-from controlflow_sdk.pipeline.model import parse_pipeline
-from controlflow_sdk.pipeline.rowcounts import RowCountError, compute_row_counts
+from uticen_lite.pipeline.model import parse_pipeline
+from uticen_lite.pipeline.rowcounts import RowCountError, compute_row_counts
 
 
 def _terminated_access_graph() -> dict:
@@ -86,10 +86,9 @@ def test_row_counts_with_custom_transform_node():
 def test_row_counts_forked_pipeline_counts_all_terminals():
     """A forked (2-terminal) pipeline must return counts for BOTH terminal ids.
 
-    Without the fix, ``_emit_counts_body`` skips only ``terminals[0]``;
-    the second terminal falls through ``_emit_node_lines`` (no ``test`` branch),
-    so no ``_f_<id>`` frame is assigned → ``RowCountError`` → returns ``{}`` →
-    the editor shows "—" for every node.
+    Both terminal frames are materialised by ``materialize_steps`` and then
+    counted via ``len()``, so neither falls through — the editor shows counts
+    for every node, including both terminals.
     """
     graph = {"nodes": [
         {"id": "imp", "type": "import", "source_id": "je"},

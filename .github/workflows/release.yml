@@ -46,7 +46,7 @@ jobs:
       - name: Smoke-test wheel import
         run: |
           pip install dist/*.whl
-          python -c "import controlflow_sdk; from controlflow_sdk import Violation; print('wheel import OK')"
+          python -c "import uticen_lite; from uticen_lite import Violation; print('wheel import OK')"
 
       - name: Confirm no compiled deps in wheel
         run: |
@@ -82,7 +82,7 @@ jobs:
       github.event.inputs.publish == 'true'
     environment:
       name: pypi
-      url: https://pypi.org/project/controlflow-sdk/
+      url: https://pypi.org/project/uticen-lite/
     steps:
       - uses: actions/checkout@v7
         with:
@@ -112,7 +112,7 @@ jobs:
       # Reuse the exact dist that build-and-check already built + twine-checked, so
       # the published bytes ARE the verified bytes (no second-build drift).
       - name: Download verified dist
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: dist-${{ github.ref_name }}
           path: dist/

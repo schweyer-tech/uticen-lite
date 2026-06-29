@@ -2,15 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Give the control plane an install-aware upgrade path — a dashboard self-upgrade button and a `cflow upgrade` CLI — gated behind an opt-in update check that keeps the zero-egress default intact.
+**Goal:** Give the control plane an install-aware upgrade path — a dashboard self-upgrade button and a `uticen-lite upgrade` CLI — gated behind an opt-in update check that keeps the zero-egress default intact.
 
-**Architecture:** A new dependency-free `controlflow_sdk/upgrade/` package detects the install method (git-editable / pipx / pip / unknown), checks the latest version (opt-in), builds the right upgrade command, and — for the web path — spawns a detached stdlib-only helper that waits for the app to exit, upgrades, and writes a status file. The CLI runs the same command inline. Web routes live in a new `plane/routes/updates.py`; the toggle persists in the existing `project.system` JSON.
+**Architecture:** A new dependency-free `uticen_lite/upgrade/` package detects the install method (git-editable / pipx / pip / unknown), checks the latest version (opt-in), builds the right upgrade command, and — for the web path — spawns a detached stdlib-only helper that waits for the app to exit, upgrades, and writes a status file. The CLI runs the same command inline. Web routes live in a new `plane/routes/updates.py`; the toggle persists in the existing `project.system` JSON.
 
 **Tech Stack:** Python ≥3.11 stdlib, FastAPI + Jinja2 + HTMX (control plane), argparse (CLI), sqlite3 (store), pytest + FastAPI `TestClient`.
 
 ## Global Constraints
 
-- Python floor **≥3.11**; ruff target **py311**, line-length **100**; `python -m ruff check .` and `python -m mypy controlflow_sdk` must stay green.
+- Python floor **≥3.11**; ruff target **py311**, line-length **100**; `python -m ruff check .` and `python -m mypy uticen_lite` must stay green.
 - **No new runtime dependency.** Do not import or add `packaging`; version comparison is a tiny in-repo helper (learning 0003 — keep the core dep-free).
 - The new `upgrade/` package is imported **only** by `plane/` and `cli/` — never by the Pyodide-safe core (`model/`, `runner/`, `rules/`).
 - **Never touch `contract/bundle.schema.json`** or any bundle producer — this feature is orthogonal to the bundle (cardinal rule, learning 0001).
@@ -36,7 +36,7 @@
 
 ## File Structure
 
-**New — `controlflow_sdk/upgrade/` (dep-free core of the feature):**
+**New — `uticen_lite/upgrade/` (dep-free core of the feature):**
 - `__init__.py` — package docstring only; consumers import submodules directly.
 - `version.py` — `is_newer(candidate, current) -> bool` (tuple compare, no deps).
 - `detect.py` — `InstallMethod` enum, pure `classify_install(...)`, `detect_install()`, `source_dir()`.
@@ -45,12 +45,12 @@
 - `spawn.py` — `write_status`/`read_status`, `_HELPER_SOURCE`, `spawn_detached_upgrade(...)`, `schedule_shutdown(...)`.
 
 **Modified:**
-- `controlflow_sdk/store/repo.py` — add `get_check_updates_on_launch` / `set_check_updates_on_launch`.
-- `controlflow_sdk/cli/__init__.py` — add `upgrade` subparser + dispatch.
-- `controlflow_sdk/cli/upgrade_cmd.py` — **new** `upgrade_cmd(args)`.
-- `controlflow_sdk/plane/app.py` — import + register `updates` routes.
-- `controlflow_sdk/plane/routes/updates.py` — **new** route module (settings page, toggle, check, badge, upgrade).
-- `controlflow_sdk/plane/routes/dashboard.py` — surface the post-upgrade status notice.
+- `uticen_lite/store/repo.py` — add `get_check_updates_on_launch` / `set_check_updates_on_launch`.
+- `uticen_lite/cli/__init__.py` — add `upgrade` subparser + dispatch.
+- `uticen_lite/cli/upgrade_cmd.py` — **new** `upgrade_cmd(args)`.
+- `uticen_lite/plane/app.py` — import + register `updates` routes.
+- `uticen_lite/plane/routes/updates.py` — **new** route module (settings page, toggle, check, badge, upgrade).
+- `uticen_lite/plane/routes/dashboard.py` — surface the post-upgrade status notice.
 - Templates: **new** `settings_updates.html`, `partials/update_result.html`, `partials/update_badge.html`, `upgrading.html`, `upgrade_unavailable.html`; **modify** `settings.html` (Updates card), `dashboard.html` (badge include + notice).
 - Docs: `README.md`, `docs/INSTALL.md`, `PRODUCT-MAP.md`, `CHANGELOG.md`.
 
@@ -59,8 +59,8 @@
 ## Task 1: `upgrade/version.py` — dependency-free version compare
 
 **Files:**
-- Create: `controlflow_sdk/upgrade/__init__.py`
-- Create: `controlflow_sdk/upgrade/version.py`
+- Create: `uticen_lite/upgrade/__init__.py`
+- Create: `uticen_lite/upgrade/version.py`
 - Test: `tests/upgrade/__init__.py`, `tests/upgrade/test_version.py`
 
 **Interfaces:**
@@ -71,7 +71,7 @@
 Create `tests/upgrade/__init__.py` (empty file). Create `tests/upgrade/test_version.py`:
 
 ```python
-from controlflow_sdk.upgrade.version import is_newer
+from uticen_lite.upgrade.version import is_newer
 
 
 def test_newer_patch_and_minor():
@@ -101,11 +101,11 @@ def test_malformed_never_raises():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/upgrade/test_version.py -q`
-Expected: FAIL with `ModuleNotFoundError: No module named 'controlflow_sdk.upgrade'`.
+Expected: FAIL with `ModuleNotFoundError: No module named 'uticen_lite.upgrade'`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `controlflow_sdk/upgrade/__init__.py`:
+Create `uticen_lite/upgrade/__init__.py`:
 
 ```python
 """Install-aware upgrade + opt-in update-awareness for the control plane.
@@ -115,7 +115,7 @@ Dependency-free (stdlib + package metadata only). Imported by ``plane/`` and
 """
 ```
 
-Create `controlflow_sdk/upgrade/version.py`:
+Create `uticen_lite/upgrade/version.py`:
 
 ```python
 """Tiny dependency-free version comparison.
@@ -158,7 +158,7 @@ Expected: PASS (5 passed).
 - [ ] **Step 5: Commit and push**
 
 ```bash
-git add controlflow_sdk/upgrade/__init__.py controlflow_sdk/upgrade/version.py tests/upgrade/
+git add uticen_lite/upgrade/__init__.py uticen_lite/upgrade/version.py tests/upgrade/
 git commit -m "feat(upgrade): dependency-free version comparison"
 git push -u origin HEAD
 ```
@@ -168,7 +168,7 @@ git push -u origin HEAD
 ## Task 2: `upgrade/detect.py` — install-method detection
 
 **Files:**
-- Create: `controlflow_sdk/upgrade/detect.py`
+- Create: `uticen_lite/upgrade/detect.py`
 - Test: `tests/upgrade/test_detect.py`
 
 **Interfaces:**
@@ -183,7 +183,7 @@ git push -u origin HEAD
 Create `tests/upgrade/test_detect.py`:
 
 ```python
-from controlflow_sdk.upgrade.detect import InstallMethod, classify_install
+from uticen_lite.upgrade.detect import InstallMethod, classify_install
 
 
 def test_editable_with_git_is_git_editable():
@@ -197,12 +197,12 @@ def test_editable_without_git_is_unknown():
 
 
 def test_pipx_prefix_is_pipx():
-    prefix = "/home/u/.local/pipx/venvs/controlflow-sdk"
+    prefix = "/home/u/.local/pipx/venvs/uticen-lite"
     assert classify_install(None, prefix, False) is InstallMethod.PIPX
 
 
 def test_windows_pipx_prefix_is_pipx():
-    prefix = r"C:\Users\u\pipx\venvs\controlflow-sdk"
+    prefix = r"C:\Users\u\pipx\venvs\uticen-lite"
     assert classify_install(None, prefix, False) is InstallMethod.PIPX
 
 
@@ -221,10 +221,10 @@ Expected: FAIL with `ImportError` / `ModuleNotFoundError` for `detect`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `controlflow_sdk/upgrade/detect.py`:
+Create `uticen_lite/upgrade/detect.py`:
 
 ```python
-"""Detect how controlflow-sdk was installed, to pick the right upgrade command.
+"""Detect how uticen-lite was installed, to pick the right upgrade command.
 
 The decision is split into a pure ``classify_install`` (fully unit-testable) and
 a thin ``detect_install`` that gathers the real environment facts.
@@ -250,7 +250,7 @@ class InstallMethod(enum.Enum):
 
 def _direct_url() -> dict | None:
     try:
-        dist = distribution("controlflow-sdk")
+        dist = distribution("uticen-lite")
     except PackageNotFoundError:
         return None
     try:
@@ -308,7 +308,7 @@ Expected: PASS (6 passed).
 - [ ] **Step 5: Commit and push**
 
 ```bash
-git add controlflow_sdk/upgrade/detect.py tests/upgrade/test_detect.py
+git add uticen_lite/upgrade/detect.py tests/upgrade/test_detect.py
 git commit -m "feat(upgrade): detect install method (git-editable/pipx/pip/unknown)"
 git push -u origin HEAD
 ```
@@ -318,7 +318,7 @@ git push -u origin HEAD
 ## Task 3: `upgrade/check.py` — current/latest version + update info
 
 **Files:**
-- Create: `controlflow_sdk/upgrade/check.py`
+- Create: `uticen_lite/upgrade/check.py`
 - Test: `tests/upgrade/test_check.py`
 
 **Interfaces:**
@@ -336,13 +336,13 @@ Create `tests/upgrade/test_check.py`:
 ```python
 from types import SimpleNamespace
 
-from controlflow_sdk.upgrade.check import (
+from uticen_lite.upgrade.check import (
     UpdateInfo,
     check_for_update,
     current_version,
     latest_version,
 )
-from controlflow_sdk.upgrade.detect import InstallMethod
+from uticen_lite.upgrade.detect import InstallMethod
 
 
 def test_current_version_is_a_string():
@@ -357,7 +357,7 @@ def test_latest_version_uses_injected_fetcher():
 
 def test_pip_update_available(monkeypatch):
     monkeypatch.setattr(
-        "controlflow_sdk.upgrade.check.current_version", lambda: "0.1.0"
+        "uticen_lite.upgrade.check.current_version", lambda: "0.1.0"
     )
     info = check_for_update(InstallMethod.PIP, fetch=lambda: "0.2.0")
     assert isinstance(info, UpdateInfo)
@@ -368,7 +368,7 @@ def test_pip_update_available(monkeypatch):
 
 def test_pip_up_to_date(monkeypatch):
     monkeypatch.setattr(
-        "controlflow_sdk.upgrade.check.current_version", lambda: "0.2.0"
+        "uticen_lite.upgrade.check.current_version", lambda: "0.2.0"
     )
     info = check_for_update(InstallMethod.PIP, fetch=lambda: "0.2.0")
     assert info.available is False
@@ -376,7 +376,7 @@ def test_pip_up_to_date(monkeypatch):
 
 def test_pip_unreachable_index_degrades(monkeypatch):
     monkeypatch.setattr(
-        "controlflow_sdk.upgrade.check.current_version", lambda: "0.1.0"
+        "uticen_lite.upgrade.check.current_version", lambda: "0.1.0"
     )
     info = check_for_update(InstallMethod.PIP, fetch=lambda: None)
     assert info.available is False
@@ -385,7 +385,7 @@ def test_pip_unreachable_index_degrades(monkeypatch):
 
 def test_unknown_method_is_not_available(monkeypatch):
     monkeypatch.setattr(
-        "controlflow_sdk.upgrade.check.current_version", lambda: "0.1.0"
+        "uticen_lite.upgrade.check.current_version", lambda: "0.1.0"
     )
     info = check_for_update(InstallMethod.UNKNOWN)
     assert info.available is False
@@ -393,10 +393,10 @@ def test_unknown_method_is_not_available(monkeypatch):
 
 def test_git_behind_uses_injected_runner(monkeypatch):
     monkeypatch.setattr(
-        "controlflow_sdk.upgrade.check.current_version", lambda: "0.1.0"
+        "uticen_lite.upgrade.check.current_version", lambda: "0.1.0"
     )
     monkeypatch.setattr(
-        "controlflow_sdk.upgrade.check.source_dir", lambda: __import__("pathlib").Path(".")
+        "uticen_lite.upgrade.check.source_dir", lambda: __import__("pathlib").Path(".")
     )
 
     def fake_git(args):
@@ -418,7 +418,7 @@ Expected: FAIL — `check` module not found.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `controlflow_sdk/upgrade/check.py`:
+Create `uticen_lite/upgrade/check.py`:
 
 ```python
 """Read the current version and (optionally) the latest available version.
@@ -438,8 +438,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from controlflow_sdk.upgrade.detect import InstallMethod, source_dir
-from controlflow_sdk.upgrade.version import is_newer
+from uticen_lite.upgrade.detect import InstallMethod, source_dir
+from uticen_lite.upgrade.version import is_newer
 
 Fetcher = Callable[[], "str | None"]
 GitRunner = Callable[[list[str]], Any]
@@ -458,9 +458,9 @@ def current_version() -> str:
     from importlib.metadata import PackageNotFoundError, version
 
     try:
-        return version("controlflow-sdk")
+        return version("uticen-lite")
     except PackageNotFoundError:
-        from controlflow_sdk import __version__
+        from uticen_lite import __version__
 
         return __version__
 
@@ -468,7 +468,7 @@ def current_version() -> str:
 def _pip_index_latest() -> str | None:
     try:
         result = subprocess.run(
-            [sys.executable, "-m", "pip", "index", "versions", "controlflow-sdk"],
+            [sys.executable, "-m", "pip", "index", "versions", "uticen-lite"],
             capture_output=True,
             text=True,
             timeout=20,
@@ -542,7 +542,7 @@ Expected: PASS (8 passed).
 - [ ] **Step 5: Commit and push**
 
 ```bash
-git add controlflow_sdk/upgrade/check.py tests/upgrade/test_check.py
+git add uticen_lite/upgrade/check.py tests/upgrade/test_check.py
 git commit -m "feat(upgrade): version check + method-aware UpdateInfo"
 git push -u origin HEAD
 ```
@@ -552,7 +552,7 @@ git push -u origin HEAD
 ## Task 4: `upgrade/command.py` — build the upgrade command
 
 **Files:**
-- Create: `controlflow_sdk/upgrade/command.py`
+- Create: `uticen_lite/upgrade/command.py`
 - Test: `tests/upgrade/test_command.py`
 
 **Interfaces:**
@@ -566,18 +566,18 @@ Create `tests/upgrade/test_command.py`:
 ```python
 import pytest
 
-from controlflow_sdk.upgrade.command import build_upgrade_command
-from controlflow_sdk.upgrade.detect import InstallMethod
+from uticen_lite.upgrade.command import build_upgrade_command
+from uticen_lite.upgrade.detect import InstallMethod
 
 
 def test_pip_command():
     cmds = build_upgrade_command(InstallMethod.PIP, python="/py")
-    assert cmds == [["/py", "-m", "pip", "install", "-U", "controlflow-sdk"]]
+    assert cmds == [["/py", "-m", "pip", "install", "-U", "uticen-lite"]]
 
 
 def test_pipx_command():
     cmds = build_upgrade_command(InstallMethod.PIPX)
-    assert cmds == [["pipx", "upgrade", "controlflow-sdk"]]
+    assert cmds == [["pipx", "upgrade", "uticen-lite"]]
 
 
 def test_git_command_is_two_steps():
@@ -607,7 +607,7 @@ Expected: FAIL — `command` module not found.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `controlflow_sdk/upgrade/command.py`:
+Create `uticen_lite/upgrade/command.py`:
 
 ```python
 """Build the upgrade command(s) for a detected install method (pure)."""
@@ -616,7 +616,7 @@ from __future__ import annotations
 
 import sys
 
-from controlflow_sdk.upgrade.detect import InstallMethod
+from uticen_lite.upgrade.detect import InstallMethod
 
 
 def build_upgrade_command(
@@ -635,9 +635,9 @@ def build_upgrade_command(
             [py, "-m", "pip", "install", "-e", source_dir],
         ]
     if method is InstallMethod.PIPX:
-        return [["pipx", "upgrade", "controlflow-sdk"]]
+        return [["pipx", "upgrade", "uticen-lite"]]
     if method is InstallMethod.PIP:
-        return [[py, "-m", "pip", "install", "-U", "controlflow-sdk"]]
+        return [[py, "-m", "pip", "install", "-U", "uticen-lite"]]
     raise ValueError(f"no upgrade command for install method {method}")
 ```
 
@@ -649,7 +649,7 @@ Expected: PASS (5 passed).
 - [ ] **Step 5: Commit and push**
 
 ```bash
-git add controlflow_sdk/upgrade/command.py tests/upgrade/test_command.py
+git add uticen_lite/upgrade/command.py tests/upgrade/test_command.py
 git commit -m "feat(upgrade): build install-aware upgrade command"
 git push -u origin HEAD
 ```
@@ -659,7 +659,7 @@ git push -u origin HEAD
 ## Task 5: `upgrade/spawn.py` — detached helper, status, shutdown
 
 **Files:**
-- Create: `controlflow_sdk/upgrade/spawn.py`
+- Create: `uticen_lite/upgrade/spawn.py`
 - Test: `tests/upgrade/test_spawn.py`
 
 **Interfaces:**
@@ -667,7 +667,7 @@ git push -u origin HEAD
   - `STATUS_FILE = ".controlplane-upgrade.status"`, `LOG_FILE = ".controlplane-upgrade.log"`.
   - `write_status(project_root, payload: dict) -> None`.
   - `read_status(project_root) -> dict | None` — reads and **deletes** the status file (one-shot notice).
-  - `_HELPER_SOURCE: str` — a self-contained, stdlib-only helper script (imports nothing from `controlflow_sdk`).
+  - `_HELPER_SOURCE: str` — a self-contained, stdlib-only helper script (imports nothing from `uticen_lite`).
   - `spawn_detached_upgrade(project_root, commands: list[list[str]], *, current: str, popen=None) -> Path` — writes the helper to a temp file, spawns it detached, returns the helper path. `popen` is injectable for tests.
   - `schedule_shutdown(delay: float = 0.7, *, timer=None) -> None` — schedules a self-shutdown; `timer` is injectable for tests.
 
@@ -678,7 +678,7 @@ Create `tests/upgrade/test_spawn.py`:
 ```python
 import json
 
-from controlflow_sdk.upgrade import spawn
+from uticen_lite.upgrade import spawn
 
 
 def test_status_roundtrip_then_clears(tmp_path):
@@ -693,9 +693,9 @@ def test_read_status_missing_is_none(tmp_path):
 
 
 def test_helper_source_is_self_contained():
-    # The detached helper must not import controlflow_sdk (the package may be
+    # The detached helper must not import uticen_lite (the package may be
     # replaced under it) and must be valid Python.
-    assert "import controlflow_sdk" not in spawn._HELPER_SOURCE
+    assert "import uticen_lite" not in spawn._HELPER_SOURCE
     compile(spawn._HELPER_SOURCE, "<helper>", "exec")
 
 
@@ -707,7 +707,7 @@ def test_spawn_writes_helper_and_invokes_popen(tmp_path):
         calls["kwargs"] = kwargs
         return object()
 
-    commands = [["pipx", "upgrade", "controlflow-sdk"]]
+    commands = [["pipx", "upgrade", "uticen-lite"]]
     helper = spawn.spawn_detached_upgrade(
         tmp_path, commands, current="0.1.0", popen=fake_popen
     )
@@ -743,7 +743,7 @@ Expected: FAIL — `spawn` module not found.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `controlflow_sdk/upgrade/spawn.py`:
+Create `uticen_lite/upgrade/spawn.py`:
 
 ```python
 """Spawn a detached helper that upgrades after the app exits, plus status I/O.
@@ -751,7 +751,7 @@ Create `controlflow_sdk/upgrade/spawn.py`:
 The helper waits for the control-plane process to fully exit before running the
 upgrade, so no file being replaced is held open (the Windows-safe ordering). It
 is written to a temp file as a self-contained, stdlib-only script that imports
-nothing from controlflow_sdk — so the package can be freely replaced under it.
+nothing from uticen_lite — so the package can be freely replaced under it.
 """
 
 from __future__ import annotations
@@ -768,7 +768,7 @@ from typing import Any, Callable
 STATUS_FILE = ".controlplane-upgrade.status"
 LOG_FILE = ".controlplane-upgrade.log"
 
-# Self-contained: stdlib only, no controlflow_sdk imports. A 60s deadline is the
+# Self-contained: stdlib only, no uticen_lite imports. A 60s deadline is the
 # backstop in case parent-PID detection is imperfect on a given platform.
 _HELPER_SOURCE = r'''
 import errno, json, os, subprocess, sys, time
@@ -881,7 +881,7 @@ Expected: PASS (5 passed).
 - [ ] **Step 5: Commit and push**
 
 ```bash
-git add controlflow_sdk/upgrade/spawn.py tests/upgrade/test_spawn.py
+git add uticen_lite/upgrade/spawn.py tests/upgrade/test_spawn.py
 git commit -m "feat(upgrade): detached upgrade helper, status I/O, self-shutdown"
 git push -u origin HEAD
 ```
@@ -891,7 +891,7 @@ git push -u origin HEAD
 ## Task 6: store — persist the opt-in toggle
 
 **Files:**
-- Modify: `controlflow_sdk/store/repo.py` (add two functions near `get_project`/`upsert_project`)
+- Modify: `uticen_lite/store/repo.py` (add two functions near `get_project`/`upsert_project`)
 - Test: `tests/store/test_repo_update_setting.py`
 
 **Interfaces:**
@@ -905,9 +905,9 @@ git push -u origin HEAD
 Create `tests/store/test_repo_update_setting.py`:
 
 ```python
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.migrations import migrate
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.migrations import migrate
 
 
 def _db(tmp_path):
@@ -942,11 +942,11 @@ def test_toggle_preserves_other_system_keys(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/store/test_repo_update_setting.py -q`
-Expected: FAIL — `AttributeError: module 'controlflow_sdk.store.repo' has no attribute 'get_check_updates_on_launch'`.
+Expected: FAIL — `AttributeError: module 'uticen_lite.store.repo' has no attribute 'get_check_updates_on_launch'`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `controlflow_sdk/store/repo.py`, add these two functions immediately after `get_project` (keep the existing imports; `get_project`/`upsert_project` already exist):
+In `uticen_lite/store/repo.py`, add these two functions immediately after `get_project` (keep the existing imports; `get_project`/`upsert_project` already exist):
 
 ```python
 def get_check_updates_on_launch(conn: sqlite3.Connection) -> bool:
@@ -980,18 +980,18 @@ Expected: PASS (3 passed).
 - [ ] **Step 5: Commit and push**
 
 ```bash
-git add controlflow_sdk/store/repo.py tests/store/test_repo_update_setting.py
+git add uticen_lite/store/repo.py tests/store/test_repo_update_setting.py
 git commit -m "feat(store): persist opt-in check-updates-on-launch toggle"
 git push -u origin HEAD
 ```
 
 ---
 
-## Task 7: CLI — `cflow upgrade [--check] [--yes]`
+## Task 7: CLI — `uticen-lite upgrade [--check] [--yes]`
 
 **Files:**
-- Create: `controlflow_sdk/cli/upgrade_cmd.py`
-- Modify: `controlflow_sdk/cli/__init__.py` (add subparser in `_build_parser`, add dispatch in `main`)
+- Create: `uticen_lite/cli/upgrade_cmd.py`
+- Modify: `uticen_lite/cli/__init__.py` (add subparser in `_build_parser`, add dispatch in `main`)
 - Test: `tests/cli/test_upgrade_cmd.py`
 
 **Interfaces:**
@@ -1003,17 +1003,17 @@ git push -u origin HEAD
 Create `tests/cli/test_upgrade_cmd.py`:
 
 ```python
-from controlflow_sdk.cli import main
-from controlflow_sdk.upgrade.check import UpdateInfo
-from controlflow_sdk.upgrade.detect import InstallMethod
+from uticen_lite.cli import main
+from uticen_lite.upgrade.check import UpdateInfo
+from uticen_lite.upgrade.detect import InstallMethod
 
 
 def test_upgrade_check_reports_and_exits_zero(monkeypatch, capsys):
     monkeypatch.setattr(
-        "controlflow_sdk.cli.upgrade_cmd.detect_install", lambda: InstallMethod.PIP
+        "uticen_lite.cli.upgrade_cmd.detect_install", lambda: InstallMethod.PIP
     )
     monkeypatch.setattr(
-        "controlflow_sdk.cli.upgrade_cmd.check_for_update",
+        "uticen_lite.cli.upgrade_cmd.check_for_update",
         lambda method: UpdateInfo(method, "0.1.0", "0.2.0", True, "Version 0.2.0 is available."),
     )
     rc = main(["upgrade", "--check"])
@@ -1025,10 +1025,10 @@ def test_upgrade_check_reports_and_exits_zero(monkeypatch, capsys):
 
 def test_upgrade_check_when_up_to_date(monkeypatch, capsys):
     monkeypatch.setattr(
-        "controlflow_sdk.cli.upgrade_cmd.detect_install", lambda: InstallMethod.PIP
+        "uticen_lite.cli.upgrade_cmd.detect_install", lambda: InstallMethod.PIP
     )
     monkeypatch.setattr(
-        "controlflow_sdk.cli.upgrade_cmd.check_for_update",
+        "uticen_lite.cli.upgrade_cmd.check_for_update",
         lambda method: UpdateInfo(method, "0.2.0", "0.2.0", False, "You're on the latest version."),
     )
     rc = main(["upgrade", "--check"])
@@ -1039,35 +1039,35 @@ def test_upgrade_check_when_up_to_date(monkeypatch, capsys):
 def test_upgrade_yes_runs_command(monkeypatch, capsys):
     ran = []
     monkeypatch.setattr(
-        "controlflow_sdk.cli.upgrade_cmd.detect_install", lambda: InstallMethod.PIP
+        "uticen_lite.cli.upgrade_cmd.detect_install", lambda: InstallMethod.PIP
     )
     monkeypatch.setattr(
-        "controlflow_sdk.cli.upgrade_cmd.check_for_update",
+        "uticen_lite.cli.upgrade_cmd.check_for_update",
         lambda method: UpdateInfo(method, "0.1.0", "0.2.0", True, "Version 0.2.0 is available."),
     )
     monkeypatch.setattr(
-        "controlflow_sdk.cli.upgrade_cmd.build_upgrade_command",
-        lambda method, source_dir=None: [["pip", "install", "-U", "controlflow-sdk"]],
+        "uticen_lite.cli.upgrade_cmd.build_upgrade_command",
+        lambda method, source_dir=None: [["pip", "install", "-U", "uticen-lite"]],
     )
 
     class FakeResult:
         returncode = 0
 
     monkeypatch.setattr(
-        "controlflow_sdk.cli.upgrade_cmd.subprocess.run",
+        "uticen_lite.cli.upgrade_cmd.subprocess.run",
         lambda cmd: ran.append(cmd) or FakeResult(),
     )
     rc = main(["upgrade", "--yes"])
     assert rc == 0
-    assert ran == [["pip", "install", "-U", "controlflow-sdk"]]
+    assert ran == [["pip", "install", "-U", "uticen-lite"]]
 
 
 def test_upgrade_unknown_method_is_handled(monkeypatch, capsys):
     monkeypatch.setattr(
-        "controlflow_sdk.cli.upgrade_cmd.detect_install", lambda: InstallMethod.UNKNOWN
+        "uticen_lite.cli.upgrade_cmd.detect_install", lambda: InstallMethod.UNKNOWN
     )
     monkeypatch.setattr(
-        "controlflow_sdk.cli.upgrade_cmd.check_for_update",
+        "uticen_lite.cli.upgrade_cmd.check_for_update",
         lambda method: UpdateInfo(method, "0.1.0", None, False, "Automatic upgrade isn't available."),
     )
     rc = main(["upgrade", "--yes"])
@@ -1082,10 +1082,10 @@ Expected: FAIL — `argument <command>: invalid choice: 'upgrade'` (subparser no
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `controlflow_sdk/cli/upgrade_cmd.py`:
+Create `uticen_lite/cli/upgrade_cmd.py`:
 
 ```python
-"""Handle ``cflow upgrade [--check] [--yes]`` — the install-aware upgrade routine.
+"""Handle ``uticen-lite upgrade [--check] [--yes]`` — the install-aware upgrade routine.
 
 Runs inline (there is no server to outlive). For a git checkout this is the
 maintainer's ``git pull --ff-only && pip install -e .`` made first-class.
@@ -1096,9 +1096,9 @@ from __future__ import annotations
 import argparse
 import subprocess
 
-from controlflow_sdk.upgrade.check import check_for_update
-from controlflow_sdk.upgrade.command import build_upgrade_command
-from controlflow_sdk.upgrade.detect import InstallMethod, detect_install, source_dir
+from uticen_lite.upgrade.check import check_for_update
+from uticen_lite.upgrade.command import build_upgrade_command
+from uticen_lite.upgrade.detect import InstallMethod, detect_install, source_dir
 
 
 def upgrade_cmd(args: argparse.Namespace) -> int:
@@ -1132,13 +1132,13 @@ def upgrade_cmd(args: argparse.Namespace) -> int:
     return 0
 ```
 
-In `controlflow_sdk/cli/__init__.py`, add the subparser inside `_build_parser()` just before `return parser` (after the `build` subparser block):
+In `uticen_lite/cli/__init__.py`, add the subparser inside `_build_parser()` just before `return parser` (after the `build` subparser block):
 
 ```python
     # -- upgrade -------------------------------------------------------------
     upgrade_p = sub.add_parser(
         "upgrade",
-        help="Check for and install controlflow-sdk updates (install-aware).",
+        help="Check for and install uticen-lite updates (install-aware).",
     )
     upgrade_p.add_argument(
         "--check",
@@ -1156,7 +1156,7 @@ And add dispatch in `main()` (alongside the other `if args.command == ...` block
 
 ```python
     if args.command == "upgrade":
-        from controlflow_sdk.cli.upgrade_cmd import upgrade_cmd
+        from uticen_lite.cli.upgrade_cmd import upgrade_cmd
 
         return upgrade_cmd(args)
 ```
@@ -1169,8 +1169,8 @@ Expected: PASS (4 passed).
 - [ ] **Step 5: Commit and push**
 
 ```bash
-git add controlflow_sdk/cli/upgrade_cmd.py controlflow_sdk/cli/__init__.py tests/cli/test_upgrade_cmd.py
-git commit -m "feat(cli): cflow upgrade [--check] [--yes]"
+git add uticen_lite/cli/upgrade_cmd.py uticen_lite/cli/__init__.py tests/cli/test_upgrade_cmd.py
+git commit -m "feat(cli): uticen-lite upgrade [--check] [--yes]"
 git push -u origin HEAD
 ```
 
@@ -1179,11 +1179,11 @@ git push -u origin HEAD
 ## Task 8: plane — Settings ▸ Updates page (toggle + check now)
 
 **Files:**
-- Create: `controlflow_sdk/plane/routes/updates.py`
-- Modify: `controlflow_sdk/plane/app.py` (import + register `updates`)
-- Create: `controlflow_sdk/plane/templates/settings_updates.html`
-- Create: `controlflow_sdk/plane/templates/partials/update_result.html`
-- Modify: `controlflow_sdk/plane/templates/settings.html` (add an "Updates" card)
+- Create: `uticen_lite/plane/routes/updates.py`
+- Modify: `uticen_lite/plane/app.py` (import + register `updates`)
+- Create: `uticen_lite/plane/templates/settings_updates.html`
+- Create: `uticen_lite/plane/templates/partials/update_result.html`
+- Modify: `uticen_lite/plane/templates/settings.html` (add an "Updates" card)
 - Test: `tests/plane/test_settings_updates.py`
 
 **Interfaces:**
@@ -1198,10 +1198,10 @@ git push -u origin HEAD
 Create `tests/plane/test_settings_updates.py`:
 
 ```python
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.upgrade.check import UpdateInfo
-from controlflow_sdk.upgrade.detect import InstallMethod
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.upgrade.check import UpdateInfo
+from uticen_lite.upgrade.detect import InstallMethod
 
 
 def test_settings_hub_links_to_updates(client):
@@ -1244,11 +1244,11 @@ def test_toggle_unchecked_persists_false(client):
 
 def test_check_now_returns_result_partial(client, monkeypatch):
     monkeypatch.setattr(
-        "controlflow_sdk.plane.routes.updates.detect_install",
+        "uticen_lite.plane.routes.updates.detect_install",
         lambda: InstallMethod.PIP,
     )
     monkeypatch.setattr(
-        "controlflow_sdk.plane.routes.updates.check_for_update",
+        "uticen_lite.plane.routes.updates.check_for_update",
         lambda method: UpdateInfo(method, "0.1.0", "0.2.0", True, "Version 0.2.0 is available."),
     )
     resp = client.post("/settings/updates/check")
@@ -1263,7 +1263,7 @@ Expected: FAIL — `/settings/updates` 404 (route not registered).
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `controlflow_sdk/plane/routes/updates.py`:
+Create `uticen_lite/plane/routes/updates.py`:
 
 ```python
 """Settings ▸ Updates: the opt-in update check + (Task 9) the upgrade trigger.
@@ -1283,10 +1283,10 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.upgrade.check import check_for_update, current_version
-from controlflow_sdk.upgrade.detect import InstallMethod, detect_install
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.upgrade.check import check_for_update, current_version
+from uticen_lite.upgrade.detect import InstallMethod, detect_install
 
 
 def register(
@@ -1334,10 +1334,10 @@ def register(
         )
 ```
 
-In `controlflow_sdk/plane/app.py`, add `updates` to the route imports and register it after `settings` (so the `/settings/updates` routes sit alongside `/settings`):
+In `uticen_lite/plane/app.py`, add `updates` to the route imports and register it after `settings` (so the `/settings/updates` routes sit alongside `/settings`):
 
 ```python
-    from controlflow_sdk.plane.routes import (
+    from uticen_lite.plane.routes import (
         ai,
         controls,
         dashboard,
@@ -1356,7 +1356,7 @@ In `controlflow_sdk/plane/app.py`, add `updates` to the route imports and regist
     updates.register(app, templates, get_conn)
 ```
 
-Create `controlflow_sdk/plane/templates/settings_updates.html`:
+Create `uticen_lite/plane/templates/settings_updates.html`:
 
 ```html
 {% extends "base.html" %}
@@ -1403,7 +1403,7 @@ Create `controlflow_sdk/plane/templates/settings_updates.html`:
 {% endblock %}
 ```
 
-Create `controlflow_sdk/plane/templates/partials/update_result.html`:
+Create `uticen_lite/plane/templates/partials/update_result.html`:
 
 ```html
 <div class="card" style="margin-top:14px;">
@@ -1411,10 +1411,10 @@ Create `controlflow_sdk/plane/templates/partials/update_result.html`:
   {% if info.available and info.method.value != 'unknown' %}
   <form method="post" action="/upgrade"
         hx-post="/upgrade" hx-target="body" hx-swap="innerHTML"
-        hx-confirm="This will close the app and upgrade controlflow-sdk. Continue?">
+        hx-confirm="This will close the app and upgrade uticen-lite. Continue?">
     <button class="btn btn-primary" type="submit">Update now</button>
     <a class="btn btn-ghost" target="_blank" rel="noopener"
-       href="https://github.com/dom-schweyer-tech/controlflow-sdk/releases">What's new</a>
+       href="https://github.com/schweyer-tech/uticen-lite/releases">What's new</a>
   </form>
   {% endif %}
 </div>
@@ -1422,7 +1422,7 @@ Create `controlflow_sdk/plane/templates/partials/update_result.html`:
 
 > `/upgrade` is added in Task 9; the button targets it. Until then the partial still renders (the form just posts to a not-yet-registered route), which is fine for this task's tests (they assert on the message text).
 
-In `controlflow_sdk/plane/templates/settings.html`, add an Updates card immediately after the AI-assisted authoring card (before the final `{% endblock %}`):
+In `uticen_lite/plane/templates/settings.html`, add an Updates card immediately after the AI-assisted authoring card (before the final `{% endblock %}`):
 
 ```html
 <div class="card">
@@ -1445,10 +1445,10 @@ Expected: PASS (5 passed).
 - [ ] **Step 5: Commit and push**
 
 ```bash
-git add controlflow_sdk/plane/routes/updates.py controlflow_sdk/plane/app.py \
-        controlflow_sdk/plane/templates/settings_updates.html \
-        controlflow_sdk/plane/templates/partials/update_result.html \
-        controlflow_sdk/plane/templates/settings.html \
+git add uticen_lite/plane/routes/updates.py uticen_lite/plane/app.py \
+        uticen_lite/plane/templates/settings_updates.html \
+        uticen_lite/plane/templates/partials/update_result.html \
+        uticen_lite/plane/templates/settings.html \
         tests/plane/test_settings_updates.py
 git commit -m "feat(plane): Settings ▸ Updates page with opt-in check + check-now"
 git push -u origin HEAD
@@ -1459,12 +1459,12 @@ git push -u origin HEAD
 ## Task 9: plane — dashboard badge + one-click upgrade
 
 **Files:**
-- Modify: `controlflow_sdk/plane/routes/updates.py` (add `/updates/badge` GET + `/upgrade` POST)
-- Modify: `controlflow_sdk/plane/routes/dashboard.py` (surface the post-upgrade status notice)
-- Create: `controlflow_sdk/plane/templates/partials/update_badge.html`
-- Create: `controlflow_sdk/plane/templates/upgrading.html`
-- Create: `controlflow_sdk/plane/templates/upgrade_unavailable.html`
-- Modify: `controlflow_sdk/plane/templates/dashboard.html` (badge include + notice)
+- Modify: `uticen_lite/plane/routes/updates.py` (add `/updates/badge` GET + `/upgrade` POST)
+- Modify: `uticen_lite/plane/routes/dashboard.py` (surface the post-upgrade status notice)
+- Create: `uticen_lite/plane/templates/partials/update_badge.html`
+- Create: `uticen_lite/plane/templates/upgrading.html`
+- Create: `uticen_lite/plane/templates/upgrade_unavailable.html`
+- Modify: `uticen_lite/plane/templates/dashboard.html` (badge include + notice)
 - Test: `tests/plane/test_dashboard_upgrade.py`
 
 **Interfaces:**
@@ -1479,10 +1479,10 @@ git push -u origin HEAD
 Create `tests/plane/test_dashboard_upgrade.py`:
 
 ```python
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.upgrade.check import UpdateInfo
-from controlflow_sdk.upgrade.detect import InstallMethod
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.upgrade.check import UpdateInfo
+from uticen_lite.upgrade.detect import InstallMethod
 
 
 def _enable_check(client):
@@ -1499,7 +1499,7 @@ def test_badge_empty_when_toggle_off(client, monkeypatch):
         called["n"] += 1
         return UpdateInfo(method, "0.1.0", "0.2.0", True, "x")
 
-    monkeypatch.setattr("controlflow_sdk.plane.routes.updates.check_for_update", boom)
+    monkeypatch.setattr("uticen_lite.plane.routes.updates.check_for_update", boom)
     resp = client.get("/updates/badge")
     assert resp.status_code == 200
     assert resp.text.strip() == ""
@@ -1509,11 +1509,11 @@ def test_badge_empty_when_toggle_off(client, monkeypatch):
 def test_badge_shows_when_on_and_newer(client, monkeypatch):
     _enable_check(client)
     monkeypatch.setattr(
-        "controlflow_sdk.plane.routes.updates.detect_install",
+        "uticen_lite.plane.routes.updates.detect_install",
         lambda: InstallMethod.PIP,
     )
     monkeypatch.setattr(
-        "controlflow_sdk.plane.routes.updates.check_for_update",
+        "uticen_lite.plane.routes.updates.check_for_update",
         lambda method: UpdateInfo(method, "0.1.0", "0.2.0", True, "Version 0.2.0 is available."),
     )
     resp = client.get("/updates/badge")
@@ -1525,31 +1525,31 @@ def test_badge_shows_when_on_and_newer(client, monkeypatch):
 def test_upgrade_spawns_and_renders_upgrading(client, monkeypatch):
     spawned = {}
     monkeypatch.setattr(
-        "controlflow_sdk.plane.routes.updates.detect_install",
+        "uticen_lite.plane.routes.updates.detect_install",
         lambda: InstallMethod.PIP,
     )
     monkeypatch.setattr(
-        "controlflow_sdk.plane.routes.updates.build_upgrade_command",
-        lambda method, source_dir=None: [["pip", "install", "-U", "controlflow-sdk"]],
+        "uticen_lite.plane.routes.updates.build_upgrade_command",
+        lambda method, source_dir=None: [["pip", "install", "-U", "uticen-lite"]],
     )
     monkeypatch.setattr(
-        "controlflow_sdk.plane.routes.updates.spawn_detached_upgrade",
+        "uticen_lite.plane.routes.updates.spawn_detached_upgrade",
         lambda root, commands, current: spawned.update(commands=commands) or None,
     )
     monkeypatch.setattr(
-        "controlflow_sdk.plane.routes.updates.schedule_shutdown",
+        "uticen_lite.plane.routes.updates.schedule_shutdown",
         lambda: spawned.update(shutdown=True),
     )
     resp = client.post("/upgrade")
     assert resp.status_code == 200
     assert "Upgrading" in resp.text
-    assert spawned["commands"] == [["pip", "install", "-U", "controlflow-sdk"]]
+    assert spawned["commands"] == [["pip", "install", "-U", "uticen-lite"]]
     assert spawned["shutdown"] is True
 
 
 def test_upgrade_unknown_renders_instructions(client, monkeypatch):
     monkeypatch.setattr(
-        "controlflow_sdk.plane.routes.updates.detect_install",
+        "uticen_lite.plane.routes.updates.detect_install",
         lambda: InstallMethod.UNKNOWN,
     )
     resp = client.post("/upgrade")
@@ -1558,7 +1558,7 @@ def test_upgrade_unknown_renders_instructions(client, monkeypatch):
 
 
 def test_dashboard_shows_post_upgrade_notice(client):
-    from controlflow_sdk.upgrade.spawn import write_status
+    from uticen_lite.upgrade.spawn import write_status
 
     write_status(client.app.state.project_root, {"ok": True, "from": "0.1.0"})
     resp = client.get("/")
@@ -1575,13 +1575,13 @@ Expected: FAIL — `/updates/badge` 404.
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `controlflow_sdk/plane/routes/updates.py`, extend the imports at the top:
+In `uticen_lite/plane/routes/updates.py`, extend the imports at the top:
 
 ```python
-from controlflow_sdk.upgrade.check import check_for_update, current_version
-from controlflow_sdk.upgrade.command import build_upgrade_command
-from controlflow_sdk.upgrade.detect import InstallMethod, detect_install, source_dir
-from controlflow_sdk.upgrade.spawn import schedule_shutdown, spawn_detached_upgrade
+from uticen_lite.upgrade.check import check_for_update, current_version
+from uticen_lite.upgrade.command import build_upgrade_command
+from uticen_lite.upgrade.detect import InstallMethod, detect_install, source_dir
+from uticen_lite.upgrade.spawn import schedule_shutdown, spawn_detached_upgrade
 ```
 
 Then add these two routes inside `register(...)` (after `check_now`):
@@ -1620,10 +1620,10 @@ Then add these two routes inside `register(...)` (after `check_now`):
         return templates.TemplateResponse(request, "upgrading.html", {"current": current})
 ```
 
-In `controlflow_sdk/plane/routes/dashboard.py`, import `read_status` and pass the notice into the template. Update the dashboard handler's `TemplateResponse` context (the handler currently returns `{"project": project, "rows": rows}`):
+In `uticen_lite/plane/routes/dashboard.py`, import `read_status` and pass the notice into the template. Update the dashboard handler's `TemplateResponse` context (the handler currently returns `{"project": project, "rows": rows}`):
 
 ```python
-from controlflow_sdk.upgrade.spawn import read_status
+from uticen_lite.upgrade.spawn import read_status
 ```
 
 ```python
@@ -1635,7 +1635,7 @@ from controlflow_sdk.upgrade.spawn import read_status
     )
 ```
 
-Create `controlflow_sdk/plane/templates/partials/update_badge.html`:
+Create `uticen_lite/plane/templates/partials/update_badge.html`:
 
 ```html
 <div class="card" style="border-color:var(--accent); margin-bottom:18px;">
@@ -1643,10 +1643,10 @@ Create `controlflow_sdk/plane/templates/partials/update_badge.html`:
     <h2 style="margin:0;">⬆ Update available: {{ info.latest }}</h2>
     <div class="spacer"></div>
     <a class="btn btn-ghost btn-sm" target="_blank" rel="noopener"
-       href="https://github.com/dom-schweyer-tech/controlflow-sdk/releases">What's new</a>
+       href="https://github.com/schweyer-tech/uticen-lite/releases">What's new</a>
     <button class="btn btn-primary btn-sm"
             hx-post="/upgrade" hx-target="body" hx-swap="innerHTML"
-            hx-confirm="This will close the app and upgrade controlflow-sdk. Continue?">
+            hx-confirm="This will close the app and upgrade uticen-lite. Continue?">
       Update now
     </button>
   </div>
@@ -1654,7 +1654,7 @@ Create `controlflow_sdk/plane/templates/partials/update_badge.html`:
 </div>
 ```
 
-Create `controlflow_sdk/plane/templates/upgrading.html`:
+Create `uticen_lite/plane/templates/upgrading.html`:
 
 ```html
 {% extends "base.html" %}
@@ -1677,7 +1677,7 @@ Create `controlflow_sdk/plane/templates/upgrading.html`:
 {% endblock %}
 ```
 
-Create `controlflow_sdk/plane/templates/upgrade_unavailable.html`:
+Create `uticen_lite/plane/templates/upgrade_unavailable.html`:
 
 ```html
 {% extends "base.html" %}
@@ -1692,14 +1692,14 @@ Create `controlflow_sdk/plane/templates/upgrade_unavailable.html`:
     Automatic upgrade isn't available for this install (installed version
     <code class="mono">{{ current }}</code>). Upgrade from a terminal:
   </p>
-  <pre class="mono"><code>pipx upgrade controlflow-sdk        # if installed with pipx
-pip install -U controlflow-sdk     # if installed with pip</code></pre>
+  <pre class="mono"><code>pipx upgrade uticen-lite        # if installed with pipx
+pip install -U uticen-lite     # if installed with pip</code></pre>
   <p class="hint">See <code class="mono">docs/INSTALL.md</code> for offline / air-gapped upgrades.</p>
 </div>
 {% endblock %}
 ```
 
-In `controlflow_sdk/plane/templates/dashboard.html`, add the notice + badge at the very top of the `{% block body %}` (immediately after the `{% block body %}` line):
+In `uticen_lite/plane/templates/dashboard.html`, add the notice + badge at the very top of the `{% block body %}` (immediately after the `{% block body %}` line):
 
 ```html
 {% if upgrade_notice %}
@@ -1729,11 +1729,11 @@ Expected: PASS (no regressions in existing plane tests).
 - [ ] **Step 6: Commit and push**
 
 ```bash
-git add controlflow_sdk/plane/routes/updates.py controlflow_sdk/plane/routes/dashboard.py \
-        controlflow_sdk/plane/templates/partials/update_badge.html \
-        controlflow_sdk/plane/templates/upgrading.html \
-        controlflow_sdk/plane/templates/upgrade_unavailable.html \
-        controlflow_sdk/plane/templates/dashboard.html \
+git add uticen_lite/plane/routes/updates.py uticen_lite/plane/routes/dashboard.py \
+        uticen_lite/plane/templates/partials/update_badge.html \
+        uticen_lite/plane/templates/upgrading.html \
+        uticen_lite/plane/templates/upgrade_unavailable.html \
+        uticen_lite/plane/templates/dashboard.html \
         tests/plane/test_dashboard_upgrade.py
 git commit -m "feat(plane): dashboard update badge + one-click self-upgrade"
 git push -u origin HEAD
@@ -1820,14 +1820,14 @@ logged to `.controlplane-upgrade.log` in the engagement folder).
 **From the terminal.** The same routine is available headless:
 
 ```bash
-cflow upgrade --check     # report installed vs latest, change nothing
-cflow upgrade             # detect the install method and upgrade (asks to confirm)
-cflow upgrade --yes       # upgrade without the prompt
+uticen-lite upgrade --check     # report installed vs latest, change nothing
+uticen-lite upgrade             # detect the install method and upgrade (asks to confirm)
+uticen-lite upgrade --yes       # upgrade without the prompt
 ```
 
-`cflow upgrade` picks the command for your install: a git checkout does
-`git pull --ff-only` + an editable reinstall; a `pipx` install does `pipx upgrade controlflow-sdk`;
-a `pip` install does `pip install -U controlflow-sdk` (honouring your configured index). Air-gapped /
+`uticen-lite upgrade` picks the command for your install: a git checkout does
+`git pull --ff-only` + an editable reinstall; a `pipx` install does `pipx upgrade uticen-lite`;
+a `pip` install does `pip install -U uticen-lite` (honouring your configured index). Air-gapped /
 pinned-wheel installs can't self-upgrade — re-run the [pinned-wheel](#option-3--pinned-wheel-air-gapped--no-index-reachable)
 steps with the new wheel.
 ```
@@ -1837,7 +1837,7 @@ steps with the new wheel.
 Add this row to the surface table (after the **Settings** row):
 
 ```markdown
-| Control plane — Updates / upgrade | view + action | **Settings ▸ Updates** shows the installed version + detected install method and an **opt-in** "check for updates on launch" toggle (default OFF — preserves zero egress) plus a manual **Check now**. When a newer version exists, a dashboard banner offers **one-click self-upgrade**: the app detects the install method (git checkout → `git pull` + reinstall · pipx → `pipx upgrade` · pip → `pip install -U`), spawns a detached helper, and shuts down for a manual re-run. The same routine is the `cflow upgrade [--check] [--yes]` CLI. No bundle impact. |
+| Control plane — Updates / upgrade | view + action | **Settings ▸ Updates** shows the installed version + detected install method and an **opt-in** "check for updates on launch" toggle (default OFF — preserves zero egress) plus a manual **Check now**. When a newer version exists, a dashboard banner offers **one-click self-upgrade**: the app detects the install method (git checkout → `git pull` + reinstall · pipx → `pipx upgrade` · pip → `pip install -U`), spawns a detached helper, and shuts down for a manual re-run. The same routine is the `uticen-lite upgrade [--check] [--yes]` CLI. No bundle impact. |
 ```
 
 - [ ] **Step 5: Add a `CHANGELOG.md` `[Unreleased]` entry**
@@ -1852,7 +1852,7 @@ Insert immediately after the `---` on line 10 (before `## [0.1.0] — 2026-06-16
 - **Upgrade & update-awareness.** The control plane detects how it was installed and can upgrade
   itself in one click — git checkout → `git pull --ff-only` + editable reinstall · pipx →
   `pipx upgrade` · pip → `pip install -U`. The same routine is available headless as
-  `cflow upgrade [--check] [--yes]`. An **opt-in** "check for updates on launch" toggle
+  `uticen-lite upgrade [--check] [--yes]`. An **opt-in** "check for updates on launch" toggle
   (Settings ▸ Updates, **off by default**) preserves the control plane's zero-egress default.
 
 ---
@@ -1886,7 +1886,7 @@ Expected: PASS — all prior tests plus the new `tests/upgrade`, `tests/cli/test
 Run: `python -m ruff check .`
 Expected: PASS (no findings).
 
-Run: `python -m mypy controlflow_sdk`
+Run: `python -m mypy uticen_lite`
 Expected: PASS (no new errors).
 
 Fix any findings inline, then re-run until both are green.
@@ -1901,7 +1901,7 @@ The detached spawn + shutdown + relaunch is not exercised by automated tests (no
 Self-upgrade mutates the environment, so it is verified manually, not in CI:
 
 1. **pip path** — in a throwaway venv, `pip install -e '.[plane]'` is detected as `git-editable`;
-   confirm `cflow upgrade --check` reports the version + method. (For a true `pip` test, install a
+   confirm `uticen-lite upgrade --check` reports the version + method. (For a true `pip` test, install a
    built wheel into a plain venv and confirm `pip install -U` is the chosen command.)
 2. **Web button** — launch `controlplane`, enable the launch check, force the badge (or use
    "Check now" with a fake newer version), click **Update now**: the app shows the "Upgrading…"
@@ -1925,7 +1925,7 @@ git push -u origin HEAD
 gh pr create --fill --base main --head worktree-control-plane-upgrade
 ```
 
-Then post the body summarizing: install-aware upgrade button + `cflow upgrade` CLI, opt-in egress (default OFF), no bundle impact, issue #11. Confirm CI is green.
+Then post the body summarizing: install-aware upgrade button + `uticen-lite upgrade` CLI, opt-in egress (default OFF), no bundle impact, issue #11. Confirm CI is green.
 
 ---
 
@@ -1936,7 +1936,7 @@ Then post the body summarizing: install-aware upgrade button + `cflow upgrade` C
 - Update check + opt-in + zero-egress (§3) → **Task 3** (check), **Task 6** (toggle persistence), **Task 8** (settings page/toggle/check), **Task 9** (badge gating: OFF ⇒ empty, no network), **Task 10** (egress reword).
 - Self-upgrade dance (§4: detached stdlib helper, wait-for-PID, status, manual re-run) → **Task 5** + **Task 9** (`/upgrade` + dashboard notice).
 - Install-aware command incl. git (§Architecture `command.py`) → **Task 4**.
-- `cflow upgrade [--check] [--yes]` (§CLI) → **Task 7**.
+- `uticen-lite upgrade [--check] [--yes]` (§CLI) → **Task 7**.
 - Web surface routes + templates (§Web surface) → **Tasks 8 & 9**.
 - Version compare without `packaging` (§6) → **Task 1**.
 - Safety/security (§Safety): explicit action + confirm (`hx-confirm` in Tasks 8/9), respect configured index (`pip index versions` in Task 3, delegate to pip/pipx in Task 4), short timeouts + graceful degrade (Task 3) → covered.

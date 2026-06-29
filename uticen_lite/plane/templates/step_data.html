@@ -1,0 +1,39 @@
+{# Full-page step-data view — opened in a new browser tab from a clickable
+   row-count on the Logic ▸ Builder / Flowchart. Server-paginated; pagination and
+   the per-step export are normal links (no HTMX). #}
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — {{ step_label or "Step" }} · Data{% endblock %}
+{% block body %}
+<a class="crumb" href="/controls/{{ control_id }}/logic/builder">← Back to builder</a>
+<div class="page-head">
+  <h1>{{ step_label or "Step" }} <span class="muted mono">{{ node_id }}</span></h1>
+  {% if control and control.title %}<p class="muted">{{ control.title }}</p>{% endif %}
+</div>
+
+{% if not frame_available %}
+<div class="callout callout-warn">{{ reason }}</div>
+{% else %}
+<h2>Data <span class="muted">— records {{ start1 }}–{{ end1 }} of {{ total }}</span></h2>
+<p>
+  <a class="btn btn-sm" href="/controls/{{ control_id }}/logic/step/{{ node_id }}/export.xlsx">
+    Download this step (.xlsx)</a>
+</p>
+<div class="table-wrap">
+  <table>
+    <thead><tr>{% for h in header %}<th class="mono">{{ h }}</th>{% endfor %}</tr></thead>
+    <tbody>
+      {% for r in rows %}<tr>{% for c in r %}<td>{{ c }}</td>{% endfor %}</tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if page_count > 1 %}
+<div class="pager">
+  {% if page > 1 %}
+  <a class="btn btn-sm" href="/controls/{{ control_id }}/logic/step/{{ node_id }}/data?page={{ page - 1 }}">← Prev</a>{% endif %}
+  <span class="muted">Page {{ page }} of {{ page_count }}</span>
+  {% if page < page_count %}
+  <a class="btn btn-sm" href="/controls/{{ control_id }}/logic/step/{{ node_id }}/data?page={{ page + 1 }}">Next →</a>{% endif %}
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

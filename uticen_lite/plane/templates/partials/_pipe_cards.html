@@ -1,0 +1,119 @@
+{# Re-renderable cards fragment — the inner content of #pipe-cards.
+
+   Cards are grouped into bands (route `_card_bands`): a shared "Inputs & shared
+   steps" band on top, then one COLLAPSIBLE <details> section per procedure whose
+   header IS the procedure editor (code · name · assertion · thresholds). Inserting
+   a step inside a section wires it into that procedure's branch; inserting a Test
+   there assigns it to that procedure (data-proc). HTMX swaps this whole fragment
+   into #pipe-cards, so all handlers are delegated on the persistent #pipe-cards.
+
+   Context: bands, sources, op_choices, join_mode_choices, control_id, procedures,
+   selected_procedure_for, node_procedures. #}
+
+{% set ASSERTION_HELP = "The audit assertion this procedure verifies — the specific claim it proves about the control (for example: Segregation of duties, Authorization, Completeness, Existence). Shown as the procedure subtitle in the workpaper." %}
+
+{% macro insert_zone(up, down, proc, pos) %}
+<div class="pipe-insert pipe-insert-{{ pos }}">
+  <button type="button" class="pipe-insert-toggle" data-insert-toggle
+          aria-label="Insert a step here" title="Insert a step here">+</button>
+  <div class="pipe-insert-menu">
+    <span class="pipe-insert-hint">Insert step</span>
+    {% for t, lbl in [('import', 'Import'), ('filter', 'Filter'), ('join', 'Join'),
+                      ('custom_python', 'Custom Python'), ('test', 'Test')] %}
+    <button type="button" class="btn btn-sm btn-add" data-insert
+            data-type="{{ t }}" data-up="{{ up }}" data-down="{{ down }}"
+            data-proc="{{ proc }}">{{ lbl }}</button>
+    {% endfor %}
+  </div>
+</div>
+{% endmacro %}
+
+{# IMPORTANT: keep `{% include "partials/_pipe_node.html" %}` at the template's
+   top level inside the `for` loops (NOT inside a macro). The partial reads the
+   loop's `node`, the per-loop `band_shared` flag, AND the GLOBAL `nodes` context
+   var (for its input-step dropdown). A macro would not reliably expose the loop
+   variable to the include — this mirrors the pre-existing working pattern. #}
+
+{% if not bands.shared.nodes and not bands.procedures %}
+<p class="muted">No steps yet — insert your first step below (start with an
+  <strong>Import</strong> to bind a source).</p>
+{{ insert_zone('', '', '', 'empty') }}
+{% else %}
+
+<details class="band-inputs" data-band-key="{{ bands.shared.key }}" open>
+  <summary class="band-head">
+    <span class="band-caret" aria-hidden="true">▸</span>
+    <span class="band-title">Inputs &amp; shared steps</span>
+    <span class="band-sub muted">data sources and steps feeding more than one procedure</span>
+  </summary>
+  <div class="band-body">
+    {% for node in bands.shared.nodes %}
+      {{ insert_zone(node.inputs[0] if node.inputs else '', node.id, '',
+                     'start' if loop.first else 'mid') }}
+      {% set band_shared = true %}
+      {% include "partials/_pipe_node.html" %}
+    {% endfor %}
+    {% if bands.shared.nodes %}{{ insert_zone((bands.shared.nodes | last).id, '', '', 'end') }}{% endif %}
+  </div>
+</details>
+
+{% for band in bands.procedures %}
+<details class="proc-section" data-proc-section data-band-key="{{ band.key }}"
+         style="--proc:{{ band.proc.color }}" open>
+  <summary class="band-head proc-head-row">
+    <span class="band-caret" aria-hidden="true">▸</span>
+    <span class="proc-head" data-proc-head data-proc-id="{{ band.proc.id }}">
+      <div class="proc-identity">
+        <input class="proc-in proc-code-chip" data-proc-code value="{{ band.proc.code }}" placeholder="P1" aria-label="Code">
+        <input class="proc-in proc-name-title" type="text" data-proc-name value="{{ band.proc.name }}" placeholder="Procedure name" aria-label="Procedure name">
+        <button type="button" class="proc-name-pencil" data-proc-name-edit aria-label="Edit procedure name"></button>
+        <span class="proc-identity-spacer"></span>
+        <button type="button" class="proc-del-btn" data-proc-del aria-label="Remove procedure">✕</button>
+      </div>
+      <div class="proc-settings">
+        <div class="proc-field proc-field-assert">
+          <label class="proc-field-label">Assertion
+            <span class="proc-help" tabindex="0" role="img" aria-label="What is an assertion?"
+                  title="{{ ASSERTION_HELP }}">&#9432;</span>
+          </label>
+          <input class="proc-in proc-assert-in" data-proc-assert value="{{ band.proc.assertion }}" placeholder="e.g. Segregation of duties" aria-label="Assertion">
+        </div>
+        <div class="proc-field proc-field-tol">
+          <label class="proc-field-label">Tolerance</label>
+          <div class="proc-tol-row">
+            <span class="proc-tol-op">&#8804;</span>
+            <input class="proc-in proc-thr-in" data-proc-pct value="{{ band.proc.failure_threshold_pct if band.proc.failure_threshold_pct is not none else '' }}" placeholder="&#8212;" aria-label="Threshold percent">
+            <span class="proc-tol-op">% or</span>
+            <input class="proc-in proc-thr-in" data-proc-count value="{{ band.proc.failure_threshold_count if band.proc.failure_threshold_count is not none else '' }}" placeholder="&#8212;" aria-label="Threshold count">
+            <span class="proc-tol-op">items</span>
+            <span class="proc-tol-hint">· blank = zero</span>
+          </div>
+        </div>
+      </div>
+      <div class="proc-field proc-field-narr">
+        <label class="proc-field-label">Narrative</label>
+        <textarea class="proc-in proc-narr" data-proc-narrative rows="2"
+                  placeholder="What this procedure tests and why"
+                  aria-label="Procedure narrative">{{ band.proc.narrative }}</textarea>
+      </div>
+    </span>
+  </summary>
+  <div class="band-body">
+    {% if not band.nodes %}
+    <p class="muted proc-empty">No test yet — insert a <strong>Test</strong> below to give this
+      procedure a result.</p>
+    {% endif %}
+    {% for node in band.nodes %}
+      {{ insert_zone(node.inputs[0] if node.inputs else '', node.id, band.proc.id,
+                     'start' if loop.first else 'mid') }}
+      {% set band_shared = false %}
+      {% include "partials/_pipe_node.html" %}
+    {% endfor %}
+    {% if band.nodes %}{{ insert_zone((band.nodes | last).id, '', band.proc.id, 'end') }}
+    {% else %}{{ insert_zone('', '', band.proc.id, 'empty') }}{% endif %}
+  </div>
+</details>
+{% endfor %}
+
+<button type="button" class="btn btn-sm btn-add" id="proc-add">＋ Add procedure</button>
+{% endif %}

@@ -16,7 +16,7 @@ Reshaping the Northwind `three-way-match` control from a standalone `test.py` in
 pipeline (Import payments → LEFT Join invoices → LEFT Join purchase_orders → one Custom Python
 node) needed the node to tell apart *invoice missing* from *PO missing*. The intuitive marker —
 the right-side join key surviving as `<key>_joined` — does not exist: the compiled merge
-(`controlflow_sdk/pipeline/compile.py::_emit_join`) uses `left_on==right_on` with
+(`uticen_lite/pipeline/compile.py::_emit_join`) uses `left_on==right_on` with
 `suffixes=('', '_joined')`, and pandas **coalesces a same-named join key into a single column**
 (no `invoice_id_joined`/`po_id_joined`). The `_joined` suffix only lands on **colliding non-key**
 columns — e.g. the PO `amount` collides with the payment `amount` and becomes `amount_joined`.
@@ -49,7 +49,7 @@ not just the count. Keep the node within the allowlist ([[0008]]): no `import pa
 
 ## Reference
 
-- `controlflow_sdk/pipeline/compile.py::_emit_join` (the `left_on/right_on` + `suffixes=('', '_joined')` merge).
-- `controlflow_sdk/pipeline/lint.py` (custom-node allowlist; [[0008]]).
+- `uticen_lite/pipeline/compile.py::_emit_join` (the `left_on/right_on` + `suffixes=('', '_joined')` merge).
+- `uticen_lite/pipeline/lint.py` (custom-node allowlist; [[0008]]).
 - `examples/northwind-trading/controls/three-way-match/pipeline.yaml` (brings `invoice_date` as the match marker; uses `amount_joined`).
 - Equivalence discipline: [[0009]]; lexical starvation: [[0008]].

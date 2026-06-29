@@ -1,6 +1,6 @@
 import pytest
 
-from controlflow_sdk.rules.spec import (
+from uticen_lite.rules.spec import (
     OPERATORS,
     RuleSpec,
     RuleSpecError,

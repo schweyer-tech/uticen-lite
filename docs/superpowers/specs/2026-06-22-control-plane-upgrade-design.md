@@ -1,11 +1,11 @@
 # Design — Upgrade & update-awareness for the control plane
 
 > Status: approved design (brainstorming). Date: 2026-06-22. Slots under issue **#11**
-> (distribution + first-run onboarding). Author surface: `controlplane` web app + `cflow` CLI.
+> (distribution + first-run onboarding). Author surface: `controlplane` web app + `uticen-lite` CLI.
 
 ## Problem
 
-There is no in-product way to move from one version of `controlflow-sdk` to the next. The
+There is no in-product way to move from one version of `uticen-lite` to the next. The
 maintainer upgrades a git checkout by hand (`git pull` + reinstall + restart); an end user on a
 `pipx`/`pip` install has no signal that a newer version exists and no affordance to take it. These
 are *mechanically different* upgrades (a git checkout has no package index; a `pipx` install has no
@@ -15,7 +15,7 @@ the app was installed**, surfaced as a dashboard button and a CLI command.
 ## Goals
 
 - A control-plane **dashboard button** that, when the install is out of date, upgrades in one click.
-- A **`cflow upgrade` CLI** that runs the same routine headless — this *is* the maintainer's
+- A **`uticen-lite upgrade` CLI** that runs the same routine headless — this *is* the maintainer's
   "git pull + reinstall" script, made first-class.
 - **Opt-in** update awareness that does not break the product's documented **zero-network-egress**
   guarantee.
@@ -40,19 +40,19 @@ the app was installed**, surfaced as a dashboard button and a CLI command.
    zero egress, exactly as documented. A manual "Check now" is always available on demand.
 3. **Execution:** one **install-aware** routine (git-editable → `git pull` + reinstall; pipx →
    `pipx upgrade`; pip → `pip install -U`), exposed as both the dashboard button and a
-   `cflow upgrade` CLI command sharing the same code path.
+   `uticen-lite upgrade` CLI command sharing the same code path.
 4. **Restart:** after a web-triggered upgrade, **manual re-run** of `controlplane` (no
    auto-relaunch — fragile cross-platform; can be added later).
 5. **What's new:** introduce a small `CHANGELOG.md` as the link target.
 
 ## Architecture
 
-New package `controlflow_sdk/upgrade/`, imported **only** by `plane/` and `cli` — never by the
+New package `uticen_lite/upgrade/`, imported **only** by `plane/` and `cli` — never by the
 Pyodide-safe core (`model/`, `runner/`, `rules/`). Stdlib + the package's own metadata only; no new
 runtime dependency.
 
 ```
-controlflow_sdk/upgrade/
+uticen_lite/upgrade/
   __init__.py      # public API: detect_install, latest_version, current_version,
                    #             build_upgrade_command, spawn_detached_upgrade, read_status
   detect.py        # detect_install() -> InstallMethod
@@ -66,20 +66,20 @@ Each unit has one job and is independently testable:
 
 - **`detect.py` — `detect_install() -> InstallMethod`** (enum: `GIT_EDITABLE`, `PIPX`, `PIP`,
   `UNKNOWN`).
-  - `GIT_EDITABLE`: read the dist-info `direct_url.json` for `controlflow-sdk` via
+  - `GIT_EDITABLE`: read the dist-info `direct_url.json` for `uticen-lite` via
     `importlib.metadata`; if `dir_info.editable is True` **and** a `.git` directory exists at the
     recorded source tree → `GIT_EDITABLE`.
-  - `PIPX`: the package install path is under `**/pipx/venvs/controlflow-sdk/**`.
+  - `PIPX`: the package install path is under `**/pipx/venvs/uticen-lite/**`.
   - `PIP`: installed (non-editable) into a normal site-packages.
   - `UNKNOWN`: none of the above (or detection raises) → no self-upgrade; show instructions.
 
 - **`check.py`**
-  - `current_version()` → `__version__` / `importlib.metadata.version("controlflow-sdk")`.
+  - `current_version()` → `__version__` / `importlib.metadata.version("uticen-lite")`.
   - `latest_version(method, timeout)` → `str | None`, method-aware:
     - `PIP` / `PIPX`: query the **configured index** (respect `PIP_INDEX_URL` / pip config — a
       corporate mirror, *not* a hardcoded PyPI URL). Primary path: the index JSON API
-      (`<index>/controlflow-sdk/json`); fallback: parse `python -m pip index versions
-      controlflow-sdk`. Short timeout; any failure → `None` ("couldn't check").
+      (`<index>/uticen-lite/json`); fallback: parse `python -m pip index versions
+      uticen-lite`. Short timeout; any failure → `None` ("couldn't check").
     - `GIT_EDITABLE`: `git fetch` then compare `HEAD` to `@{u}`; "latest" is expressed as
       "N commits behind" (+ short SHA), not a PyPI version.
     - `UNKNOWN`: `None` (never reached for the badge).
@@ -92,11 +92,11 @@ Each unit has one job and is independently testable:
   - `build_upgrade_command(method) -> list[str]`:
     - `GIT_EDITABLE`: a two-step (`git -C <src> pull --ff-only`, then
       `<python> -m pip install -e <src>`); the editable reinstall keeps existing extras.
-    - `PIPX`: `pipx upgrade controlflow-sdk`.
-    - `PIP`: `<python> -m pip install -U controlflow-sdk` (index from the environment/pip config).
+    - `PIPX`: `pipx upgrade uticen-lite`.
+    - `PIP`: `<python> -m pip install -U uticen-lite` (index from the environment/pip config).
   - `spawn_detached_upgrade(method, project_dir, parent_pid)`:
     1. Render `_helper.py` to a **temp file** (self-contained, imports nothing from
-       `controlflow_sdk`, so the package can be replaced under it).
+       `uticen_lite`, so the package can be replaced under it).
     2. Spawn it **detached** — POSIX `start_new_session=True`; Windows
        `creationflags=CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS` — with stdout/stderr to the log.
 
@@ -136,7 +136,7 @@ Each unit has one job and is independently testable:
 
 ## CLI surface
 
-- **`cflow upgrade [--check] [--yes]`** — runs **inline** (no detached dance; there is no server to
+- **`uticen-lite upgrade [--check] [--yes]`** — runs **inline** (no detached dance; there is no server to
   outlive):
   - `--check`: report installed-vs-latest (or "N commits behind" for git) and exit; no changes.
   - bare: detect method, print the command, confirm (skipped with `--yes`), run it, exit.
@@ -171,7 +171,7 @@ Each unit has one job and is independently testable:
 
 ## Docs / map / follow-ups
 
-- `docs/INSTALL.md`: new **"Upgrading"** section (button + `cflow upgrade` + the opt-in check + the
+- `docs/INSTALL.md`: new **"Upgrading"** section (button + `uticen-lite upgrade` + the opt-in check + the
   egress reword).
 - `PRODUCT-MAP.md`: add a row for the Updates settings + upgrade affordance once shipped.
 - `CHANGELOG.md`: introduce it (target for "What's new"; makes version bumps legible).
@@ -193,7 +193,7 @@ Each unit has one job and is independently testable:
 Self-upgrade mutates the environment, so it is verified manually, not in CI:
 
 1. **pip path** — in a throwaway venv, `pip install -e '.[plane]'` is detected as `git-editable`;
-   confirm `cflow upgrade --check` reports the version + method. (For a true `pip` test, install a
+   confirm `uticen-lite upgrade --check` reports the version + method. (For a true `pip` test, install a
    built wheel into a plain venv and confirm `pip install -U` is the chosen command.)
 2. **Web button** — launch `controlplane`, enable the launch check, force the badge (or use
    "Check now" with a fake newer version), click **Update now**: the app shows the "Upgrading…"

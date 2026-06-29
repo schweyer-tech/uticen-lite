@@ -35,8 +35,8 @@ of the accessor. Mirror the already-migrated consumer's pattern (here `compile.p
 
 ## Reference
 
-- `controlflow_sdk/pipeline/model.py` (`Pipeline.terminals`, `Pipeline.terminal`).
-- `controlflow_sdk/pipeline/rowcounts.py` (the missed site) and `controlflow_sdk/pipeline/compile.py`
+- `uticen_lite/pipeline/model.py` (`Pipeline.terminals`, `Pipeline.terminal`).
+- `uticen_lite/pipeline/rowcounts.py` (the missed site) and `uticen_lite/pipeline/compile.py`
   (the correct multi-terminal pattern to copy); fix commit `1c93f8f`.
 - Same family as [[0004]] — a change whose breakage a back-compat / single-record shim hides from local
   tests, caught only by a 2+-element fixture and a whole-branch review.

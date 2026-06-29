@@ -1,7 +1,7 @@
 # Workpaper revisions (round 2) — design
 
 Follow-on to `2026-06-17-workpaper-app-parity-design.md`, applying analyst review notes.
-Scope spans the **SDK renderer** and the **ControlFlow app** workpaper view; each note is tagged.
+Scope spans the **SDK renderer** and the **Uticen app** workpaper view; each note is tagged.
 
 ## Binding constraints (unchanged + one relaxation)
 - SDK HTML stays a **single self-contained file**: inline `<style>`, **no external assets / no CDN**,

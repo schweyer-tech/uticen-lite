@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — Export Bundle{% endblock %}
+{% block body %}
+<div class="page-head">
+  <h1>Export bundle</h1>
+  <p class="lead">Download a versioned import bundle the Uticen app imports 1:1. Contains all controls and run history — never the raw population data.</p>
+</div>
+<div class="card">
+  <h2>Generate bundle</h2>
+  <p>The bundle is validated against the integration contract before download.</p>
+  <form method="post" action="/export" style="margin-top:14px;">
+    <button class="btn btn-primary" type="submit">Export bundle</button>
+  </form>
+</div>
+{% endblock %}

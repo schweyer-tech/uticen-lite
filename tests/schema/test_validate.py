@@ -1,6 +1,6 @@
 """Tests for JSON-Schema contracts + validator (Task 5)."""
 
-from controlflow_sdk.schema.validate import validate_control, validate_sources
+from uticen_lite.schema.validate import validate_control, validate_sources
 
 
 def test_valid_control_passes():

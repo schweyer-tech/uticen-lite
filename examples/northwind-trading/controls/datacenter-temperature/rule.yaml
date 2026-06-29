@@ -1,0 +1,13 @@
+# No-code rule (rule_spec): flag any data-center site whose snapshotted temperature
+# exceeds the 27°C ASHRAE-recommended ceiling. temperature_c loads as the source's
+# `number` data_type, so the comparison value is numeric (learning 0011: match the
+# value type to the column's loaded dtype). Expected: 2 violations on the frozen
+# snapshot (Singapore 30.9°C, Mumbai 27.5°C).
+logic: all
+severity: medium
+item_key_column: site_id
+description_template: "Data center '{site_id}' ({city}) read {temperature_c}°C, above the 27°C ceiling"
+conditions:
+  - column: temperature_c
+    op: gt
+    value: 27.0

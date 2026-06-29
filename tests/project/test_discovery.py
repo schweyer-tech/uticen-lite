@@ -1,4 +1,4 @@
-"""Tests for controlflow_sdk.project.discovery — TDD (write first, implement second)."""
+"""Tests for uticen_lite.project.discovery — TDD (write first, implement second)."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from controlflow_sdk.model.control import ControlDef
-from controlflow_sdk.project import (
+from uticen_lite.model.control import ControlDef
+from uticen_lite.project import (
     Project,
     ProjectError,
     discover_controls,
@@ -56,8 +56,8 @@ class TestDiscoverControls:
 
     def test_threshold_block_parsed(self, tmp_path):
         """A ``threshold:`` block in control.yaml is parsed onto the ControlDef."""
-        from controlflow_sdk.model.control import SourceBinding
-        from controlflow_sdk.project.discovery import _parse_control
+        from uticen_lite.model.control import SourceBinding
+        from uticen_lite.project.discovery import _parse_control
 
         doc = {
             "id": "thresholded",
@@ -207,7 +207,7 @@ class TestLoadTestCallable:
 
 class TestInlineTestCode:
     def _control(self, **kw):  # type: ignore[no-untyped-def]
-        from controlflow_sdk.model.control import FrameworkRefs
+        from uticen_lite.model.control import FrameworkRefs
 
         base = dict(
             id="c",

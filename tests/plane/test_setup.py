@@ -3,9 +3,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from controlflow_sdk.plane.app import create_app
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
+from uticen_lite.plane.app import create_app
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
 
 
 @pytest.fixture
@@ -18,7 +18,7 @@ def fresh_client(tmp_path: Path) -> TestClient:
 def test_first_run_shows_setup_screen(fresh_client: TestClient):
     resp = fresh_client.get("/")
     assert resp.status_code == 200
-    assert "Welcome to the Control Plane" in resp.text
+    assert "Welcome to Uticen Lite" in resp.text
     assert "Load the Northwind demo" in resp.text
     # No controls dashboard on first run.
     assert "New control" not in resp.text
@@ -73,7 +73,7 @@ def test_post_setup_blank_name_stays_on_setup(fresh_client: TestClient, tmp_path
     resp = fresh_client.post("/setup", data={"name": "   "}, follow_redirects=False)
     assert resp.status_code == 303
     assert repo.get_project(connect(tmp_path)) is None
-    assert "Welcome to the Control Plane" in fresh_client.get("/").text
+    assert "Welcome to Uticen Lite" in fresh_client.get("/").text
 
 
 def test_post_setup_demo_loads_runnable_engagement(fresh_client: TestClient, tmp_path: Path):
@@ -82,8 +82,8 @@ def test_post_setup_demo_loads_runnable_engagement(fresh_client: TestClient, tmp
 
     conn = connect(tmp_path)
     assert repo.get_project(conn)["name"]  # demo names the engagement
-    assert len(repo.list_controls(conn)) == 8
-    assert len(list((tmp_path / "data").glob("*.csv"))) == 8
+    assert len(repo.list_controls(conn)) == 9
+    assert len(list((tmp_path / "data").glob("*.csv"))) == 9
 
     # Dashboard now lists the demo controls and a run works.
     page = fresh_client.get("/")

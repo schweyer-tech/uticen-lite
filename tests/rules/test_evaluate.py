@@ -1,8 +1,8 @@
 import pandas as pd
 
-from controlflow_sdk.model.population import ColumnMeta, Population
-from controlflow_sdk.rules.evaluate import evaluate_rule
-from controlflow_sdk.rules.spec import parse_rule_spec
+from uticen_lite.model.population import ColumnMeta, Population
+from uticen_lite.rules.evaluate import evaluate_rule
+from uticen_lite.rules.spec import parse_rule_spec
 
 
 def _pop(df: pd.DataFrame, key="user_id") -> Population:

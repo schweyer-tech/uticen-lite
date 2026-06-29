@@ -1,4 +1,4 @@
-"""TDD tests for controlflow_sdk.bundle.archive (Phase 3, Task 3).
+"""TDD tests for uticen_lite.bundle.archive (Phase 3, Task 3).
 
 Red → Green cycle:
   1. Write tests (RED – archive module does not exist yet).
@@ -14,7 +14,7 @@ import tempfile
 
 import pytest
 
-from controlflow_sdk.bundle import read_bundle, write_bundle
+from uticen_lite.bundle import read_bundle, write_bundle
 
 # ---------------------------------------------------------------------------
 # Tests

@@ -40,10 +40,33 @@ to the new DOM. Treat the control plane's e2e browser smoke as a **load-bearing*
 HTMX-swap changes — never dismiss an e2e strict-mode/locator failure as flaky without reading
 it; it is usually reporting that the assembled DOM changed.
 
+**This extends beyond HTMX DOM swaps:** also re-run the browser gate and **re-derive its
+assertions** when you change a **run-aggregation or render semantic**, not only when the DOM
+structure changes. A pre-existing e2e test is the thing that catches it. (2026-06-28,
+procedures: making the control-level aggregate **dedupe violations by item-key** flipped a
+dashboard "Failed" tile 2→1, and rendering `{code} · {title}` instead of `P{i}: {title}`
+broke a multi-procedure heading regex — both were **stale-test fixes**, not bugs. Confirm the
+new value is the correct one, then update the expectation; never edit an assertion whose new
+value looks wrong — [[0035]].)
+
+**Corollary — a removed/renamed DOM hook fans out to e2e suites your per-task gate SKIPS.**
+The browser e2e tests are marked `-m browser`, so the default `pytest -q` AND a per-task gate
+scoped to one suite (e.g. `tests/plane`) both **deselect** them — a change that removes or
+renames a `data-*` attribute an e2e asserts on passes its own task gate while silently breaking
+a browser test in another file. Before trusting such a change, `grep -rn` the **whole `tests/`
+tree** (incl. `tests/e2e`) for the old attribute and run `pytest tests/e2e -m browser`.
+(2026-06-28: removing `data-proc-title` / `data-threshold-pct` / `data-threshold-count` from the
+Test node card broke `tests/e2e/test_multi_procedure.py`, invisible to the task's `tests/plane`
+gate; it surfaced only when the e2e task ran later — migrate the dropped assertion to the
+attribute's new home, don't just delete it.) DOM-hook member of the fan-out-audit family
+([[0031]] count literals, [[0014]] singular accessors, [[0038]] render sites).
+
 ## Reference
 
 - `tests/e2e/test_smoke.py` — the browser gate (issue #13).
-- `controlflow_sdk/plane/templates/partials/rule_builder.html` — the `hx-get` / `hx-target` /
+- `tests/e2e/test_multi_procedure.py` — the 2026-06-28 recurrence: aggregation/render-semantic
+  changes (item-key dedupe; `{code} · {title}` headings) made its count/heading assertions stale.
+- `uticen_lite/plane/templates/partials/rule_builder.html` — the `hx-get` / `hx-target` /
   `hx-swap` wiring whose behaviour change triggered this.
 - Builds on [0007](0007-control-plane-editors-are-server-rendered-sub-route-tabs.md)
   (server-rendered HTMX sub-routes) and shares the spirit of

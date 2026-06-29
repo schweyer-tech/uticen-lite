@@ -7,10 +7,10 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from controlflow_sdk.adapters.base import Source
-from controlflow_sdk.adapters.files import UnsupportedSourceError, source_for
-from controlflow_sdk.model.control import SourceBinding
-from controlflow_sdk.model.population import Population
+from uticen_lite.adapters.base import Source
+from uticen_lite.adapters.files import UnsupportedSourceError, source_for
+from uticen_lite.model.control import SourceBinding
+from uticen_lite.model.population import Population
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -72,7 +72,7 @@ def _make_binding(
 
 class TestSourceFor:
     def test_returns_csv_source_for_csv_binding(self) -> None:
-        from controlflow_sdk.adapters.files import CsvSource
+        from uticen_lite.adapters.files import CsvSource
 
         binding = _make_binding(fmt="csv")
         src = source_for(binding, FIXTURES)

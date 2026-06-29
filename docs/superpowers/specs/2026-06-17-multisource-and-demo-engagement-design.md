@@ -1,12 +1,12 @@
 # SDK Multi-Source `test()` + "Northwind Trading" Demo Engagement — Design
 
 > Status: **Approved design (2026-06-17)** — pending implementation plans.
-> Repo: `controlflow-sdk`. Two coordinated pieces: a small SDK capability (multi-source `test()`)
+> Repo: `uticen-lite`. Two coordinated pieces: a small SDK capability (multi-source `test()`)
 > and a rich sample engagement that uses it. Decomposed into two build phases (§5).
 
 ## 1. Summary & motivation
 
-Build a **fake mid-size company ("Northwind Trading Co.") with ~8 decently-complex audit controls**, committed to the SDK repo under `examples/northwind-trading/`, that does **triple duty**: a runnable **demo** (`cflow run` → audit-grade workpapers; `cflow build` → an import bundle for the ControlFlow app), **cold-user onboarding** (a real project to copy/adapt — far better than the bare scaffold), and **rich test fixtures** (a CI test runs it end-to-end so it stays green).
+Build a **fake mid-size company ("Northwind Trading Co.") with ~8 decently-complex audit controls**, committed to the SDK repo under `examples/northwind-trading/`, that does **triple duty**: a runnable **demo** (`uticen-lite run` → audit-grade workpapers; `uticen-lite build` → an import bundle for the Uticen app), **cold-user onboarding** (a real project to copy/adapt — far better than the bare scaffold), and **rich test fixtures** (a CI test runs it end-to-end so it stays green).
 
 Designing the controls surfaced a real SDK gap: **`test(pop)` currently receives only the first bound source.** `run_control` loads every bound source into `populations` but passes only `populations[0]` to the test callable, and `Population` exposes no siblings — so a single control cannot join across sources. The most realistic blended-org controls (3-way PO/invoice/payment match, terminated-user-access, vendor-master SoD) are exactly cross-source joins. So this design **first extends the SDK** to expose all bound sources to `test()`, then builds the demo on top.
 
@@ -91,13 +91,13 @@ examples/northwind-trading/
   (target/ is gitignored — never commit generated output)
 ```
 
-- **README**: a short narrative (the company, the audit scope), a per-control table, and the run/build/import walkthrough (`cflow run` → open a workpaper; `cflow build` → import into ControlFlow at Settings → Imports).
-- **CI fixture test** (`tests/examples/test_northwind.py`): runs the example end-to-end — `cflow validate`, `cflow run` (asserts the expected per-control exception counts + that the clean control is clean), `cflow build`, and `validate_bundle` on the produced manifest. This keeps the example correct as the SDK evolves and gives the importer a realistic multi-control, multi-source fixture. (Use a tmp copy + `--at` a fixed timestamp so the privileged-review 90-day logic is deterministic.)
+- **README**: a short narrative (the company, the audit scope), a per-control table, and the run/build/import walkthrough (`uticen-lite run` → open a workpaper; `uticen-lite build` → import into Uticen at Settings → Imports).
+- **CI fixture test** (`tests/examples/test_northwind.py`): runs the example end-to-end — `uticen-lite validate`, `uticen-lite run` (asserts the expected per-control exception counts + that the clean control is clean), `uticen-lite build`, and `validate_bundle` on the produced manifest. This keeps the example correct as the SDK evolves and gives the importer a realistic multi-control, multi-source fixture. (Use a tmp copy + `--at` a fixed timestamp so the privileged-review 90-day logic is deterministic.)
 
 ## 5. Part D — Decomposition (build phases)
 
 - **Phase 1 — SDK multi-source `test()`** (`runner/execute.py` + tests + README). Small, backward-compatible; lands first (the example depends on it). Own commit(s); SDK gate green; push to `main`.
-- **Phase 2 — Northwind Trading example** (`examples/northwind-trading/` data + 8 controls + sources + README + the CI fixture test). Built on Phase 1. Authored so `cflow validate/run/build` succeed and the fixture test asserts the seeded outcomes.
+- **Phase 2 — Northwind Trading example** (`examples/northwind-trading/` data + 8 controls + sources + README + the CI fixture test). Built on Phase 1. Authored so `uticen-lite validate/run/build` succeed and the fixture test asserts the seeded outcomes.
 
 Both land in the SDK repo. Each phase gets its own implementation plan.
 
@@ -111,5 +111,5 @@ Both land in the SDK repo. Each phase gets its own implementation plan.
 
 ## 7. References
 - Strategy: full-population CCM; "any domain — that generality is the point"; NIST RMF/800-53 spine in scope.
-- SDK contract: `def test(pop) -> list[dict]` (item_key/description/severity/details); `controlflow_sdk/runner/execute.py`, `model/population.py`, `project/discovery.py`.
+- SDK contract: `def test(pop) -> list[dict]` (item_key/description/severity/details); `uticen_lite/runner/execute.py`, `model/population.py`, `project/discovery.py`.
 - App importer: bundle → controls/workpapers/control-owned scripts/exceptions (framework_refs carry through).

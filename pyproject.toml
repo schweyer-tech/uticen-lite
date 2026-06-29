@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "controlflow-sdk"
+name = "uticen-lite"
 version = "0.1.0"
-description = "Author and run full-population control tests; export audit-grade workpapers importable into ControlFlow."
+description = "Author and run full-population control tests; export audit-grade workpapers importable into Uticen."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
@@ -25,7 +25,7 @@ plane = ["fastapi>=0.110", "uvicorn>=0.27", "jinja2>=3.1", "python-multipart>=0.
 # This extra is NEVER needed by the fast unit lane (tests/e2e is ignored there).
 e2e = ["pytest-playwright>=0.5"]
 # Optional AI-assisted authoring backends. The SDKs are imported lazily inside
-# controlflow_sdk/ai/ (never at import time), so the package runs without this
+# uticen_lite/ai/ (never at import time), so the package runs without this
 # extra; Ollama uses the stdlib only. (Learning 0003: keep the core dep-free.)
 ai = ["anthropic>=0.50", "openai>=1.40"]
 dev = ["pytest>=8.0", "ruff>=0.5", "mypy>=1.8", "types-PyYAML", "types-jsonschema",
@@ -34,21 +34,21 @@ dev = ["pytest>=8.0", "ruff>=0.5", "mypy>=1.8", "types-PyYAML", "types-jsonschem
   "httpx>=0.27", "anthropic>=0.50", "openai>=1.40"]
 
 [project.scripts]
-cflow = "controlflow_sdk.cli:main"
-controlplane = "controlflow_sdk.plane.__main__:main"
+uticen-lite = "uticen_lite.cli:main"
+controlplane = "uticen_lite.plane.__main__:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["controlflow_sdk"]
+packages = ["uticen_lite"]
 
 # Ship the Northwind demo inside the package so a pip-installed control plane can
 # offer one-click "Load the demo" without a repo checkout. examples/ is the single
 # source of truth (out-of-package → force-include is the correct tool; see
 # docs/learnings/0003). Map only the files the demo loader needs.
 [tool.hatch.build.targets.wheel.force-include]
-"examples/northwind-trading/cflow.yaml" = "controlflow_sdk/_demo/northwind-trading/cflow.yaml"
-"examples/northwind-trading/sources.yaml" = "controlflow_sdk/_demo/northwind-trading/sources.yaml"
-"examples/northwind-trading/controls" = "controlflow_sdk/_demo/northwind-trading/controls"
-"examples/northwind-trading/data" = "controlflow_sdk/_demo/northwind-trading/data"
+"examples/northwind-trading/cflow.yaml" = "uticen_lite/_demo/northwind-trading/cflow.yaml"
+"examples/northwind-trading/sources.yaml" = "uticen_lite/_demo/northwind-trading/sources.yaml"
+"examples/northwind-trading/controls" = "uticen_lite/_demo/northwind-trading/controls"
+"examples/northwind-trading/data" = "uticen_lite/_demo/northwind-trading/data"
 
 
 [tool.pytest.ini_options]
@@ -57,9 +57,16 @@ packages = ["controlflow_sdk"]
 # register the `browser` marker so it does not emit PytestUnknownMarkWarning.
 # The CI e2e job overrides the ignore by targeting the dir: `pytest tests/e2e`.
 addopts = "--ignore=tests/e2e"
+# Restrict to test_ prefix so imported helpers (e.g. tests_for_procedure) are
+# not mistakenly collected as tests when they appear in a test module namespace.
+python_functions = ["test_*"]
 markers = [
   "browser: end-to-end Playwright browser test (opt-in; excluded from the fast unit lane)",
 ]
 filterwarnings = [
   "ignore:Using .httpx. with .starlette.testclient.:starlette.exceptions.StarletteDeprecationWarning",
+  # Third-party: uvicorn imports websockets.server which is deprecated in websockets 14.x.
+  # These arise in the e2e live-server fixture and are outside project code.
+  "ignore:websockets.legacy is deprecated:DeprecationWarning",
+  "ignore:websockets.server.WebSocketServerProtocol is deprecated:DeprecationWarning",
 ]

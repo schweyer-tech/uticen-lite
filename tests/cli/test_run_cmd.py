@@ -1,4 +1,4 @@
-"""Tests for the ``cflow run`` subcommand (store-backed)."""
+"""Tests for the ``uticen-lite run`` subcommand (store-backed)."""
 
 from __future__ import annotations
 
@@ -10,11 +10,11 @@ from unittest.mock import patch
 
 import pytest
 
-from controlflow_sdk.cli import main
-from controlflow_sdk.cli.import_cmd import import_cmd
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.run_service import run_control_in_store as _real_run_control_in_store
+from uticen_lite.cli import main
+from uticen_lite.cli.import_cmd import import_cmd
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.run_service import run_control_in_store as _real_run_control_in_store
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -148,14 +148,14 @@ class TestMissingStore:
     def test_run_on_dir_without_store_prints_actionable_message(
         self, tmp_path: Path, capsys: pytest.CaptureFixture
     ) -> None:
-        """The error must name the dir and point the user at `cflow import`,
+        """The error must name the dir and point the user at `uticen-lite import`,
         not leak the raw sqlite3 'no such table' text."""
         empty = tmp_path / "no-store"
         empty.mkdir()
         main(["run", str(empty), "--at", FIXED_AT])
         err = capsys.readouterr().err
         assert "No engagement store found" in err
-        assert "cflow import" in err
+        assert "uticen-lite import" in err
         assert "no such table" not in err
 
 
@@ -193,7 +193,7 @@ class TestPartialFailure:
         conn = connect(root)
 
         # Discover the full control list so we can pick one to fail.
-        from controlflow_sdk.store.loader import load_project_from_store
+        from uticen_lite.store.loader import load_project_from_store
 
         project = load_project_from_store(conn)
         all_ids = [c.id for c in project.controls]
@@ -209,7 +209,7 @@ class TestPartialFailure:
             return _real_run_control_in_store(conn_, root_, control_id, executed_at)
 
         with patch(
-            "controlflow_sdk.cli.run_cmd.run_control_in_store",
+            "uticen_lite.cli.run_cmd.run_control_in_store",
             side_effect=_patched,
         ):
             rc = main(["run", str(root), "--at", FIXED_AT])

@@ -14,7 +14,7 @@
   ```
 - Branch is `feat/unified-logic-authoring` (already created off `main`). Stay on it.
 - Gates after each task (worktree-local venv): `python -m pytest -q`, `python -m ruff check .`,
-  `python -m mypy controlflow_sdk`. The e2e gate (`pytest tests/e2e -m browser`, after
+  `python -m mypy uticen_lite`. The e2e gate (`pytest tests/e2e -m browser`, after
   `playwright install chromium`) runs only in the task that touches it (Task 9).
 
 ---
@@ -23,11 +23,11 @@
 
 **Architecture:** Server-rendered sub-route tabs (learning 0007). The Logic tab reuses the existing pipeline node editor (Builder), the U2 SVG (Flowchart), and the generated/escape-hatch Python (Python). Every control is viewed as a node graph via a pure `derive_builder_graph()` helper; the store schema, the pipeline compile step (graph → rule_spec/test_code, learning 0010), and `bundle.schema.json` are untouched (cardinal rule 0001).
 
-**Tech Stack:** FastAPI + Jinja2 + HTMX; SQLite; pandas (core); the existing `controlflow_sdk.pipeline` model/compile.
+**Tech Stack:** FastAPI + Jinja2 + HTMX; SQLite; pandas (core); the existing `uticen_lite.pipeline` model/compile.
 
 ## Global Constraints
 
-- Python ≥3.11; ruff target `py311`, line-length 100; mypy clean on `controlflow_sdk`.
+- Python ≥3.11; ruff target `py311`, line-length 100; mypy clean on `uticen_lite`.
 - Do NOT modify `contract/bundle.schema.json` or the bundle manifest shape (cardinal rule 0001).
 - Store schema unchanged — no new columns, no migration, no `schema_version` bump (0010).
 - All CSS colors via `var(--token)`; light/dark parity (0005).
@@ -39,22 +39,22 @@
 ### Task 1: Startup banner shows both launch commands (Note #1)
 
 **Files:**
-- Modify: `controlflow_sdk/plane/__main__.py:8-24` (print banner before `uvicorn.run`)
+- Modify: `uticen_lite/plane/__main__.py:8-24` (print banner before `uvicorn.run`)
 - Test: `tests/plane/test_app.py` (add a unit test for a pure banner helper)
 
 **Interfaces:**
-- Produces: `controlflow_sdk.plane.__main__.launch_banner(host: str, port: int) -> str`
+- Produces: `uticen_lite.plane.__main__.launch_banner(host: str, port: int) -> str`
 
 - [ ] **Step 1: Write the failing test**
 ```python
 # tests/plane/test_app.py
-from controlflow_sdk.plane.__main__ import launch_banner
+from uticen_lite.plane.__main__ import launch_banner
 
 def test_launch_banner_names_both_entry_points():
     b = launch_banner("127.0.0.1", 8765)
     assert "http://127.0.0.1:8765" in b
     assert "controlplane" in b
-    assert "python -m controlflow_sdk.plane" in b
+    assert "python -m uticen_lite.plane" in b
 ```
 
 - [ ] **Step 2: Run it — expect FAIL** (`ImportError: cannot import name 'launch_banner'`)
@@ -62,12 +62,12 @@ Run: `python -m pytest tests/plane/test_app.py -k launch_banner -q`
 
 - [ ] **Step 3: Implement**
 ```python
-# controlflow_sdk/plane/__main__.py  (add helper; call it in main() before uvicorn.run)
+# uticen_lite/plane/__main__.py  (add helper; call it in main() before uvicorn.run)
 def launch_banner(host: str, port: int) -> str:
     url = f"http://{host}:{port}"
     return (
-        f"ControlFlow Control Plane — {url}\n"
-        f"  launch with:  controlplane   (or)   python -m controlflow_sdk.plane"
+        f"Uticen Control Plane — {url}\n"
+        f"  launch with:  controlplane   (or)   python -m uticen_lite.plane"
     )
 ```
 In `main()`, just before `uvicorn.run(...)`: `print(launch_banner(args.host, args.port))`.
@@ -76,7 +76,7 @@ In `main()`, just before `uvicorn.run(...)`: `print(launch_banner(args.host, arg
 
 - [ ] **Step 5: Commit + push**
 ```bash
-git add controlflow_sdk/plane/__main__.py tests/plane/test_app.py
+git add uticen_lite/plane/__main__.py tests/plane/test_app.py
 git commit -m "feat(plane): startup banner names both launch commands"
 git push -u origin HEAD
 ```
@@ -88,7 +88,7 @@ git push -u origin HEAD
 A pure view-model helper: returns a pipeline graph dict for the Builder, or `None` for a raw-Python control (no graph). This is the foundation for "nodes for everything."
 
 **Files:**
-- Create: `controlflow_sdk/plane/logic_view.py`
+- Create: `uticen_lite/plane/logic_view.py`
 - Test: `tests/plane/test_logic_view.py`
 
 **Interfaces:**
@@ -103,7 +103,7 @@ A pure view-model helper: returns a pipeline graph dict for the Builder, or `Non
 - [ ] **Step 1: Write failing tests**
 ```python
 # tests/plane/test_logic_view.py
-from controlflow_sdk.plane.logic_view import derive_builder_graph, is_raw_python
+from uticen_lite.plane.logic_view import derive_builder_graph, is_raw_python
 
 def _ids(graph): return [n["id"] for n in graph["nodes"]]
 
@@ -151,12 +151,12 @@ def test_raw_python_returns_none():
     assert is_raw_python({"rule_spec": {"conditions": []}}) is False
 ```
 
-- [ ] **Step 2: Run — expect FAIL** (`ModuleNotFoundError: controlflow_sdk.plane.logic_view`)
+- [ ] **Step 2: Run — expect FAIL** (`ModuleNotFoundError: uticen_lite.plane.logic_view`)
 Run: `python -m pytest tests/plane/test_logic_view.py -q`
 
 - [ ] **Step 3: Implement**
 ```python
-# controlflow_sdk/plane/logic_view.py
+# uticen_lite/plane/logic_view.py
 """View-model helper: render any control as a node graph for the Logic ▸ Builder tab.
 
 Pure (no DB/IO). The graph it returns is the same shape parse_pipeline()/the Builder
@@ -198,7 +198,7 @@ def derive_builder_graph(control: dict[str, Any], bound_source_ids: list[str]) -
 
 - [ ] **Step 5: Commit + push**
 ```bash
-git add controlflow_sdk/plane/logic_view.py tests/plane/test_logic_view.py
+git add uticen_lite/plane/logic_view.py tests/plane/test_logic_view.py
 git commit -m "feat(plane): derive_builder_graph — view any control as a node graph"
 git push -u origin HEAD
 ```
@@ -210,10 +210,10 @@ git push -u origin HEAD
 Rename the pipeline route module to `logic.py` and expose the three sub-routes; add the sub-tab nav include; flip the top-level tab. Builder keeps rendering the existing pipeline editor for now (Task 4 swaps in derivation); Flowchart and Python render the existing diagram/python sections extracted into their own templates is Task 4 — here just get routing + nav green.
 
 **Files:**
-- Rename/modify: `controlflow_sdk/plane/routes/pipeline.py` → keep filename but rename `register` content; add routes `GET /controls/{id}/logic` (302→builder), `/logic/builder`, `/logic/flowchart`, `/logic/python`, `POST /controls/{id}/logic/builder` (was `/pipeline`), `POST /controls/{id}/logic/convert`. Keep `GET /controls/{id}/pipeline` as a 301 redirect to `/logic/builder`.
-- Create: `controlflow_sdk/plane/templates/partials/_logic_tabs.html`
-- Modify: `controlflow_sdk/plane/templates/partials/_control_tabs.html:1-5` (Pipeline → Logic, href `/controls/{{ control.id }}/logic/builder`, active key `logic`)
-- Modify: `controlflow_sdk/plane/app.py:75` (registration comment/name stays `pipeline.register` — module unchanged path)
+- Rename/modify: `uticen_lite/plane/routes/pipeline.py` → keep filename but rename `register` content; add routes `GET /controls/{id}/logic` (302→builder), `/logic/builder`, `/logic/flowchart`, `/logic/python`, `POST /controls/{id}/logic/builder` (was `/pipeline`), `POST /controls/{id}/logic/convert`. Keep `GET /controls/{id}/pipeline` as a 301 redirect to `/logic/builder`.
+- Create: `uticen_lite/plane/templates/partials/_logic_tabs.html`
+- Modify: `uticen_lite/plane/templates/partials/_control_tabs.html:1-5` (Pipeline → Logic, href `/controls/{{ control.id }}/logic/builder`, active key `logic`)
+- Modify: `uticen_lite/plane/app.py:75` (registration comment/name stays `pipeline.register` — module unchanged path)
 - Test: `tests/plane/test_pipeline_editor.py` (add sub-route + redirect + nav tests)
 
 **Interfaces:**
@@ -269,7 +269,7 @@ Run: `python -m pytest tests/plane/test_pipeline_editor.py -k "logic or redirect
 
 - [ ] **Step 5: Commit + push**
 ```bash
-git add controlflow_sdk/plane/routes/pipeline.py controlflow_sdk/plane/templates/partials/_logic_tabs.html controlflow_sdk/plane/templates/partials/_control_tabs.html controlflow_sdk/plane/templates/control_pipeline.html tests/plane/test_pipeline_editor.py
+git add uticen_lite/plane/routes/pipeline.py uticen_lite/plane/templates/partials/_logic_tabs.html uticen_lite/plane/templates/partials/_control_tabs.html uticen_lite/plane/templates/control_pipeline.html tests/plane/test_pipeline_editor.py
 git commit -m "feat(plane): Logic tab with builder/flowchart/python sub-routes (+ /pipeline redirect)"
 git push -u origin HEAD
 ```
@@ -281,8 +281,8 @@ git push -u origin HEAD
 Break `control_pipeline.html` into three templates so each sub-route shows only its pane, and make the Builder render `derive_builder_graph(...)` for non-pipeline controls.
 
 **Files:**
-- Create: `controlflow_sdk/plane/templates/logic_builder.html` (Steps editor + toolbar + Save; the JS editor block), `logic_flowchart.html` (the `{% include "partials/_pipe_diagram.html" %}` + heading), `logic_python.html` (Task 5).
-- Modify: `controlflow_sdk/plane/routes/pipeline.py` — the three GETs render their own template; `_editor_context` gains a `builder_graph` (call `derive_builder_graph`) and a `raw_python` flag, so Builder shows the node editor for a derived graph or the "authored in Python" notice when `derive_builder_graph` returns `None`.
+- Create: `uticen_lite/plane/templates/logic_builder.html` (Steps editor + toolbar + Save; the JS editor block), `logic_flowchart.html` (the `{% include "partials/_pipe_diagram.html" %}` + heading), `logic_python.html` (Task 5).
+- Modify: `uticen_lite/plane/routes/pipeline.py` — the three GETs render their own template; `_editor_context` gains a `builder_graph` (call `derive_builder_graph`) and a `raw_python` flag, so Builder shows the node editor for a derived graph or the "authored in Python" notice when `derive_builder_graph` returns `None`.
 - Delete: `control_pipeline.html` once the three templates cover it (or keep as a thin base they extend).
 - Test: `tests/plane/test_pipeline_editor.py`
 
@@ -313,7 +313,7 @@ def test_builder_shows_python_notice_for_raw_python(client):
 
 - [ ] **Step 5: Commit + push**
 ```bash
-git add controlflow_sdk/plane/templates/logic_builder.html controlflow_sdk/plane/templates/logic_flowchart.html controlflow_sdk/plane/routes/pipeline.py tests/plane/test_pipeline_editor.py
+git add uticen_lite/plane/templates/logic_builder.html uticen_lite/plane/templates/logic_flowchart.html uticen_lite/plane/routes/pipeline.py tests/plane/test_pipeline_editor.py
 git commit -m "feat(plane): split Logic into Builder/Flowchart panes; Builder derives a graph for every control"
 git push -u origin HEAD
 ```
@@ -325,8 +325,8 @@ git push -u origin HEAD
 Relocate the CodeMirror raw-Python editor here. Graph controls show read-only generated Python + "Convert to Python test →"; raw-Python controls get the editable editor saving via a new POST.
 
 **Files:**
-- Create: `controlflow_sdk/plane/templates/logic_python.html` (move CodeMirror CSS/JS includes + textarea from `control_edit.html:151-176`).
-- Modify: `controlflow_sdk/plane/routes/pipeline.py` — `GET /logic/python` passes `generated_python`, `raw_python` flag, and `test_code`; add `POST /controls/{id}/logic/python` saving raw `test_code` (test_kind="python", pipeline=None) reusing the existing convert/upsert pattern (pipeline.py:498-511). Convert button already targets `/logic/convert` → redirects to `/logic/python` (Task 3).
+- Create: `uticen_lite/plane/templates/logic_python.html` (move CodeMirror CSS/JS includes + textarea from `control_edit.html:151-176`).
+- Modify: `uticen_lite/plane/routes/pipeline.py` — `GET /logic/python` passes `generated_python`, `raw_python` flag, and `test_code`; add `POST /controls/{id}/logic/python` saving raw `test_code` (test_kind="python", pipeline=None) reusing the existing convert/upsert pattern (pipeline.py:498-511). Convert button already targets `/logic/convert` → redirects to `/logic/python` (Task 3).
 - Test: `tests/plane/test_pipeline_editor.py`
 
 - [ ] **Step 1: Write failing tests**
@@ -351,7 +351,7 @@ def test_python_tab_editable_for_raw_python(client):
 - [ ] **Step 4: Run — expect PASS.** Run: `python -m pytest tests/plane/test_pipeline_editor.py -q`
 - [ ] **Step 5: Commit + push**
 ```bash
-git add controlflow_sdk/plane/templates/logic_python.html controlflow_sdk/plane/routes/pipeline.py tests/plane/test_pipeline_editor.py
+git add uticen_lite/plane/templates/logic_python.html uticen_lite/plane/routes/pipeline.py tests/plane/test_pipeline_editor.py
 git commit -m "feat(plane): Logic ▸ Python tab — generated view + relocated escape hatch"
 git push -u origin HEAD
 ```
@@ -363,8 +363,8 @@ git push -u origin HEAD
 Remove the Test-logic section from the Definition template and make the Definition POST save metadata + sources only (no rule/python parsing). New controls are created with no logic; the Builder derives a scaffold on first view (Task 2/4).
 
 **Files:**
-- Modify: `controlflow_sdk/plane/templates/control_edit.html` — delete lines 108–143 (Test logic section) and the CodeMirror + condition-row JS at 151–211 (moved to logic_python.html / logic_builder.html). Keep Details, Failure thresholds, Data sources, Submit.
-- Modify: `controlflow_sdk/plane/routes/controls.py` — `_save_from_form` (253–309): drop the `test_kind` rule/python/pipeline branching; save only metadata + framework + thresholds + sources; pass `test_kind`/`rule_spec`/`test_code`/`pipeline` through **unchanged** for an existing control (load current values and re-upsert them) so editing metadata never clobbers logic. For a NEW control, create with `test_kind="pipeline"`, `pipeline=None`, `rule_spec=None`, `test_code=None` (Builder seeds on view). The `_rule_spec_from_form`, `_conditions_view_from_form`, `_condition_row`/`_conditions` partial endpoints **move with the rule builder** (they are used by the Builder's Test-node condition editor) — keep them registered.
+- Modify: `uticen_lite/plane/templates/control_edit.html` — delete lines 108–143 (Test logic section) and the CodeMirror + condition-row JS at 151–211 (moved to logic_python.html / logic_builder.html). Keep Details, Failure thresholds, Data sources, Submit.
+- Modify: `uticen_lite/plane/routes/controls.py` — `_save_from_form` (253–309): drop the `test_kind` rule/python/pipeline branching; save only metadata + framework + thresholds + sources; pass `test_kind`/`rule_spec`/`test_code`/`pipeline` through **unchanged** for an existing control (load current values and re-upsert them) so editing metadata never clobbers logic. For a NEW control, create with `test_kind="pipeline"`, `pipeline=None`, `rule_spec=None`, `test_code=None` (Builder seeds on view). The `_rule_spec_from_form`, `_conditions_view_from_form`, `_condition_row`/`_conditions` partial endpoints **move with the rule builder** (they are used by the Builder's Test-node condition editor) — keep them registered.
 - Test: `tests/plane/test_controls.py`
 
 - [ ] **Step 1: Write failing tests**
@@ -391,7 +391,7 @@ def test_editing_metadata_preserves_existing_logic(client):
 - [ ] **Step 4: Run — expect PASS.** Run: `python -m pytest tests/plane/test_controls.py -q`
 - [ ] **Step 5: Commit + push**
 ```bash
-git add controlflow_sdk/plane/templates/control_edit.html controlflow_sdk/plane/routes/controls.py tests/plane/test_controls.py
+git add uticen_lite/plane/templates/control_edit.html uticen_lite/plane/routes/controls.py tests/plane/test_controls.py
 git commit -m "feat(plane): Definition tab is metadata-only; logic authoring moves to the Logic tab"
 git push -u origin HEAD
 ```
@@ -403,16 +403,16 @@ git push -u origin HEAD
 Guarantee a derived **cross-source** rule (`not_exists_in`) survives a Builder save unchanged: derive → render on the Test node → save → compile back to the identical `rule_spec`.
 
 **Files:**
-- Modify (only if needed): `controlflow_sdk/plane/templates/partials/_pipe_node.html` — ensure a Test node's condition rows offer the cross-source ops + the `other_source`/`this_key`/`other_key` fields (reuse the same widgets the rule builder uses in `rule_conditions.html`).
-- Verify: `controlflow_sdk/pipeline/compile.py:_try_pure_rule_spec` passes a cross-source condition through to the emitted `rule_spec` for a single `Import → Test` (no Join). If it currently rejects/strips it, extend it minimally to pass cross-source condition dicts through unchanged.
+- Modify (only if needed): `uticen_lite/plane/templates/partials/_pipe_node.html` — ensure a Test node's condition rows offer the cross-source ops + the `other_source`/`this_key`/`other_key` fields (reuse the same widgets the rule builder uses in `rule_conditions.html`).
+- Verify: `uticen_lite/pipeline/compile.py:_try_pure_rule_spec` passes a cross-source condition through to the emitted `rule_spec` for a single `Import → Test` (no Join). If it currently rejects/strips it, extend it minimally to pass cross-source condition dicts through unchanged.
 - Test: `tests/plane/test_logic_view.py` + `tests/pipeline/test_compile.py` (or wherever compile is tested)
 
 - [ ] **Step 1: Write the failing round-trip test**
 ```python
 # tests/plane/test_logic_view.py
-from controlflow_sdk.pipeline.model import parse_pipeline
-from controlflow_sdk.pipeline.compile import compile_pipeline
-from controlflow_sdk.plane.logic_view import derive_builder_graph
+from uticen_lite.pipeline.model import parse_pipeline
+from uticen_lite.pipeline.compile import compile_pipeline
+from uticen_lite.plane.logic_view import derive_builder_graph
 
 def test_cross_source_rule_round_trips_to_same_rule_spec():
     rule = {"logic": "all", "severity": "high", "item_key_column": "pid",
@@ -431,7 +431,7 @@ def test_cross_source_rule_round_trips_to_same_rule_spec():
 - [ ] **Step 4: Run — expect PASS.** Re-run the test above + `python -m pytest tests/pipeline -q`.
 - [ ] **Step 5: Commit + push**
 ```bash
-git add controlflow_sdk/pipeline/compile.py controlflow_sdk/plane/templates/partials/_pipe_node.html tests/plane/test_logic_view.py tests/pipeline/test_compile.py
+git add uticen_lite/pipeline/compile.py uticen_lite/plane/templates/partials/_pipe_node.html tests/plane/test_logic_view.py tests/pipeline/test_compile.py
 git commit -m "feat(pipeline): cross-source rule round-trips through a single Import→Test (Builder)"
 git push -u origin HEAD
 ```
@@ -451,7 +451,7 @@ Update tests that asserted the old Definition test-logic / Pipeline tab so the s
 Run: `python -m pytest tests/plane -q`
 - [ ] **Step 2: Fix each failing assertion** to match the new routes/structure (no behavior change to the product — only test expectations + URLs). Keep each fix minimal; do not weaken a test to pass.
 - [ ] **Step 3: Run — expect PASS.** Run: `python -m pytest tests/plane -q`
-- [ ] **Step 4: Full gates.** Run: `python -m pytest -q && python -m ruff check . && python -m mypy controlflow_sdk`
+- [ ] **Step 4: Full gates.** Run: `python -m pytest -q && python -m ruff check . && python -m mypy uticen_lite`
 - [ ] **Step 5: Commit + push**
 ```bash
 git add tests/plane
@@ -499,7 +499,7 @@ git push -u origin HEAD
 ## Final gate (after Task 10)
 
 - [ ] `python -m pytest -q` → green (with `[adapters]` installed, else ignore the openpyxl-only failures).
-- [ ] `python -m ruff check .` → clean · `python -m mypy controlflow_sdk` → clean.
+- [ ] `python -m ruff check .` → clean · `python -m mypy uticen_lite` → clean.
 - [ ] `python -m pytest tests/e2e -m browser -q` → 1 passed.
 - [ ] `python -m pytest tests/test_contract_export.py tests/schema/test_bundle_schema.py -q` → green (cardinal rule intact).
 - [ ] Open a PR `feat/unified-logic-authoring` → `main`; do not self-merge without the user's go-ahead.

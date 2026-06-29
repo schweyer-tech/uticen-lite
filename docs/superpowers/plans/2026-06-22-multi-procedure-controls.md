@@ -17,7 +17,7 @@
 - **Learning 0002:** async/writing plane handlers open their own sqlite connection (try/finally); sync GETs use `Depends(get_conn)`.
 - **Learning 0012:** re-run + update the e2e browser smoke when an HTMX swap restructures a `plane/` form.
 - **Back-compat:** every change keeps the single-terminal (N==1) path byte-identical (graph, compiled artifact, workpaper, bundle).
-- **Gates green after every task:** `python -m pytest -q`, `python -m ruff check .`, `python -m mypy controlflow_sdk` — all clean, output pristine.
+- **Gates green after every task:** `python -m pytest -q`, `python -m ruff check .`, `python -m mypy uticen_lite` — all clean, output pristine.
 
 ---
 
@@ -36,14 +36,14 @@
 
 ## File structure (what changes)
 
-- `controlflow_sdk/pipeline/model.py` — N-terminal validation + `Pipeline.terminals` + terminal config fields. (Task 1)
-- `controlflow_sdk/pipeline/compile.py` — `compile_pipeline_procedures()` + multi-terminal union in `_emit_python`. (Task 2)
-- `controlflow_sdk/store/migrations.py`, `controlflow_sdk/store/repo.py`, `controlflow_sdk/model/run.py` — `runs.procedure_id`. (Task 3)
-- `controlflow_sdk/store/run_service.py` — fan-out: one run per terminal. (Task 4)
-- `controlflow_sdk/model/workpaper.py`, `controlflow_sdk/model/control.py` — per-procedure threshold + determination roll-up; multi-procedure `assemble`. (Task 5)
-- `controlflow_sdk/render/html.py`, `controlflow_sdk/render/markdown.py` — N procedure sections + per-procedure pills + overall verdict. (Task 6)
-- `controlflow_sdk/bundle/assemble.py` — `_build_workpaper` emits N procedures; control `test_code` = union. (Task 7)
-- `controlflow_sdk/plane/templates/partials/_pipe_node.html`, `controlflow_sdk/plane/routes/pipeline.py` — Test-card title+threshold fields; mark all terminals; serialize. (Task 8)
+- `uticen_lite/pipeline/model.py` — N-terminal validation + `Pipeline.terminals` + terminal config fields. (Task 1)
+- `uticen_lite/pipeline/compile.py` — `compile_pipeline_procedures()` + multi-terminal union in `_emit_python`. (Task 2)
+- `uticen_lite/store/migrations.py`, `uticen_lite/store/repo.py`, `uticen_lite/model/run.py` — `runs.procedure_id`. (Task 3)
+- `uticen_lite/store/run_service.py` — fan-out: one run per terminal. (Task 4)
+- `uticen_lite/model/workpaper.py`, `uticen_lite/model/control.py` — per-procedure threshold + determination roll-up; multi-procedure `assemble`. (Task 5)
+- `uticen_lite/render/html.py`, `uticen_lite/render/markdown.py` — N procedure sections + per-procedure pills + overall verdict. (Task 6)
+- `uticen_lite/bundle/assemble.py` — `_build_workpaper` emits N procedures; control `test_code` = union. (Task 7)
+- `uticen_lite/plane/templates/partials/_pipe_node.html`, `uticen_lite/plane/routes/pipeline.py` — Test-card title+threshold fields; mark all terminals; serialize. (Task 8)
 - `tests/e2e/test_smoke.py` (or a new `test_multi_procedure.py`) — author 2-test control end-to-end. (Task 9)
 
 ---
@@ -51,7 +51,7 @@
 ## Task 1: Pipeline model — allow N terminals + terminal config
 
 **Files:**
-- Modify: `controlflow_sdk/pipeline/model.py`
+- Modify: `uticen_lite/pipeline/model.py`
 - Test: `tests/pipeline/test_model.py`
 
 **Interfaces:**
@@ -71,13 +71,13 @@ def test_pipeline_allows_two_terminal_tests():
         {"id": "b", "type": "test", "inputs": ["flt"],
          "config": {"logic": "all", "conditions": [{"column": "po", "op": "is_empty"}]}},
     ]}
-    from controlflow_sdk.pipeline.model import parse_pipeline
+    from uticen_lite.pipeline.model import parse_pipeline
     p = parse_pipeline(graph)
     assert [t.id for t in p.terminals] == ["a", "b"]
     assert p.terminal.id == "a"  # back-compat: first terminal
 
 def test_pipeline_rejects_non_test_sink():
-    from controlflow_sdk.pipeline.model import parse_pipeline, PipelineError
+    from uticen_lite.pipeline.model import parse_pipeline, PipelineError
     graph = {"nodes": [
         {"id": "imp", "type": "import", "source_id": "s"},
         {"id": "flt", "type": "filter", "inputs": ["imp"],
@@ -90,7 +90,7 @@ def test_pipeline_rejects_non_test_sink():
         parse_pipeline(graph)
 
 def test_single_terminal_back_compat_unchanged():
-    from controlflow_sdk.pipeline.model import parse_pipeline
+    from uticen_lite.pipeline.model import parse_pipeline
     graph = {"nodes": [
         {"id": "imp", "type": "import", "source_id": "s"},
         {"id": "tst", "type": "test", "inputs": ["imp"],
@@ -127,12 +127,12 @@ def test_single_terminal_back_compat_unchanged():
     ```
   - Update the `Pipeline` docstring ("exactly one terminal Test node" → "one or more terminal Test nodes").
 
-- [ ] **Step 4: Run** — `python -m pytest tests/pipeline/test_model.py -q` → PASS; then full gates (`pytest -q`, `ruff check .`, `mypy controlflow_sdk`).
+- [ ] **Step 4: Run** — `python -m pytest tests/pipeline/test_model.py -q` → PASS; then full gates (`pytest -q`, `ruff check .`, `mypy uticen_lite`).
 
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/pipeline/model.py tests/pipeline/test_model.py
+git add uticen_lite/pipeline/model.py tests/pipeline/test_model.py
 git commit -m "feat(pipeline): allow N terminal Test nodes (Pipeline.terminals)"
 git push -u origin HEAD
 ```
@@ -142,7 +142,7 @@ git push -u origin HEAD
 ## Task 2: Compile — per-procedure artifacts + multi-terminal union
 
 **Files:**
-- Modify: `controlflow_sdk/pipeline/compile.py`
+- Modify: `uticen_lite/pipeline/compile.py`
 - Test: `tests/pipeline/test_compile.py`
 
 **Interfaces:**
@@ -156,7 +156,7 @@ git push -u origin HEAD
 
 ```python
 def _forked():
-    from controlflow_sdk.pipeline.model import parse_pipeline
+    from uticen_lite.pipeline.model import parse_pipeline
     return parse_pipeline({"nodes": [
         {"id": "imp", "type": "import", "source_id": "inv"},
         {"id": "flt", "type": "filter", "inputs": ["imp"],
@@ -170,7 +170,7 @@ def _forked():
     ]})
 
 def test_compile_one_procedure_per_terminal():
-    from controlflow_sdk.pipeline.compile import compile_pipeline_procedures
+    from uticen_lite.pipeline.compile import compile_pipeline_procedures
     procs = compile_pipeline_procedures(_forked())
     assert [p.procedure_id for p in procs] == ["a", "b"]
     # Procedure "a" is a pure single-source chain → rule_spec referencing approver only.
@@ -182,8 +182,8 @@ def test_compile_one_procedure_per_terminal():
 def test_union_test_code_runs_both_branches_and_concatenates(tmp_path):
     # equivalence: exec the union test() over a fixture; violations == branch a + branch b
     import pandas as pd
-    from controlflow_sdk.pipeline.compile import compile_pipeline
-    from controlflow_sdk.model.population import Population
+    from uticen_lite.pipeline.compile import compile_pipeline
+    from uticen_lite.model.population import Population
     union = compile_pipeline(_forked())
     assert union.test_kind == "python"
     ns = {}
@@ -259,7 +259,7 @@ def test_union_test_code_runs_both_branches_and_concatenates(tmp_path):
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/pipeline/compile.py tests/pipeline/test_compile.py
+git add uticen_lite/pipeline/compile.py tests/pipeline/test_compile.py
 git commit -m "feat(pipeline): compile per-terminal procedures + a multi-terminal union test()"
 git push -u origin HEAD
 ```
@@ -269,7 +269,7 @@ git push -u origin HEAD
 ## Task 3: Store — `runs.procedure_id`
 
 **Files:**
-- Modify: `controlflow_sdk/store/migrations.py` (new migration step bumping `user_version`), `controlflow_sdk/store/repo.py` (`insert_run`, run row mapping), `controlflow_sdk/model/run.py` (carry `procedure_id`)
+- Modify: `uticen_lite/store/migrations.py` (new migration step bumping `user_version`), `uticen_lite/store/repo.py` (`insert_run`, run row mapping), `uticen_lite/model/run.py` (carry `procedure_id`)
 - Test: `tests/store/test_repo_runs.py`
 
 **Interfaces:**
@@ -280,10 +280,10 @@ git push -u origin HEAD
 
 ```python
 def test_run_persists_procedure_id(tmp_path):
-    from controlflow_sdk.store.db import connect
-    from controlflow_sdk.store.migrations import migrate
-    from controlflow_sdk.store import repo
-    from controlflow_sdk.model.run import RunRecord
+    from uticen_lite.store.db import connect
+    from uticen_lite.store.migrations import migrate
+    from uticen_lite.store import repo
+    from uticen_lite.model.run import RunRecord
     conn = connect(tmp_path); migrate(conn)
     repo.upsert_project(conn, name="P")
     repo.upsert_control(conn, id="C", title="t", objective="o", narrative="n",
@@ -309,7 +309,7 @@ def test_run_persists_procedure_id(tmp_path):
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/store/migrations.py controlflow_sdk/store/repo.py controlflow_sdk/model/run.py tests/store/test_repo_runs.py
+git add uticen_lite/store/migrations.py uticen_lite/store/repo.py uticen_lite/model/run.py tests/store/test_repo_runs.py
 git commit -m "feat(store): add runs.procedure_id (store-only; default '')"
 git push -u origin HEAD
 ```
@@ -319,7 +319,7 @@ git push -u origin HEAD
 ## Task 4: Run service — one run per procedure
 
 **Files:**
-- Modify: `controlflow_sdk/store/run_service.py`
+- Modify: `uticen_lite/store/run_service.py`
 - Test: `tests/store/test_run_service.py`
 
 **Interfaces:**
@@ -349,7 +349,7 @@ def test_forked_control_runs_one_result_per_procedure(tmp_path):
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/store/run_service.py tests/store/test_run_service.py
+git add uticen_lite/store/run_service.py tests/store/test_run_service.py
 git commit -m "feat(store): run each pipeline terminal as its own procedure result"
 git push -u origin HEAD
 ```
@@ -359,7 +359,7 @@ git push -u origin HEAD
 ## Task 5: Workpaper + determination roll-up
 
 **Files:**
-- Modify: `controlflow_sdk/model/workpaper.py` (`Procedure` gains `threshold` + `determination`; `Workpaper.determination` roll-up; multi-procedure `assemble`)
+- Modify: `uticen_lite/model/workpaper.py` (`Procedure` gains `threshold` + `determination`; `Workpaper.determination` roll-up; multi-procedure `assemble`)
 - Test: `tests/model/test_workpaper.py`
 
 **Interfaces:**
@@ -373,9 +373,9 @@ git push -u origin HEAD
 
 ```python
 def test_control_fails_if_any_procedure_fails():
-    from controlflow_sdk.model.workpaper import Workpaper, Procedure
-    from controlflow_sdk.model.control import Threshold
-    from controlflow_sdk.model.run import RunRecord
+    from uticen_lite.model.workpaper import Workpaper, Procedure
+    from uticen_lite.model.control import Threshold
+    from uticen_lite.model.run import RunRecord
     pass_proc = Procedure(title="A", narrative="", test_code="...",
         result=RunRecord(run_id="ra", control_id="C", executed_at="t",
                          population_size=100, violations=[], provenance=[]),
@@ -411,7 +411,7 @@ def test_control_fails_if_any_procedure_fails():
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/model/workpaper.py tests/model/test_workpaper.py
+git add uticen_lite/model/workpaper.py tests/model/test_workpaper.py
 git commit -m "feat(workpaper): per-procedure threshold/determination + any-fails roll-up"
 git push -u origin HEAD
 ```
@@ -421,7 +421,7 @@ git push -u origin HEAD
 ## Task 6: Render — N procedure sections + verdicts
 
 **Files:**
-- Modify: `controlflow_sdk/render/html.py`, `controlflow_sdk/render/markdown.py`
+- Modify: `uticen_lite/render/html.py`, `uticen_lite/render/markdown.py`
 - Test: `tests/render/test_render.py`, `tests/render/test_html_parity.py`
 
 **Interfaces:**
@@ -439,7 +439,7 @@ git push -u origin HEAD
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/render/ tests/render/
+git add uticen_lite/render/ tests/render/
 git commit -m "feat(render): render N procedures with per-procedure + overall verdicts"
 git push -u origin HEAD
 ```
@@ -449,7 +449,7 @@ git push -u origin HEAD
 ## Task 7: Bundle — N procedures + union test_code (contract gate)
 
 **Files:**
-- Modify: `controlflow_sdk/bundle/assemble.py` (`_build_workpaper`)
+- Modify: `uticen_lite/bundle/assemble.py` (`_build_workpaper`)
 - Test: `tests/plane/test_pipeline_editor.py` (new export test) + rely on `tests/test_contract_export.py`, `tests/schema/test_bundle_schema.py`
 
 **Interfaces:**
@@ -467,7 +467,7 @@ git push -u origin HEAD
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/bundle/assemble.py tests/plane/test_pipeline_editor.py
+git add uticen_lite/bundle/assemble.py tests/plane/test_pipeline_editor.py
 git commit -m "feat(bundle): emit N workpaper procedures for forked controls (schema 1.0 intact)"
 git push -u origin HEAD
 ```
@@ -477,7 +477,7 @@ git push -u origin HEAD
 ## Task 8: Builder UI — Test-card fields + relaxed save + all-terminals
 
 **Files:**
-- Modify: `controlflow_sdk/plane/templates/partials/_pipe_node.html` (Test card: procedure title + threshold inputs), `controlflow_sdk/plane/templates/logic_builder.html` (serialize the new fields in the builder JS), `controlflow_sdk/plane/routes/pipeline.py` (`_diagram`/`_card_vm` mark **all** terminals)
+- Modify: `uticen_lite/plane/templates/partials/_pipe_node.html` (Test card: procedure title + threshold inputs), `uticen_lite/plane/templates/logic_builder.html` (serialize the new fields in the builder JS), `uticen_lite/plane/routes/pipeline.py` (`_diagram`/`_card_vm` mark **all** terminals)
 - Test: `tests/plane/test_pipeline_editor.py`
 
 **Interfaces:**
@@ -501,7 +501,7 @@ git push -u origin HEAD
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/plane/templates/partials/_pipe_node.html controlflow_sdk/plane/templates/logic_builder.html controlflow_sdk/plane/routes/pipeline.py tests/plane/test_pipeline_editor.py
+git add uticen_lite/plane/templates/partials/_pipe_node.html uticen_lite/plane/templates/logic_builder.html uticen_lite/plane/routes/pipeline.py tests/plane/test_pipeline_editor.py
 git commit -m "feat(plane): author per-procedure title+threshold; mark all terminals"
 git push -u origin HEAD
 ```
@@ -534,7 +534,7 @@ git push -u origin HEAD
 ## Final verification (after all tasks)
 
 - [ ] `python -m pytest -q` — all green, output pristine.
-- [ ] `python -m ruff check .` — clean. `python -m mypy controlflow_sdk` — clean.
+- [ ] `python -m ruff check .` — clean. `python -m mypy uticen_lite` — clean.
 - [ ] `python -m pytest tests/e2e -m browser -q` — green.
 - [ ] Manually (or via the seed-and-serve harness) author a forked control and eyeball the workpaper: two procedure sections, two verdicts, overall any-fails verdict.
 - [ ] Open a PR (base `main`); body summarizes the feature + the contract-safety argument (schema 1.0 intact). Then update `PRODUCT-MAP.md` (Logic surface now supports multi-procedure controls) and capture any durable learning via `compounding-learnings`.

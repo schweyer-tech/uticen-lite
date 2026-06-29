@@ -18,7 +18,7 @@ import zipfile
 
 import pytest
 
-from controlflow_sdk.pipeline.lint import OFFRAMP_MESSAGE
+from uticen_lite.pipeline.lint import OFFRAMP_MESSAGE
 
 _OFFRAMP_STABLE = "pull data in with an Import node, or convert this control"
 assert _OFFRAMP_STABLE in OFFRAMP_MESSAGE
@@ -33,7 +33,7 @@ def _make_source(client, sid, csv):
 
 
 def _conn(client):
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store.db import connect
     return connect(client.app.state.project_root)
 
 
@@ -71,7 +71,7 @@ def _type_column_boolean(client, sid, col):
     """Map a source column's data_type to boolean (as an analyst would in the
     source editor) so it loads as a REAL bool dtype — the Stage-3 gotcha: the
     Filter value for a bool column is python True, surfaced as a typed value."""
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     src = repo.get_source(conn, sid)
     cols = [dict(c) for c in src["columns"]]
@@ -149,8 +149,8 @@ def test_diagram_lays_join_branches_in_separate_converging_lanes():
     """The multi-lane view-model puts a Join's two feeder branches in distinct
     lanes that converge at the Join, while keeping every edge a real input→node
     relationship (presentation-only — never reorders execution)."""
-    from controlflow_sdk.pipeline.model import parse_pipeline
-    from controlflow_sdk.plane.routes.pipeline import _diagram
+    from uticen_lite.pipeline.model import parse_pipeline
+    from uticen_lite.plane.routes.pipeline import _diagram
 
     pipeline = parse_pipeline(_terminated_access_graph())
     diagram = _diagram(pipeline, counts={})
@@ -194,7 +194,7 @@ def test_authoring_terminated_access_pipeline_runs_with_right_exceptions(client)
     _make_control(client, "C1")
     _save_pipeline(client, "C1", _terminated_access_graph())
 
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "C1")
     conn.close()
@@ -243,7 +243,7 @@ def test_convert_to_python_sets_kind_and_prefills_code(client):
     assert resp.status_code in (302, 303)
     assert resp.headers["location"] == "/controls/C1/logic/python"
 
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "C1")
     conn.close()
@@ -271,7 +271,7 @@ def test_convert_pure_pipeline_yields_runnable_test(client):
     ]}
     _save_pipeline(client, "C3", graph)
 
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "C3")
     conn.close()
@@ -311,7 +311,7 @@ def test_custom_node_with_open_shows_inline_offramp_error(client):
     assert _OFFRAMP_STABLE in resp.text
     # The error is pinned on the offending node card (inline), not just a banner.
     assert "node-error" in resp.text
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "C2")
     conn.close()
@@ -464,7 +464,7 @@ def test_builder_derives_graph_for_rule_control_and_save_persists(client):
     assert resp.status_code in (302, 303), f"save returned {resp.status_code}"
 
     # 4. The control must now have a persisted pipeline (not None).
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, cid)
     conn.close()
@@ -610,7 +610,7 @@ def test_cross_source_condition_preserved_through_builder_save(client):
     r2 = _save_pipeline(client, "CS1", embedded_graph)
     assert r2.status_code in (302, 303), f"re-save returned {r2.status_code}"
 
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     ctrl = repo.get_control(conn, "CS1")
     conn.close()
@@ -655,7 +655,7 @@ def test_builder_degrades_gracefully_on_incomplete_test_condition(client):
     # Construct the stored graph directly via repo so the save path's validation
     # is bypassed (the save route would reject it; we need the GET to survive it
     # when the graph is already in that state — e.g. after a partial migration).
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     ctrl = repo.get_control(conn, "INC1")
     incomplete_graph = {
@@ -712,7 +712,7 @@ def test_python_save_does_not_clobber_graph_control(client):
     _make_control(client, "G1")
     _save_pipeline(client, "G1", _terminated_access_graph())
 
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     before = repo.get_control(conn, "G1")
     conn.close()
@@ -746,7 +746,7 @@ def test_python_save_works_for_raw_python_control(client):
                        follow_redirects=False)
     assert resp.status_code in (302, 303), f"expected redirect, got {resp.status_code}"
 
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, cid)
     conn.close()
@@ -813,7 +813,7 @@ def test_forked_control_bundle_has_n_procedures(client):
     - The two procedure titles are distinct
     - control["test_code"] is non-empty (the union test())
     """
-    from controlflow_sdk.schema.validate import validate_bundle
+    from uticen_lite.schema.validate import validate_bundle
 
     _seed_forked_bundle_control(client)
 
@@ -892,10 +892,11 @@ def _seed_forked_t8(client):
     _make_control(client, "T8")
 
 
-def test_forked_builder_renders_both_test_cards_with_proc_title_and_threshold_fields(client):
+def test_forked_builder_renders_both_test_cards(client):
     """GET /controls/T8/logic/builder for a forked 2-terminal control must:
     - render BOTH Test cards (data-node="a" and data-node="b")
-    - each Test card must carry data-proc-title, data-threshold-pct, data-threshold-count inputs
+    - Test node cards must NOT carry the vestigial data-proc-title / threshold inputs
+      (those fields moved to the procedure section header in Task 2)
     """
     _seed_forked_t8(client)
     graph = _forked_graph_with_titles()
@@ -910,14 +911,10 @@ def test_forked_builder_renders_both_test_cards_with_proc_title_and_threshold_fi
     assert 'data-node="a"' in html, "Test card 'a' not found in builder"
     assert 'data-node="b"' in html, "Test card 'b' not found in builder"
 
-    # Both cards have the new procedure-title and threshold inputs.
-    assert "data-proc-title" in html, "data-proc-title attribute missing from Test card"
-    assert "data-threshold-pct" in html, "data-threshold-pct attribute missing from Test card"
-    assert "data-threshold-count" in html, "data-threshold-count attribute missing from Test card"
-
-    # Saved titles round-trip back into the rendered value attributes.
-    assert 'value="High-value items"' in html, "Procedure title 'High-value items' not rendered"
-    assert 'value="Low-value items"' in html, "Procedure title 'Low-value items' not rendered"
+    # Vestigial procedure-identity fields are absent from the node cards.
+    assert "data-proc-title" not in html, "data-proc-title should be gone from Test node cards"
+    assert "data-threshold-pct" not in html, "data-threshold-pct should be gone"
+    assert "data-threshold-count" not in html, "data-threshold-count should be gone"
 
 
 def test_forked_builder_post_saves_and_roundtrips_titles(client):
@@ -941,8 +938,8 @@ def test_diagram_marks_all_terminals_for_forked_control():
     After the fix it uses ``n.id in {t.id for t in pipeline.terminals}`` so ALL
     terminal boxes are marked.
     """
-    from controlflow_sdk.pipeline.model import parse_pipeline
-    from controlflow_sdk.plane.routes.pipeline import _diagram
+    from uticen_lite.pipeline.model import parse_pipeline
+    from uticen_lite.plane.routes.pipeline import _diagram
 
     graph = _forked_graph_with_titles()
     pipeline = parse_pipeline(graph)
@@ -982,15 +979,17 @@ def test_single_terminal_back_compat(client):
     r = _save_pipeline(client, "BT1", graph)
     assert r.status_code in (302, 303), f"single-terminal save failed: {r.status_code}"
 
-    # The builder must render with the new inputs present (but empty).
+    # The builder must render cleanly without the vestigial proc-title / threshold inputs.
     html = client.get("/controls/BT1/logic/builder").text
-    assert "data-proc-title" in html, "data-proc-title missing on single-terminal card"
-    assert "data-threshold-pct" in html, "data-threshold-pct missing on single-terminal card"
-    assert "data-threshold-count" in html, "data-threshold-count missing on single-terminal card"
+    assert "data-severity" in html, "data-severity missing on single-terminal card"
+    assert "data-procedure" in html, "data-procedure missing on single-terminal card"
+    assert "data-proc-title" not in html, "data-proc-title should be gone from Test node cards"
+    assert "data-threshold-pct" not in html, "data-threshold-pct should be gone"
+    assert "data-threshold-count" not in html, "data-threshold-count should be gone"
 
     # The flowchart marks the single terminal correctly.
-    from controlflow_sdk.pipeline.model import parse_pipeline
-    from controlflow_sdk.plane.routes.pipeline import _diagram
+    from uticen_lite.pipeline.model import parse_pipeline
+    from uticen_lite.plane.routes.pipeline import _diagram
     pipeline = parse_pipeline(graph)
     diagram = _diagram(pipeline, counts={})
     terminal_boxes = [b for b in diagram["boxes"] if b["terminal"]]
@@ -1000,8 +999,8 @@ def test_single_terminal_back_compat(client):
 def test_diagram_boxes_carry_node_narrative():
     """Each flowchart box exposes its node's narrative so the SVG can show the
     beginning of it (truncated) with the full text on hover."""
-    from controlflow_sdk.pipeline.model import parse_pipeline
-    from controlflow_sdk.plane.routes.pipeline import _diagram
+    from uticen_lite.pipeline.model import parse_pipeline
+    from uticen_lite.plane.routes.pipeline import _diagram
 
     diagram = _diagram(parse_pipeline(_terminated_access_graph()), counts={})
     narr = {b["id"]: b["narrative"] for b in diagram["boxes"]}
@@ -1043,8 +1042,18 @@ def test_flowchart_shows_narrative_truncated_with_full_text_on_hover(client):
 
 def test_builder_has_per_gap_insert_affordances_not_only_bottom_toolbar(client):
     """Steps can be inserted at any position: an insert control sits at every gap
-    (top, between each pair of cards, bottom), each carrying the up/down node ids
-    it splices between — replacing the old single bottom-only add toolbar."""
+    inside each band (before each card, between pairs, and a trailing zone per
+    band) — replacing the old single bottom-only add toolbar. The sectioned
+    Builder groups cards into a shared Inputs band + one section per procedure, so
+    the per-gap count is one zone before each card plus one end zone per non-empty
+    band."""
+    from uticen_lite.pipeline.model import parse_pipeline
+    from uticen_lite.plane.routes.pipeline import (
+        _card_bands,
+        _card_vm,
+        _procedure_context,
+    )
+
     _seed_terminated_access(client)
     _make_control(client, "C1")
     assert _save_pipeline(client, "C1", _terminated_access_graph()).status_code in (302, 303)
@@ -1055,11 +1064,171 @@ def test_builder_has_per_gap_insert_affordances_not_only_bottom_toolbar(client):
     # Insert affordances exist, positioned by up/down ids.
     assert "data-insert-toggle" in body
     assert "data-insert" in body
-    # One insert zone per gap: N cards → N+1 zones (top + between + bottom).
-    # Count zone elements by class (the substring "data-insert-toggle" also
-    # appears once in the page's delegation JS, so don't substring-count that).
+    # Per-gap zones live INSIDE #pipe-cards. The "Add procedure" JS also contains a
+    # `pipe-insert-empty` literal (the new-section template), so scope the count to
+    # the cards region to exclude it.
+    cards = body[body.index('id="pipe-cards"'):body.index('class="page-actions"')]
+    # Banded layout: one zone before each card + one end zone per non-empty band.
+    pipe = parse_pipeline(_terminated_access_graph())
+    vms = [_card_vm(n, pipe, {}, {}, {}) for n in pipe.topological()]
+    bands = _card_bands(pipe, vms, _procedure_context(pipe))
+    nonempty_bands = (1 if bands["shared"]["nodes"] else 0) + sum(
+        1 for b in bands["procedures"] if b["nodes"])
     n_nodes = len(_terminated_access_graph()["nodes"])
-    assert len(re.findall(r'class="pipe-insert pipe-insert-', body)) == n_nodes + 1
+    assert len(re.findall(r'class="pipe-insert pipe-insert-', cards)) == n_nodes + nonempty_bands
     # Each node type is offerable from an insert menu.
     for t in ("import", "filter", "join", "custom_python", "test"):
         assert f'data-type="{t}"' in body
+
+
+# ---------------------------------------------------------------------------
+# Task 2: autosave — in-place card swaps for routine edits
+# ---------------------------------------------------------------------------
+
+def test_builder_renders_autosave_status_affordance(client):
+    """The builder page contains the autosave status element and the
+    autosaveSubmit JS helper so that add/remove/insert actions swap only
+    the #pipe-cards region without a full-page reload."""
+    _make_control(client, "C1")
+    body = client.get("/controls/C1/logic/builder").text
+
+    # The status affordance element must be present.
+    assert 'id="autosave-status"' in body, "autosave-status element missing"
+
+    # The JS helper that issues the autosave fetch must be defined.
+    assert "autosaveSubmit" in body, "autosaveSubmit helper missing"
+
+    # Full-page form.submit() must NOT be used for card-mutation actions.
+    # The only legitimate submit path is the explicit Save pipeline button,
+    # which triggers the form's own submit event — not a programmatic .submit().
+    assert "pipeline-form').submit()" not in body, (
+        "found full-page .submit() in card-mutation handlers — "
+        "card mutations should call autosaveSubmit()"
+    )
+
+
+def test_autosave_post_returns_cards_fragment_not_redirect(client):
+    """POST /controls/{id}/logic/builder with autosave=1 returns the
+    pipe-cards HTML fragment (200) instead of a redirect, so the client-side
+    fetch can swap only #pipe-cards without a full-page reload."""
+    _make_source(client, "accounts", b"account_id,is_active\nA1,true\nA2,false\n")
+    _make_control(client, "C1")
+    # A minimal valid pipeline: Import → Test (terminal).
+    graph = {"nodes": [
+        {"id": "imp", "type": "import", "source_id": "accounts",
+         "narrative": "", "config": {}, "inputs": []},
+        {"id": "tst", "type": "test", "inputs": ["imp"],
+         "narrative": "", "config": {"logic": "all", "conditions": []}},
+    ]}
+    resp = client.post(
+        "/controls/C1/logic/builder",
+        data={"pipeline_json": json.dumps(graph), "autosave": "1"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 200
+    # Fragment must contain the node cards — not a full page.
+    assert 'data-node="imp"' in resp.text
+    assert 'data-node="tst"' in resp.text
+    assert "<html" not in resp.text
+
+
+def test_autosave_validation_error_returns_cards_fragment_not_full_page(client):
+    """When autosave=1 and a lint error fires, the server MUST return a 422
+    cards fragment (not the full logic_builder.html page).
+
+    The newly submitted node must remain visible in the fragment with the
+    error surfaced inline — so the author can see and fix it without losing
+    the node they just inserted.  (Issue: full-page 422 drops the DOM node.)
+    """
+    _make_source(client, "je_frag", b"entry_id,amount\nE1,100\n")
+    _make_control(client, "ErrFrag")
+    bad_graph = {"nodes": [
+        {"id": "imp", "type": "import", "source_id": "je_frag",
+         "inputs": [], "config": {}},
+        {"id": "cust", "type": "custom_python", "inputs": ["imp"],
+         "config": {"flavor": "transform",
+                    "code": "rows = open('/etc/passwd').read()"}},
+        {"id": "tst", "type": "test", "inputs": ["cust"],
+         "config": {"logic": "all", "conditions": [],
+                    "item_key_column": "entry_id"}},
+    ]}
+    resp = client.post(
+        "/controls/ErrFrag/logic/builder",
+        data={"pipeline_json": json.dumps(bad_graph), "autosave": "1"},
+        follow_redirects=False,
+    )
+    # Must still signal an error (422), not a success or redirect.
+    assert resp.status_code == 422, (
+        f"autosave error must return 422, got {resp.status_code}"
+    )
+    # The response MUST be a fragment, not a full HTML page.
+    assert "<html" not in resp.text, (
+        "autosave error should return a cards fragment, not the full HTML page"
+    )
+    # All submitted nodes must remain visible so the author can fix the error.
+    assert 'data-node="imp"' in resp.text
+    assert 'data-node="cust"' in resp.text
+    # The lint error must be surfaced inside the fragment.
+    assert _OFFRAMP_STABLE in resp.text, (
+        "lint error must appear in the autosave error fragment"
+    )
+
+
+def test_autosave_js_updates_cards_on_non_200_response(client):
+    """The autosaveSubmit JS must update #pipe-cards even when the server
+    returns a non-200 status (e.g. 422 validation error), so the newly
+    inserted node stays visible and can be configured by the author.
+
+    The old ``if (!resp.ok) { throw`` pattern discards the response body on
+    any non-2xx status, which causes the browser to silently drop the node.
+    """
+    _make_control(client, "JS1")
+    body = client.get("/controls/JS1/logic/builder").text
+    # The throw-on-non-OK guard must be absent.
+    assert "if (!resp.ok) { throw" not in body, (
+        "autosaveSubmit must not throw on non-OK status; "
+        "non-200 responses must still update #pipe-cards"
+    )
+
+
+def test_autosave_js_sequence_guard_present(client):
+    """The autosaveSubmit JS must include a sequence counter guard so only
+    the newest in-flight autosave response is applied to #pipe-cards.
+
+    Without the guard, two rapid autosave requests can resolve out of order
+    and the older (stale) response clobbers the newer one.
+    """
+    _make_control(client, "JS2")
+    body = client.get("/controls/JS2/logic/builder").text
+    assert "_autosaveSeq" in body, (
+        "autosaveSubmit must define a sequence counter (_autosaveSeq) "
+        "to prevent concurrent autosave responses from clobbering the DOM"
+    )
+    assert "seq !== _autosaveSeq" in body, (
+        "autosaveSubmit must check the sequence counter before applying "
+        "a response (seq !== _autosaveSeq guard)"
+    )
+
+
+def test_builder_renders_recalculate_button(client):
+    """The builder page contains a Recalculate button that allows users to
+    refresh row counts after structural changes (e.g., removing nodes).
+
+    The button serializes the current graph and calls reload() to trigger
+    an autosave, which recalculates row counts and updates the UI in place.
+    """
+    _make_control(client, "RC1")
+    body = client.get("/controls/RC1/logic/builder").text
+
+    # The recalculate button must be present with correct ID.
+    assert 'id="recalc-btn"' in body, "recalc-btn element missing"
+
+    # The button text must be visible.
+    assert '↻ Recalculate' in body or 'Recalculate' in body, (
+        "Recalculate button text missing"
+    )
+
+    # The button must have a click handler that calls reload().
+    assert 'recalc-btn' in body and 'addEventListener' in body and 'reload()' in body, (
+        "recalc-btn click handler missing or doesn't call reload()"
+    )

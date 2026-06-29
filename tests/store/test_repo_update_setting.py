@@ -1,6 +1,6 @@
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.migrations import migrate
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.migrations import migrate
 
 
 def _db(tmp_path):
@@ -9,9 +9,18 @@ def _db(tmp_path):
     return conn
 
 
-def test_default_is_false(tmp_path):
+def test_default_is_true(tmp_path):
+    # On by default so the header update indicator shows out of the box; OFF is
+    # the explicit opt-in to strict zero egress.
     conn = _db(tmp_path)
     repo.upsert_project(conn, name="Acme")
+    assert repo.get_check_updates_on_launch(conn) is True
+
+
+def test_explicit_false_is_respected(tmp_path):
+    conn = _db(tmp_path)
+    repo.upsert_project(conn, name="Acme")
+    repo.set_check_updates_on_launch(conn, False)
     assert repo.get_check_updates_on_launch(conn) is False
 
 

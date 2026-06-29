@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.migrations import SCHEMA_VERSION, migrate
+from uticen_lite.store.db import connect
+from uticen_lite.store.migrations import SCHEMA_VERSION, migrate
 
 
 def _user_version(conn) -> int:
@@ -43,7 +43,7 @@ def test_sources_has_title_column(tmp_path: Path):
 
 def test_v1_store_upgrades_to_title_without_data_loss(tmp_path: Path):
     # Simulate a store left at schema v1 (before the title column existed).
-    from controlflow_sdk.store.migrations import _STEPS
+    from uticen_lite.store.migrations import _STEPS
 
     conn = connect(tmp_path)
     conn.executescript(_STEPS[0])
@@ -61,8 +61,43 @@ def test_v1_store_upgrades_to_title_without_data_loss(tmp_path: Path):
     assert row[0] == "s" and row[1] is None
 
 
+def _control_columns(conn) -> set[str]:
+    return {r[1] for r in conn.execute("PRAGMA table_info(controls)").fetchall()}
+
+
+def test_controls_has_threshold_rationale_column(tmp_path: Path):
+    conn = connect(tmp_path)
+    migrate(conn)
+    assert "failure_threshold_rationale" in _control_columns(conn)
+
+
+def test_v6_store_upgrades_to_threshold_rationale_without_data_loss(tmp_path: Path):
+    # Simulate a store left at schema v6 (before the rationale column existed).
+    from uticen_lite.store.migrations import _STEPS
+
+    conn = connect(tmp_path)
+    for step in _STEPS[:6]:  # steps 1..6
+        conn.executescript(step)
+    conn.execute("PRAGMA user_version = 6")
+    conn.execute(
+        "INSERT INTO controls (id, title, failure_threshold_count, test_kind, rule_spec) "
+        "VALUES ('C1', 'Existing', 2, 'rule', '{}')"
+    )
+    conn.commit()
+    assert "failure_threshold_rationale" not in _control_columns(conn)
+
+    migrate(conn)  # forward step 7 adds the column on the existing DB
+    assert _user_version(conn) == SCHEMA_VERSION
+    assert "failure_threshold_rationale" in _control_columns(conn)
+    row = conn.execute(
+        "SELECT title, failure_threshold_count, failure_threshold_rationale "
+        "FROM controls WHERE id = 'C1'"
+    ).fetchone()
+    assert tuple(row) == ("Existing", 2, None)  # existing data intact, new col NULL
+
+
 def test_source_files_table_and_backfill(tmp_path: Path):
-    from controlflow_sdk.store.migrations import _STEPS
+    from uticen_lite.store.migrations import _STEPS
 
     conn = connect(tmp_path)
     conn.executescript(_STEPS[0])      # v1 schema

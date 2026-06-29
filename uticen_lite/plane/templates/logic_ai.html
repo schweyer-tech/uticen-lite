@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — Logic AI: {{ control.title if control else control_id }}{% endblock %}
+{% block body %}
+<a class="crumb" href="/controls/{{ control_id }}">← {{ control.title if control else control_id }}</a>
+<div class="page-head">
+  <h1>Logic</h1>
+  <p class="muted mono">{{ control_id }}</p>
+</div>
+{% if control %}{% include "_control_tabs.html" %}{% endif %}
+{% if logic_tab is defined %}{% include "partials/_logic_tabs.html" %}{% endif %}
+
+<div class="card">
+  <div class="card-head"><h2>Draft with AI</h2></div>
+  <p class="lead">
+    Ask for rule suggestions from the control objective and bound source sample.
+    Keep iterating the prompt until the draft looks right, then apply the logic in the Builder tab.
+  </p>
+
+  {% if ai_enabled %}
+  <form hx-post="/controls/ai/draft" hx-target="#ai-draft-panel" hx-swap="innerHTML">
+    <div class="field">
+      <label>Prompt</label>
+      <textarea name="objective" rows="5">{{ control.objective if control else '' }}</textarea>
+      <span class="hint">
+        Tip: include extra constraints or examples in this prompt to steer the suggestion.
+      </span>
+    </div>
+    {% if control and control.source_ids %}
+      {% for sid in control.source_ids %}
+      <input type="hidden" name="source_ids" value="{{ sid }}">
+      {% endfor %}
+    {% endif %}
+    <div class="page-actions">
+      <button class="btn btn-primary" type="submit">Ask AI for suggestions</button>
+      <a class="btn btn-ghost" href="/controls/{{ control_id }}/logic/builder">Open Builder</a>
+    </div>
+  </form>
+  {% else %}
+  <p class="muted">
+    AI authoring is not configured.
+    <a href="/settings/ai">Set up a provider in AI Settings</a> to enable this feature.
+  </p>
+  {% endif %}
+
+  <div id="ai-draft-panel" style="margin-top:14px;"></div>
+</div>
+{% endblock %}

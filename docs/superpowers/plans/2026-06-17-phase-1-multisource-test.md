@@ -9,7 +9,7 @@
 - **Never ask the user for permission to continue between tasks.** Execute the full plan start to finish without interruption.
 - On an unresolvable error after 2–3 attempts: note it in the task and **skip to the next task**.
 - **Commit per task; do NOT push** (the controller pushes once the phase gate is green — SDK repo `main`).
-- Work in the SDK repo: `/Users/dom/repos/controlflow-sdk`. Toolchain: `ruff`, `mypy`, `python3 -m pytest` (python3 has the editable install + dev deps). Before each commit run the full gate clean: `ruff check --fix --unsafe-fixes . && ruff format . && mypy controlflow_sdk && python3 -m pytest -q`.
+- Work in the SDK repo: `/Users/dom/repos/uticen-lite`. Toolchain: `ruff`, `mypy`, `python3 -m pytest` (python3 has the editable install + dev deps). Before each commit run the full gate clean: `ruff check --fix --unsafe-fixes . && ruff format . && mypy uticen_lite && python3 -m pytest -q`.
 
 ---
 
@@ -32,7 +32,7 @@
 ### Task 1: Runner passes a `sources` dict to tests that accept it
 
 **Files:**
-- Modify: `controlflow_sdk/runner/execute.py`
+- Modify: `uticen_lite/runner/execute.py`
 - Test: `tests/runner/test_execute.py`
 
 **Interfaces:**
@@ -71,7 +71,7 @@ def test_two_arg_test_can_join_across_sources(tmp_path):
 def test_two_arg_test_that_raises_still_wrapped_as_runner_error(tmp_path):
     # def test(pop, sources): raise ValueError("boom")  -> run_control raises RunnerError naming the control + "boom"
     import pytest
-    from controlflow_sdk.runner.execute import RunnerError
+    from uticen_lite.runner.execute import RunnerError
     with pytest.raises(RunnerError, match="boom"):
         ...
 ```
@@ -79,7 +79,7 @@ def test_two_arg_test_that_raises_still_wrapped_as_runner_error(tmp_path):
 - [ ] **Step 2: Run to verify they fail.** Run: `python3 -m pytest tests/runner/test_execute.py -q`
   Expected: the two-arg tests FAIL (today `run_control` calls `test_fn(primary)` only, so `def test(pop, sources)` raises `TypeError: test() missing 1 required positional argument` — surfaced as a `RunnerError`).
 
-- [ ] **Step 3: Implement the runner change.** In `controlflow_sdk/runner/execute.py`:
+- [ ] **Step 3: Implement the runner change.** In `uticen_lite/runner/execute.py`:
   - Add `import inspect` at the top (with the other stdlib imports).
   - Add the helper (near `RunnerError`):
 
@@ -132,13 +132,13 @@ def _accepts_sources(test_fn: object) -> bool:
         ...
 ```
 
-- [ ] **Step 4: Run the tests + full gate.** Run: `ruff check --fix --unsafe-fixes . && ruff format . && mypy controlflow_sdk && python3 -m pytest -q`
+- [ ] **Step 4: Run the tests + full gate.** Run: `ruff check --fix --unsafe-fixes . && ruff format . && mypy uticen_lite && python3 -m pytest -q`
   Expected: all green (the new tests pass; the pre-existing suite is unchanged).
 
 - [ ] **Step 5: Commit** (do NOT push).
 
 ```bash
-git add controlflow_sdk/runner/execute.py tests/runner/test_execute.py
+git add uticen_lite/runner/execute.py tests/runner/test_execute.py
 git commit -m "feat(runner): pass a {source_id: Population} dict to tests that accept def test(pop, sources)"
 ```
 

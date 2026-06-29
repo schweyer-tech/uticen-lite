@@ -10,7 +10,9 @@
 # it is safe to run against fork PRs.
 #
 # Note: pull_request_target reads this workflow from the default branch (main),
-# so it takes effect once merged there.
+# so it takes effect once merged there. After the org migration the maintainer
+# login (dom-schweyer-tech) no longer equals github.repository_owner (the org
+# schweyer-tech), so the maintainer is allow-listed explicitly below.
 name: Restrict PR authors
 
 on:
@@ -23,9 +25,10 @@ permissions:
 
 jobs:
   guard:
-    # Allow the repo owner and Dependabot; close everyone else.
+    # Allow the maintainer (dom-schweyer-tech), the repo owner, and Dependabot; close everyone else.
     if: >
       github.event.pull_request.user.login != github.repository_owner &&
+      github.event.pull_request.user.login != 'dom-schweyer-tech' &&
       github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:

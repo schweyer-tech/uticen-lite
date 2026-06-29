@@ -11,6 +11,7 @@ import-bundle.zip
 .ruff_cache/
 .compound/
 .claude/worktrees/
+.worktrees/
 
 # Subagent-driven-development scratch (briefs, reports, ledger, diffs)
 .superpowers/

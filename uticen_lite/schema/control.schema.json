@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://uticen.dev/schemas/control/1.0",
+  "title": "Uticen Control Definition",
+  "description": "Schema for a single control definition document.",
+  "type": "object",
+  "required": ["id", "title", "objective", "narrative", "sources"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique slug identifier for the control."
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable control title."
+    },
+    "objective": {
+      "type": "string",
+      "description": "What the control is designed to achieve."
+    },
+    "narrative": {
+      "type": "string",
+      "description": "Detailed description of the control procedure."
+    },
+    "framework_refs": {
+      "type": "object",
+      "description": "Optional framework reference tags (e.g. NIST, ISO).",
+      "properties": {
+        "nist": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    },
+    "risk": {
+      "type": ["object", "null"],
+      "description": "Optional risk linked to this control.",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "inherent_rating": { "type": ["string", "null"] }
+      },
+      "required": ["name"]
+    },
+    "sources": {
+      "type": "array",
+      "description": "Data sources bound to this control.",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Source identifier."
+          }
+        }
+      },
+      "minItems": 0
+    },
+    "severity_policy": {
+      "type": "object",
+      "description": "Optional severity escalation rules."
+    },
+    "threshold": {
+      "type": ["object", "null"],
+      "description": "Optional pass/fail tolerance. A control passes when the exception rate is <= failure_threshold_pct AND the count is <= failure_threshold_count (each ignored when null). Both null means zero tolerance.",
+      "properties": {
+        "failure_threshold_pct": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "failure_threshold_count": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "rationale": {
+          "type": ["string", "null"],
+          "description": "Optional author prose justifying the chosen tolerance. Render + store only; never serialized into the export bundle."
+        }
+      },
+      "additionalProperties": false
+    },
+    "test_path": {
+      "type": "string",
+      "description": "Relative path to the test script."
+    }
+  },
+  "additionalProperties": true
+}

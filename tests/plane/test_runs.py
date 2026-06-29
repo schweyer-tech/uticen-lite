@@ -38,6 +38,63 @@ def test_run_then_view(client):
     assert "1" in view.text                  # failed count present
 
 
+def _pct_control(client):
+    """A SoD control with a 50% failure threshold.
+
+    The fixture population is 2 rows with exactly 1 violation (U1), so the run's
+    exception rate is 50% — at the threshold, therefore a PASS. Used to prove the
+    run view derives its verdict from the threshold, not from `failed == 0`.
+    """
+    csv = b"user_id,can_create,can_approve\nU1,true,true\nU2,true,false\n"
+    client.post("/sources", data={"source_id": "users", "format": "csv"},
+                files={"file": ("users.csv", io.BytesIO(csv), "text/csv")},
+                follow_redirects=False)
+    client.post("/controls", data={
+        "id": "sod", "title": "SoD", "objective": "o", "narrative": "n",
+        "source_ids": ["users"],
+        "failure_threshold_pct": "50",
+    }, follow_redirects=False)
+    graph = {"nodes": [
+        {"id": "imp", "type": "import", "source_id": "users"},
+        {"id": "tst", "type": "test", "inputs": ["imp"],
+         "config": {"logic": "all", "severity": "high", "item_key_column": "user_id",
+                    "description_template": "User {user_id}",
+                    "conditions": [
+                        {"column": "can_create", "op": "eq", "value": "true"},
+                        {"column": "can_approve", "op": "eq", "value": "true"},
+                    ]}},
+    ]}
+    client.post("/controls/sod/logic/builder",
+                data={"pipeline_json": json.dumps(graph)},
+                follow_redirects=False)
+
+
+def test_run_view_verdict_respects_threshold(client):
+    """A1/E3: a run within its failure threshold must read 'Operated effectively'
+    on the outer page — the same verdict the embedded workpaper reaches. The outer
+    page must NOT contradict the workpaper by keying off `failed == 0`."""
+    _pct_control(client)
+    resp = client.post("/controls/sod/run", follow_redirects=False)
+    view = client.get(resp.headers["location"])
+    assert view.status_code == 200
+    # 1/2 = 50% exceptions, threshold 50% → passes → effective.
+    assert "Operated effectively" in view.text
+    assert "Operated with deficiencies" not in view.text
+    # the threshold is surfaced so a pass-with-exceptions is self-explanatory.
+    assert "Threshold" in view.text
+
+
+def test_dashboard_badge_respects_threshold(client):
+    """A1 (dashboard): the last-run badge must pass/fail by the control threshold,
+    matching the run view — a within-tolerance run reads 'pass', not 'fail'."""
+    _pct_control(client)
+    client.post("/controls/sod/run", follow_redirects=False)
+    home = client.get("/")
+    # 50% exceptions at a 50% threshold → pass badge, not a red fail badge.
+    assert 'class="badge pass"' in home.text
+    assert 'class="badge fail"' not in home.text
+
+
 def _run_id_of(client):
     resp = client.post("/controls/sod/run", follow_redirects=False)
     return resp.headers["location"].rsplit("/", 1)[-1]

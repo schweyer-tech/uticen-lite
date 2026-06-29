@@ -22,10 +22,10 @@ from pathlib import Path
 import pytest
 import uvicorn
 
-from controlflow_sdk.plane.app import create_app
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.migrations import migrate
+from uticen_lite.plane.app import create_app
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.migrations import migrate
 
 
 def _free_port() -> int:

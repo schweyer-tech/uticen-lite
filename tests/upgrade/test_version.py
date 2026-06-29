@@ -1,4 +1,4 @@
-from controlflow_sdk.upgrade.version import is_newer
+from uticen_lite.upgrade.version import is_newer
 
 
 def test_newer_patch_and_minor():

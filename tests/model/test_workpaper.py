@@ -6,10 +6,10 @@ import pathlib
 
 import pytest
 
-from controlflow_sdk.model.control import ControlDef, FrameworkRefs, Threshold
-from controlflow_sdk.model.run import RunRecord
-from controlflow_sdk.model.violation import Severity, Violation
-from controlflow_sdk.model.workpaper import Procedure, ProcedureSpec, Workpaper
+from uticen_lite.model.control import ControlDef, FrameworkRefs, Threshold
+from uticen_lite.model.run import RunRecord
+from uticen_lite.model.violation import Severity, Violation
+from uticen_lite.model.workpaper import Procedure, ProcedureSpec, Workpaper
 
 GENERATED_AT = "2026-06-16T00:00:00Z"
 TEST_PY_CONTENT = """\
@@ -238,7 +238,8 @@ class TestProcedureDetermination:
         d = proc.to_dict()
         assert "threshold" not in d
         assert "determination" not in d
-        assert set(d.keys()) == {"title", "narrative", "test_code", "result"}
+        # code/assertion are additive (Task 4); threshold/determination remain excluded.
+        assert set(d.keys()) == {"code", "title", "assertion", "narrative", "test_code", "result"}
 
 
 class TestWorkpaperRollUp:

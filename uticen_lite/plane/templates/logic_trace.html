@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — Trace: {{ control.title if control else control_id }}{% endblock %}
+{% block head %}
+<style>
+  .trace-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0 4px; }
+  .trace-form input[type=text] {
+    font-size: 14px; padding: 6px 10px; min-width: 260px;
+    background: var(--bg-input); color: var(--text-primary);
+    border: 1px solid var(--border-default); border-radius: var(--radius-input);
+  }
+  .trace-examples { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 12px; align-items: center; }
+  .trace-examples .muted { font-size: 12px; }
+  .trace-chip {
+    font-family: var(--font-mono); font-size: 12px; padding: 2px 8px;
+    border: 1px solid var(--border-default); border-radius: var(--radius-badge);
+    background: var(--bg-surface-1); color: var(--text-secondary); text-decoration: none;
+  }
+  .trace-chip:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+  .trace-steps { display: flex; flex-direction: column; gap: 0; margin: 12px 0; }
+  .trace-step {
+    display: flex; align-items: baseline; gap: 10px; padding: 8px 12px;
+    border: 1px solid var(--border-default); border-bottom: none; background: var(--bg-surface-1);
+  }
+  .trace-step:last-child { border-bottom: 1px solid var(--border-default); }
+  .trace-badge {
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
+    padding: 2px 8px; border-radius: var(--radius-badge); white-space: nowrap;
+  }
+  .tb-present { background: var(--status-success-muted); color: var(--status-success); }
+  .tb-dropped { background: var(--status-critical-muted); color: var(--status-critical); }
+  .tb-absent  { background: var(--bg-surface-3); color: var(--text-tertiary); }
+  .tb-indeterminate { background: var(--status-warning-muted); color: var(--status-warning); }
+  .trace-step-label { font-weight: 600; }
+  .trace-step-reason { color: var(--text-secondary); font-size: 13px; }
+  .trace-verdict {
+    margin: 16px 0 6px; padding: 12px 14px; border-radius: var(--radius-card);
+    border: 1px solid var(--border-default); background: var(--bg-surface-1);
+  }
+  .trace-verdict.flagged { border-color: var(--status-critical); }
+  .trace-verdict.passed  { border-color: var(--status-success); }
+  .trace-cond-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  .trace-cond-table th, .trace-cond-table td {
+    text-align: left; padding: 5px 8px; font-size: 13px;
+    border-bottom: 1px solid var(--border-default);
+  }
+  .cond-pass { color: var(--status-success); font-weight: 600; }
+  .cond-fail { color: var(--text-tertiary); }
+  .cond-na   { color: var(--status-warning); }
+</style>
+{% endblock %}
+{% block body %}
+{% if control %}
+{% set active = 'logic' %}{% include "partials/_control_header.html" %}
+{% else %}
+<a class="crumb" href="/controls/{{ control_id }}">← {{ control_id }}</a>
+<div class="page-head"><h1>Logic</h1><p class="muted mono">{{ control_id }}</p></div>
+{% endif %}
+{% include "partials/_logic_tabs.html" %}
+
+<p class="lead">Follow one record through the control's steps to see exactly where it
+  is flagged — or why it passes. Type or paste a key value
+  {% if trace and trace.key_column %}from the <strong>{{ trace.key_column }}</strong> column{% endif %}.</p>
+
+<form class="trace-form" method="get" action="/controls/{{ control_id }}/logic/trace">
+  <input type="text" name="key" value="{{ key }}" placeholder="Item key to trace"
+         aria-label="Item key to trace" autofocus>
+  <button class="btn btn-primary" type="submit">Trace</button>
+</form>
+{% if examples %}
+<div class="trace-examples">
+  <span class="muted">Try:</span>
+  {% for ex in examples %}
+  <a class="trace-chip" href="/controls/{{ control_id }}/logic/trace?key={{ ex | urlencode }}">{{ ex }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if message %}
+<div class="callout callout-warn">{{ message }}</div>
+{% endif %}
+{% if trace and trace.message %}
+<div class="callout callout-warn">{{ trace.message }}</div>
+{% endif %}
+
+{% if trace and not trace.message %}
+  {% if trace.shared_count > 1 %}
+  <div class="callout">{{ trace.shared_count }} records share this key; tracing the first.</div>
+  {% endif %}
+
+  <h2>Walk</h2>
+  <div class="trace-steps">
+    {% for s in trace.steps %}
+    <div class="trace-step">
+      <span class="trace-badge tb-{{ s.status }}">{{ s.status }}</span>
+      <span class="trace-step-label">{{ s.label }}</span>
+      {% if s.reason %}<span class="trace-step-reason">{{ s.reason }}</span>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {% for t in trace.tests %}
+  {% if t.reached == false %}{% set vclass = '' %}
+  {% elif t.flagged is none %}{% set vclass = '' %}
+  {% elif t.flagged %}{% set vclass = 'flagged' %}
+  {% else %}{% set vclass = 'passed' %}{% endif %}
+  <div class="trace-verdict {{ vclass }}">
+    <strong>{{ t.label }}:</strong>
+    {% if t.reached == false %}
+      <span class="muted">Did not reach this Test.</span>
+    {% elif t.flagged is none %}
+      <span class="muted">{{ t.note or "Verdict unavailable." }}</span>
+    {% elif t.flagged %}
+      Flagged as an exception.
+    {% else %}
+      Passed — not flagged.
+    {% endif %}
+    {% if t.note and t.flagged is not none and t.reached != false %}
+    <p class="muted" style="margin:6px 0 0;">{{ t.note }}</p>
+    {% endif %}
+    {% if t.conditions %}
+    <table class="trace-cond-table">
+      <thead><tr><th>Condition</th><th>Actual value</th><th>Result</th></tr></thead>
+      <tbody>
+        {% for c in t.conditions %}
+        <tr>
+          <td class="mono">{{ c.column }} {{ c.op }}{% if c.value is not none %} {{ c.value }}{% endif %}</td>
+          <td class="mono">{{ c.actual }}</td>
+          <td>
+            {% if c.passed is none %}<span class="cond-na">— {{ c.note }}</span>
+            {% elif c.passed %}<span class="cond-pass">✓ matched{% if c.note %} ({{ c.note }}){% endif %}</span>
+            {% else %}<span class="cond-fail">✗ no match{% if c.note %} ({{ c.note }}){% endif %}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+  {% endfor %}
+{% endif %}
+{% endblock %}

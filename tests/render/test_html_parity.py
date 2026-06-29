@@ -17,11 +17,11 @@ import re
 
 import pytest
 
-from controlflow_sdk.model.control import Threshold
-from controlflow_sdk.model.run import RunRecord, SourceProvenance
-from controlflow_sdk.model.violation import Severity, Violation
-from controlflow_sdk.model.workpaper import DataSample, Procedure, Workpaper
-from controlflow_sdk.render import render_html
+from uticen_lite.model.control import Threshold
+from uticen_lite.model.run import RunRecord, SourceProvenance
+from uticen_lite.model.violation import Severity, Violation
+from uticen_lite.model.workpaper import DataSample, Procedure, Workpaper
+from uticen_lite.render import render_html
 
 # Canonical 7-section order (Sign-off and Evaluation both omitted).
 EXPECTED_SECTION_IDS = [

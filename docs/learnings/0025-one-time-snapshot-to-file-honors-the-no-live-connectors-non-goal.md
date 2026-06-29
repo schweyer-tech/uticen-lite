@@ -35,8 +35,8 @@ reinterpretation approved before building, rather than silently shipping a conne
 
 ## Reference
 - `STRATEGY.md` §Scope/non-goals ("Not live connectors")
-- `controlflow_sdk/plane/fetch.py` (`fetch_snapshot` — one GET, injectable opener, no scheduler)
-- `controlflow_sdk/plane/routes/sources.py` (`create_source_from_url`, `refetch_source` → existing refresh-confirm flow)
+- `uticen_lite/plane/fetch.py` (`fetch_snapshot` — one GET, injectable opener, no scheduler)
+- `uticen_lite/plane/routes/sources.py` (`create_source_from_url`, `refetch_source` → existing refresh-confirm flow)
 - `docs/superpowers/specs/2026-06-22-multi-format-sources-design.md` (§2 the reinterpretation)
 - Egress discipline: [[0017]]
 </content>

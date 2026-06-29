@@ -54,7 +54,7 @@ Both halves converge on the **existing** create-source / file-version flow in
 
 ### Seam 1 — `extract_table` (format-aware funnel)
 
-New module `controlflow_sdk/plane/ingest.py`:
+New module `uticen_lite/plane/ingest.py`:
 
 ```python
 def extract_table(raw: bytes, fmt: str, *, sheet: str | int | None = None) -> ExtractedTable
@@ -67,18 +67,18 @@ xlsx — the available sheet names.
 
 - **CSV** → stdlib (`csv` module), exactly as today. **No new dependency** for the CSV path, so a
   minimal `[plane]` install keeps working.
-- **xlsx / parquet** → lazy-import a new `controlflow_sdk/adapters/inspect.py` that owns the
+- **xlsx / parquet** → lazy-import a new `uticen_lite/adapters/inspect.py` that owns the
   pandas-touching reads (`read_dataframe(raw, fmt, sheet) -> pd.DataFrame`, `sheet_names(raw) ->
   list[str]`). **pandas stays strictly in `adapters/`** per the `STRATEGY.md` constraint
   (Pyodide-safe core). The DataFrame is read as all-strings where possible and converted to
   header+rows by `ingest.py`.
 - **`[adapters]` absent** → raise a typed `AdaptersUnavailable` that the routes catch and render as a
-  friendly "Excel/Parquet support needs `pip install controlflow-sdk[adapters]`" message on the
+  friendly "Excel/Parquet support needs `pip install uticen-lite[adapters]`" message on the
   upload page — never a 500.
 
 ### Seam 2 — `fetch_snapshot` (one-time URL fetch)
 
-New module `controlflow_sdk/plane/fetch.py`:
+New module `uticen_lite/plane/fetch.py`:
 
 ```python
 def fetch_snapshot(
@@ -179,14 +179,14 @@ the risk surfaced loudly.
 
 | File | Change |
 | --- | --- |
-| `controlflow_sdk/plane/ingest.py` | **New.** `extract_table` + `ExtractedTable` + `AdaptersUnavailable`. CSV stdlib; xlsx/parquet via lazy `adapters.inspect`. |
-| `controlflow_sdk/adapters/inspect.py` | **New.** `read_dataframe(raw, fmt, sheet)`, `sheet_names(raw)` — the only pandas in this feature. |
-| `controlflow_sdk/plane/fetch.py` | **New.** `fetch_snapshot` + `FetchedSnapshot` + `FetchError`; injectable `opener`; JSON→CSV (stdlib). |
-| `controlflow_sdk/plane/routes/sources.py` | Replace the 4 CSV-hardcoded helpers with `extract_table`; add URL-create + re-fetch routes; infer format from extension; render `[adapters]`/fetch errors; sheet dropdown wiring. |
-| `controlflow_sdk/store/migrations.py` | **Step 6:** `ALTER TABLE sources ADD COLUMN sheet TEXT` + `CREATE TABLE source_fetch (...)`. |
-| `controlflow_sdk/store/repo.py` | `upsert_source(..., sheet=None)`; `source_fetch` CRUD helpers (`upsert_source_fetch`, `get_source_fetch`). Fetch provenance lives per-source in `source_fetch` (single URL per source), not per file-version. |
-| `controlflow_sdk/store/loader.py`, `store/import_service.py` | Thread `sheet` into `SourceBinding.config` when present. |
-| `controlflow_sdk/plane/templates/source_new.html` (+ `source_data.html`, `source_history.html`, `source_refresh.html`) | Upload/URL mode toggle, sheet dropdown, re-fetch button, secrets warning callout, non-CSV preview. |
+| `uticen_lite/plane/ingest.py` | **New.** `extract_table` + `ExtractedTable` + `AdaptersUnavailable`. CSV stdlib; xlsx/parquet via lazy `adapters.inspect`. |
+| `uticen_lite/adapters/inspect.py` | **New.** `read_dataframe(raw, fmt, sheet)`, `sheet_names(raw)` — the only pandas in this feature. |
+| `uticen_lite/plane/fetch.py` | **New.** `fetch_snapshot` + `FetchedSnapshot` + `FetchError`; injectable `opener`; JSON→CSV (stdlib). |
+| `uticen_lite/plane/routes/sources.py` | Replace the 4 CSV-hardcoded helpers with `extract_table`; add URL-create + re-fetch routes; infer format from extension; render `[adapters]`/fetch errors; sheet dropdown wiring. |
+| `uticen_lite/store/migrations.py` | **Step 6:** `ALTER TABLE sources ADD COLUMN sheet TEXT` + `CREATE TABLE source_fetch (...)`. |
+| `uticen_lite/store/repo.py` | `upsert_source(..., sheet=None)`; `source_fetch` CRUD helpers (`upsert_source_fetch`, `get_source_fetch`). Fetch provenance lives per-source in `source_fetch` (single URL per source), not per file-version. |
+| `uticen_lite/store/loader.py`, `store/import_service.py` | Thread `sheet` into `SourceBinding.config` when present. |
+| `uticen_lite/plane/templates/source_new.html` (+ `source_data.html`, `source_history.html`, `source_refresh.html`) | Upload/URL mode toggle, sheet dropdown, re-fetch button, secrets warning callout, non-CSV preview. |
 | `PRODUCT-MAP.md` | Update the Source-manager / Source-editor rows to name Excel/Parquet + URL snapshot. |
 
 ## 9. Testing
@@ -208,7 +208,7 @@ the risk surfaced loudly.
   [0012](../../learnings/0012-rerun-e2e-browser-smoke-on-htmx-swap-changes.md)) — the add-source form
   restructures in place (mode toggle + conditional sheet dropdown); extend `tests/e2e` to cover the
   assembled DOM rather than trusting isolated partials.
-- **Gates** — `pytest -q` (pristine, no warnings), `ruff check`, `mypy controlflow_sdk` all green;
+- **Gates** — `pytest -q` (pristine, no warnings), `ruff check`, `mypy uticen_lite` all green;
   the **contract gate stays green and unchanged**.
 
 ## 10. Non-goals (v1)
