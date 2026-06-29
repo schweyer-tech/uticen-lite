@@ -48,8 +48,8 @@ names the legitimate path (here: "pull data in with an Import node, or convert t
 
 ## Reference
 
-- `controlflow_sdk/pipeline/lint.py` (`_DenyScanner`, `lint_custom_code`, `lint_pipeline`).
-- `controlflow_sdk/pipeline/compile.py` (module-level `_node_<id>` emission = lexical starvation).
-- `controlflow_sdk/store/export_service.py` (hard export gate; raises `LintError`).
+- `uticen_lite/pipeline/lint.py` (`_DenyScanner`, `lint_custom_code`, `lint_pipeline`).
+- `uticen_lite/pipeline/compile.py` (module-level `_node_<id>` emission = lexical starvation).
+- `uticen_lite/store/export_service.py` (hard export gate; raises `LintError`).
 - `tests/pipeline/test_lint.py`, `tests/store/test_export_gate.py`.
 - The trust boundary it complements: [[0001]].

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 
-from controlflow_sdk.plane import fetch
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
+from uticen_lite.plane import fetch
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
 
 
 def _fake_opener(payload):
@@ -12,6 +12,29 @@ def _fake_opener(payload):
     def opener(req):
         return body, "application/json"
     return opener
+
+
+def test_from_url_page_keeps_global_nav_and_chip(client):
+    """B1: the Fetch-from-URL tab must carry the same global header as every other
+    page — nav links + the engagement chip — not a stripped header."""
+    page = client.get("/sources/from-url")
+    assert page.status_code == 200
+    # the engagement chip (project name) and the top nav are present
+    assert "Acme" in page.text
+    assert 'href="/sources"' in page.text and 'href="/export"' in page.text
+    # and the <title> keeps its engagement prefix, not a dangling "— Add source"
+    assert "Acme — Add source" in page.text
+
+
+def test_from_url_error_keeps_global_nav(client):
+    """The header must also survive a validation error on the URL tab (B1)."""
+    resp = client.post("/sources/from-url", data={
+        "source_id": "api", "url": "not-a-url", "headers": "{bad json",
+        "record_path": "", "as_of_date": "",
+    }, follow_redirects=False)
+    assert resp.status_code == 200  # re-renders the form with an error
+    assert "Acme" in resp.text
+    assert 'href="/sources"' in resp.text
 
 
 def test_create_from_url_snapshots_and_stores_fetch(client):

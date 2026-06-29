@@ -15,17 +15,17 @@ from pathlib import Path
 
 import pandas as pd
 
-from controlflow_sdk.adapters.files import source_for
-from controlflow_sdk.model.population import ColumnMeta, Population
-from controlflow_sdk.pipeline.compile import (
+from uticen_lite.adapters.files import source_for
+from uticen_lite.model.population import ColumnMeta, Population
+from uticen_lite.pipeline.compile import (
     CompileResult,
     compile_pipeline,
     compile_pipeline_procedures,
 )
-from controlflow_sdk.pipeline.model import parse_pipeline
-from controlflow_sdk.project.loader import load_sources
-from controlflow_sdk.rules.evaluate import evaluate_rule
-from controlflow_sdk.rules.spec import parse_rule_spec
+from uticen_lite.pipeline.model import parse_pipeline
+from uticen_lite.project.loader import load_sources
+from uticen_lite.rules.evaluate import evaluate_rule
+from uticen_lite.rules.spec import parse_rule_spec
 
 _EXAMPLE = Path(__file__).resolve().parents[2] / "examples" / "northwind-trading"
 
@@ -485,3 +485,60 @@ def test_union_test_code_runs_both_branches_and_concatenates(tmp_path):
     out = ns["test"](pop, {"inv": pop})
     keys = sorted(v["item_key"] for v in out)
     assert keys == ["1", "2"]  # both branches' violations, trunk computed once
+
+
+# ---------------------------------------------------------------------------
+# Regression: blank condition placeholder from "+ Add condition" must not 500
+# ---------------------------------------------------------------------------
+
+def test_compile_tolerates_blank_condition_in_filter_node():
+    """Blank placeholder row (column='') in a Filter node must be stripped at
+    compile time, not raise RuleSpecError and 500 the save route.
+
+    Reproduces the bug: _emit_terminal_rule called parse_rule_spec on the RAW
+    (unfiltered) conditions dict even though _conditions() had already filtered
+    them.  The plain ``{column:'', op:'eq', value:''}`` placeholder raised
+    ``RuleSpecError: each condition needs a column``, propagating as an uncaught
+    500 from the save handler.
+    """
+    # Non-pure pipeline (two Import nodes) so _emit_python is taken.
+    graph = {"nodes": [
+        {"id": "imp1", "type": "import", "source_id": "accounts",
+         "inputs": [], "config": {}},
+        {"id": "imp2", "type": "import", "source_id": "employees",
+         "inputs": [], "config": {}},
+        {"id": "join", "type": "join", "inputs": ["imp1", "imp2"],
+         "config": {"mode": "inner", "left_key": "emp_id", "right_key": "emp_id"}},
+        {"id": "tst", "type": "test", "inputs": ["join"],
+         "config": {"logic": "all",
+                    "conditions": [
+                        {"column": "status", "op": "eq", "value": "ok"},  # valid
+                        {"column": "", "op": "eq", "value": ""},           # blank placeholder
+                    ]}},
+    ]}
+    parsed = parse_pipeline(graph)
+    result = compile_pipeline(parsed)
+    # Must not raise — blank condition silently dropped, valid one retained.
+    assert result.test_kind == "python"
+    assert "status" in result.test_code
+
+
+def test_compile_tolerates_blank_condition_in_test_node_pure():
+    """Same guard on the pure (rule_spec) path: blank placeholder in a Test node
+    must be dropped by _usable_conditions in _build_flat_spec."""
+    graph = {"nodes": [
+        {"id": "imp", "type": "import", "source_id": "accounts",
+         "inputs": [], "config": {}},
+        {"id": "tst", "type": "test", "inputs": ["imp"],
+         "config": {"logic": "all",
+                    "conditions": [
+                        {"column": "is_active", "op": "eq", "value": True},
+                        {"column": "", "op": "eq", "value": ""},  # blank placeholder
+                    ]}},
+    ]}
+    parsed = parse_pipeline(graph)
+    result = compile_pipeline(parsed)
+    assert result.test_kind == "rule"
+    # Blank condition stripped; only the valid one in the spec.
+    assert len(result.rule_spec["conditions"]) == 1
+    assert result.rule_spec["conditions"][0]["column"] == "is_active"

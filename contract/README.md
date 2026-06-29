@@ -1,15 +1,15 @@
 # contract/
 
-This directory contains the exported ControlFlow SDK schema contract.
+This directory contains the exported Uticen SDK schema contract.
 
 ## What is this?
 
 `bundle.schema.json` is a verbatim copy of the canonical JSON Schema shipped
-inside the `controlflow_sdk` Python package at:
+inside the `uticen_lite` Python package at:
 
-    controlflow_sdk/schema/bundle.schema.json
+    uticen_lite/schema/bundle.schema.json
 
-It is committed here so that the ControlFlow app can **vendor** it without
+It is committed here so that the Uticen app can **vendor** it without
 depending on the SDK package at build time.
 
 ## Current version
@@ -18,10 +18,10 @@ Schema version: **1.0**
 
 ## How the app pins it
 
-The ControlFlow app should:
+The Uticen app should:
 
 1. Copy `contract/bundle.schema.json` into its own source tree (e.g.
-   `src/lib/controlflow-sdk/bundle.schema.json`).
+   `src/lib/uticen-lite/bundle.schema.json`).
 2. Record the SDK git SHA or release tag it was copied from in a comment or
    a companion `vendor.json` file.
 3. Re-vendor whenever the SDK ships a new schema version and update the

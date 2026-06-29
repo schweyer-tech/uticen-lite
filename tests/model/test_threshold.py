@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import pytest
 
-from controlflow_sdk.model.control import Threshold
-from controlflow_sdk.model.workpaper import Determination
+from uticen_lite.model.control import Threshold
+from uticen_lite.model.workpaper import Determination
 
 
 class TestThresholdParse:
@@ -51,7 +51,22 @@ class TestThresholdParse:
 
     def test_to_dict_roundtrips(self) -> None:
         t = Threshold(failure_threshold_pct=5.0, failure_threshold_count=1)
-        assert t.to_dict() == {"failure_threshold_pct": 5.0, "failure_threshold_count": 1}
+        assert t.to_dict() == {
+            "failure_threshold_pct": 5.0,
+            "failure_threshold_count": 1,
+            "rationale": None,
+        }
+
+    def test_rationale_parsed_and_serialized(self) -> None:
+        t = Threshold.from_raw(
+            {"failure_threshold_count": 2, "rationale": "  3% is immaterial here  "}
+        )
+        assert t.rationale == "3% is immaterial here"  # trimmed
+        assert t.to_dict()["rationale"] == "3% is immaterial here"
+
+    def test_blank_rationale_normalizes_to_none(self) -> None:
+        assert Threshold.from_raw({"rationale": "   "}).rationale is None
+        assert Threshold.from_raw({"failure_threshold_pct": 5}).rationale is None
 
 
 class TestThresholdPasses:

@@ -33,10 +33,10 @@ from collections.abc import Iterator
 import pytest
 import uvicorn
 
-from controlflow_sdk.plane.app import create_app
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.migrations import migrate
+from uticen_lite.plane.app import create_app
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.migrations import migrate
 
 
 def _free_port() -> int:
@@ -88,7 +88,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Page, expect
 
-from controlflow_sdk.schema.validate import validate_bundle
+from uticen_lite.schema.validate import validate_bundle
 
 CSV = b"user_id,can_create,can_approve\nU1,true,true\nU2,true,false\n"
 
@@ -200,10 +200,10 @@ def test_author_run_export_smoke(page: Page, live_server: str, tmp_path: Path) -
         with:
           filters: |
             plane:
-              - 'controlflow_sdk/plane/**'
+              - 'uticen_lite/plane/**'
               - 'contract/**'
-              - 'controlflow_sdk/bundle/**'
-              - 'controlflow_sdk/schema/**'
+              - 'uticen_lite/bundle/**'
+              - 'uticen_lite/schema/**'
               - 'tests/e2e/**'
               - 'pyproject.toml'
               - '.github/workflows/ci.yml'
@@ -247,7 +247,7 @@ TDD targets (the deliverable IS a test, so "tests" here means: write the failing
 - **New file `tests/e2e/conftest.py`** — `engagement`, `live_server` fixtures (above). Pattern-matches `tests/plane/conftest.py` for engagement setup.
 - **Existing fast suite must stay green and pristine:** after the pyproject change, run `pytest -q` and confirm `tests/e2e/` is NOT collected (no `pytest-playwright` import error, no browser launch, no new warnings). Confirm the `browser` marker does not emit `PytestUnknownMarkWarning` anywhere.
 - **Reuse of existing fixtures/patterns:** the CSV payload and rule-control form fields are lifted from `tests/plane/test_runs.py` / `tests/plane/test_export.py` to guarantee a known full-population result; the bundle-zip-read + `manifest["schema_version"]` assertions mirror `tests/plane/test_export.py::test_export_returns_valid_bundle`, upgraded to call `validate_bundle` directly.
-- **Local verification before merge:** `pip install -e ".[plane,e2e]" && python -m playwright install chromium && pytest tests/e2e -m browser` must pass locally; `python -m ruff check .` and `python -m mypy controlflow_sdk` stay green (the new test files live under `tests/`, which mypy does not scan — `mypy controlflow_sdk` is unaffected; still run ruff on the new files).
+- **Local verification before merge:** `pip install -e ".[plane,e2e]" && python -m playwright install chromium && pytest tests/e2e -m browser` must pass locally; `python -m ruff check .` and `python -m mypy uticen_lite` stay green (the new test files live under `tests/`, which mypy does not scan — `mypy uticen_lite` is unaffected; still run ruff on the new files).
 - **New fixtures:** none beyond `engagement`/`live_server`; the CSV is an inline constant.
 
 ## Non-goals / out of scope

@@ -1,0 +1,57 @@
+{# Bound data sources for an existing control: chips + a searchable picker.
+   Click the ▾ arrow (or focus the field) to see every source, then type to
+   narrow. Add/remove POST to /controls/{id}/sources and swap this fragment in
+   place (no full reload → scroll preserved). 2026-06-28 review. #}
+<div id="bound-sources" class="bound-sources">
+  {% set bound = control.source_ids %}
+  <div class="source-chips">
+    {% for source in sources if source.id in bound %}
+    <span class="source-chip">
+      <span class="src-name">{{ source.title or source.id }}</span>
+      {% if source.title %}<span class="mono muted">{{ source.id }}</span>{% endif %}
+      <a class="chip-view" href="/sources/{{ source.id }}" target="_blank"
+         rel="noopener" title="View source">↗</a>
+      <button type="button" class="chip-remove"
+              aria-label="Remove {{ source.title or source.id }}"
+              hx-post="/controls/{{ control.id }}/sources"
+              hx-vals='{"action": "remove", "source_id": "{{ source.id }}"}'
+              hx-target="#bound-sources" hx-swap="outerHTML">×</button>
+    </span>
+    {% else %}
+    <span class="muted">No data sources bound yet.</span>
+    {% endfor %}
+  </div>
+  {% set unbound = sources | rejectattr('id', 'in', bound) | list %}
+  {% if unbound %}
+  <div class="source-combobox">
+    <input type="text" class="source-search" placeholder="Search or pick a data source…"
+           role="combobox" aria-autocomplete="list" aria-expanded="false"
+           aria-controls="source-results-list"
+           aria-label="Search data sources to add" autocomplete="off"
+           oninput="filterSourceOptions(this)" onfocus="filterSourceOptions(this)"
+           onblur="closeSourceResults(this)">
+    <button type="button" class="source-combobox-toggle" tabindex="-1"
+            aria-label="Show all data sources"
+            onmousedown="event.preventDefault()"
+            onclick="toggleSourceResults(this)">▾</button>
+    <ul class="source-results" id="source-results-list" hidden>
+      {% for source in unbound %}
+      <li class="source-option-row"
+          data-label="{{ ((source.title or '') ~ ' ' ~ source.id) | lower }}"
+          style="display: none;">
+        <button type="button" class="source-option"
+                hx-post="/controls/{{ control.id }}/sources"
+                hx-vals='{"action": "add", "source_id": "{{ source.id }}"}'
+                hx-target="#bound-sources" hx-swap="outerHTML">
+          <span class="src-name">{{ source.title or source.id }}</span>
+          {% if source.title %}<span class="mono muted">{{ source.id }}</span>{% endif %}
+        </button>
+      </li>
+      {% endfor %}
+      <li class="muted source-no-match" style="display: none;">No matching sources.</li>
+    </ul>
+  </div>
+  {% else %}
+  <p class="muted source-all-bound">All available sources are bound.</p>
+  {% endif %}
+</div>

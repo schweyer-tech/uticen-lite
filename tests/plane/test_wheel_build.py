@@ -45,26 +45,26 @@ def _names(whl: Path) -> list[str]:
 def test_wheel_ships_web_assets(built_wheel: Path) -> None:
     names = _names(built_wheel)
     for asset in (
-        "controlflow_sdk/plane/static/app.css",
-        "controlflow_sdk/plane/static/htmx.min.js",
-        "controlflow_sdk/plane/templates/base.html",
-        "controlflow_sdk/plane/templates/setup.html",
-        "controlflow_sdk/plane/templates/partials/rule_builder.html",
+        "uticen_lite/plane/static/app.css",
+        "uticen_lite/plane/static/htmx.min.js",
+        "uticen_lite/plane/templates/base.html",
+        "uticen_lite/plane/templates/setup.html",
+        "uticen_lite/plane/templates/partials/rule_builder.html",
     ):
         assert asset in names
 
 
 def test_wheel_ships_bundled_demo(built_wheel: Path) -> None:
     names = _names(built_wheel)
-    demo = "controlflow_sdk/_demo/northwind-trading/"
+    demo = "uticen_lite/_demo/northwind-trading/"
     csvs = [n for n in names if n.startswith(demo + "data/") and n.endswith(".csv")]
     ctrls = [
         n
         for n in names
         if n.startswith(demo + "controls/") and n.endswith("control.yaml")
     ]
-    assert len(csvs) == 8
-    assert len(ctrls) == 8
+    assert len(csvs) == 9
+    assert len(ctrls) == 9
     assert demo + "cflow.yaml" in names
     assert demo + "sources.yaml" in names
 
@@ -111,7 +111,7 @@ def test_clean_venv_install_resolves_packaged_demo(
         [
             str(py),
             "-c",
-            "from controlflow_sdk.store.import_service import demo_source_dir;"
+            "from uticen_lite.store.import_service import demo_source_dir;"
             "p=str(demo_source_dir());"
             "assert '_demo' in p, p;"
             "print(p)",

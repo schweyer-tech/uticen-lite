@@ -1,7 +1,7 @@
 import io
 
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
 
 
 def _make_source(client, sid="users"):
@@ -70,6 +70,111 @@ def test_edit_control_shows_values(client):
     page = client.get("/controls/py2")
     assert page.status_code == 200
     assert "Editable" in page.text
+
+
+def test_edit_control_shows_id_in_details_box(client):
+    # 2026-06-27 review: the control ID is a plain editable field in the
+    # Definition "Details" box — like any other field, no separate Edit
+    # button or rename form. Saving the form renames the control.
+    _make_source(client)
+    client.post("/controls", data={
+        "id": "HDRID1", "title": "Header ID", "objective": "o", "narrative": "n",
+        "source_ids": ["users"]}, follow_redirects=False)
+
+    page = client.get("/controls/HDRID1")
+    assert page.status_code == 200
+    assert 'class="control-id-banner"' not in page.text   # gone from the header
+    # A normal editable field inside the metadata form, valued at the current id.
+    assert 'id="f-id"' in page.text
+    assert 'name="id"' in page.text
+    assert 'value="HDRID1"' in page.text
+    # The standalone rename mechanism is gone: no separate Edit button/form.
+    assert 'class="control-id-row"' not in page.text
+    assert 'id="id-rename-form"' not in page.text
+    assert 'name="new_id"' not in page.text
+    assert 'action="/controls/HDRID1/id"' not in page.text
+
+
+def test_edit_control_renames_via_main_save(client):
+    # Editing the Control ID field and saving the Definition form renames the
+    # control everywhere (sources, runs) — the same path as any field edit.
+    _make_source(client)
+    client.post("/controls", data={
+        "id": "CIDOLD1", "title": "Rename me", "objective": "o", "narrative": "n",
+        "source_ids": ["users"]}, follow_redirects=False)
+
+    resp = client.post("/controls/CIDOLD1", data={
+        "id": "CIDNEW1", "title": "Rename me", "objective": "o", "narrative": "n",
+        "source_ids": ["users"]}, follow_redirects=False)
+    assert resp.status_code in (302, 303)
+    assert resp.headers["location"] == "/controls/CIDNEW1"
+    assert _get_control(client, "CIDOLD1") is None
+    renamed = _get_control(client, "CIDNEW1")
+    assert renamed is not None
+    assert renamed["title"] == "Rename me"
+    assert renamed["source_ids"] == ["users"]
+
+
+def test_edit_control_rename_to_existing_id_is_friendly_not_500(client):
+    # Renaming onto an id that already exists must surface a friendly error,
+    # never a 500 from the rename's ValueError.
+    _make_source(client)
+    for cid in ("CIDA1", "CIDB1"):
+        client.post("/controls", data={
+            "id": cid, "title": cid, "objective": "o", "narrative": "n",
+            "source_ids": ["users"]}, follow_redirects=False)
+    resp = client.post("/controls/CIDA1", data={
+        "id": "CIDB1", "title": "CIDA1", "objective": "o", "narrative": "n",
+        "source_ids": ["users"]}, follow_redirects=False)
+    assert resp.status_code != 500, resp.text
+    assert "already exists" in resp.text
+    # both originals still exist (the clashing rename was refused)
+    assert _get_control(client, "CIDA1") is not None
+    assert _get_control(client, "CIDB1") is not None
+
+
+def test_edit_control_moves_title_editing_to_header(client):
+    _make_source(client)
+    client.post("/controls", data={
+        "id": "HDRTITLE1", "title": "Header title", "objective": "o", "narrative": "n",
+        "source_ids": ["users"]}, follow_redirects=False)
+
+    page = client.get("/controls/HDRTITLE1")
+    assert page.status_code == 200
+    assert 'class="control-title-edit"' in page.text
+    assert 'action="/controls/HDRTITLE1/title"' in page.text
+    assert 'class="control-title-display"' in page.text
+    assert 'class="control-title-pencil"' in page.text
+    assert 'id="f-title"' not in page.text
+
+
+def test_edit_control_header_title_editor_updates_title(client):
+    _make_source(client)
+    client.post("/controls", data={
+        "id": "TITLEEDIT1", "title": "Old title", "objective": "o", "narrative": "n",
+        "source_ids": ["users"]}, follow_redirects=False)
+
+    resp = client.post(
+        "/controls/TITLEEDIT1/title",
+        data={"title": "New title from header"},
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303)
+    assert resp.headers["location"] == "/controls/TITLEEDIT1"
+    updated = _get_control(client, "TITLEEDIT1")
+    assert updated["title"] == "New title from header"
+
+
+def test_edit_control_header_splits_title_and_run(client):
+    # 2026-06-27 review: the Run button sits to the right of the title (a split
+    # header), not crowding it.
+    _make_source(client)
+    client.post("/controls", data={
+        "id": "HDRLAYOUT1", "title": "Layout", "objective": "o", "narrative": "n",
+        "source_ids": ["users"]}, follow_redirects=False)
+    page = client.get("/controls/HDRLAYOUT1").text
+    assert "control-head" in page                       # flex split header
+    assert 'action="/controls/HDRLAYOUT1/run"' in page   # Run lives in that header
 
 
 def test_source_picker_shows_title_and_view_link(client):
@@ -216,3 +321,121 @@ def test_definition_save_preserves_logic_required_sources(client):
     assert "f2_employees" in after["source_ids"], (
         "source f2_employees was dropped even though the pipeline still needs it"
     )
+
+
+def test_definition_add_source_auto_adds_import_node(client):
+    import json
+
+    _make_source(client, "def_a")
+    _make_source(client, "def_b")
+    cid = "DEFSYNC1"
+    client.post("/controls", data={
+        "id": cid, "title": "Definition sync", "objective": "o", "narrative": "n",
+        "source_ids": ["def_a"],
+    }, follow_redirects=False)
+    graph = {
+        "nodes": [
+            {"id": "imp_a", "type": "import", "source_id": "def_a", "narrative": ""},
+            {"id": "tst", "type": "test", "inputs": ["imp_a"], "narrative": "",
+             "config": {"logic": "all", "severity": "medium", "conditions": []}},
+        ]
+    }
+    client.post(f"/controls/{cid}/logic/builder",
+                data={"pipeline_json": json.dumps(graph)},
+                follow_redirects=False)
+
+    client.post(f"/controls/{cid}", data={
+        "id": cid, "title": "Definition sync", "objective": "o", "narrative": "n",
+        "framework_nist": "",
+        "source_ids": ["def_a", "def_b"],
+    }, follow_redirects=False)
+
+    updated = _get_control(client, cid)
+    nodes = (updated.get("pipeline") or {}).get("nodes", [])
+    import_sources = [n.get("source_id") for n in nodes if n.get("type") == "import"]
+    assert "def_b" in import_sources
+    assert [n.get("type") for n in nodes[:2]] == ["import", "import"]
+
+
+def test_definition_remove_source_unimports_and_cleans_inputs(client):
+    import json
+
+    _make_source(client, "drop_a")
+    _make_source(client, "drop_b")
+    cid = "DEFSYNC2"
+    client.post("/controls", data={
+        "id": cid, "title": "Definition sync", "objective": "o", "narrative": "n",
+        "source_ids": ["drop_a", "drop_b"],
+    }, follow_redirects=False)
+    graph = {
+        "nodes": [
+            {"id": "imp_a", "type": "import", "source_id": "drop_a", "narrative": ""},
+            {"id": "imp_b", "type": "import", "source_id": "drop_b", "narrative": ""},
+            {"id": "tst", "type": "test", "inputs": ["imp_a", "imp_b"], "narrative": "",
+             "config": {"logic": "all", "severity": "medium", "conditions": []}},
+        ]
+    }
+    client.post(f"/controls/{cid}/logic/builder",
+                data={"pipeline_json": json.dumps(graph)},
+                follow_redirects=False)
+
+    client.post(f"/controls/{cid}", data={
+        "id": cid, "title": "Definition sync", "objective": "o", "narrative": "n",
+        "framework_nist": "",
+        "source_ids": ["drop_a"],
+    }, follow_redirects=False)
+
+    updated = _get_control(client, cid)
+    nodes = (updated.get("pipeline") or {}).get("nodes", [])
+    import_sources = [n.get("source_id") for n in nodes if n.get("type") == "import"]
+    assert "drop_b" not in import_sources
+    test_node = next(n for n in nodes if n.get("id") == "tst")
+    assert "imp_b" not in list(test_node.get("inputs") or [])
+
+
+def test_definition_existing_control_enables_source_autosave(client):
+    _make_source(client, "auto_src")
+    client.post("/controls", data={
+        "id": "AUTOSAVE1", "title": "Autosave check", "objective": "o", "narrative": "n",
+        "source_ids": ["auto_src"],
+    }, follow_redirects=False)
+
+    page = client.get("/controls/AUTOSAVE1")
+    assert page.status_code == 200
+    assert "data-source-autosave-form" in page.text
+
+
+def test_threshold_rationale_persists_and_renders(client):
+    _make_source(client, "tr_src")
+    client.post("/controls", data={
+        "id": "TR1", "title": "Threshold rationale", "objective": "o", "narrative": "n",
+        "source_ids": ["tr_src"],
+        "failure_threshold_count": "2",
+        "failure_threshold_rationale": "Up to 2 exceptions is immaterial for this account.",
+    }, follow_redirects=False)
+
+    stored = _get_control(client, "TR1")
+    assert stored["failure_threshold_rationale"] == \
+        "Up to 2 exceptions is immaterial for this account."
+
+    page = client.get("/controls/TR1")
+    assert "Threshold rationale" in page.text            # the field label
+    assert "immaterial for this account" in page.text    # the saved value renders
+
+
+def test_threshold_rationale_survives_title_edit(client):
+    """Regression (learning 0023): a title-only update must not NULL the rationale."""
+    _make_source(client, "tr_src2")
+    client.post("/controls", data={
+        "id": "TR2", "title": "Before", "objective": "o", "narrative": "n",
+        "source_ids": ["tr_src2"],
+        "failure_threshold_rationale": "Documented tolerance.",
+    }, follow_redirects=False)
+    assert _get_control(client, "TR2")["failure_threshold_rationale"] == "Documented tolerance."
+
+    # The header pencil posts only the title through a separate handler.
+    client.post("/controls/TR2/title", data={"title": "After"}, follow_redirects=False)
+
+    updated = _get_control(client, "TR2")
+    assert updated["title"] == "After"
+    assert updated["failure_threshold_rationale"] == "Documented tolerance."  # not nulled

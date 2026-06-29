@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — Logic Flowchart: {{ control.title if control else control_id }}{% endblock %}
+{% block head %}
+<style>
+  /* ── generated SVG flowchart ────────────────────────────────────────── */
+  .flowchart svg { max-width: 100%; height: auto; }
+  .fc-box rect { fill: var(--bg-surface-2); stroke: var(--border-strong); }
+  .fc-box.fc-terminal rect { stroke: var(--accent-primary); }
+  .fc-box text { fill: var(--text-primary); font-family: var(--font-sans); font-size: 12px; }
+  .fc-box .fc-count { fill: var(--text-secondary); font-family: var(--font-mono); font-size: 11px; }
+  .fc-box .fc-narr { fill: var(--text-tertiary); font-family: var(--font-sans); font-size: 11px; font-style: italic; }
+  .fc-box:hover rect { stroke: var(--accent-primary); }
+  .fc-box { cursor: default; }
+  .fc-edge { stroke: var(--border-strong); stroke-width: 2; fill: none; }
+  /* Swimlane bands (shared Inputs band + one per procedure) + collapse toggles. */
+  .fc-band { fill: var(--bg-surface-1); stroke: var(--border-default); stroke-width: 1; opacity: 0.5; }
+  .fc-band-proc { opacity: 0.35; }
+  .fc-band-label { fill: var(--text-secondary); font-family: var(--font-sans); font-size: 12px; font-weight: 600; cursor: pointer; }
+  .fc-summary rect { fill: var(--bg-surface-3); stroke-dasharray: 4 3; }
+  .fc-summary text { fill: var(--text-secondary); font-family: var(--font-sans); font-size: 12px; }
+  /* Procedure legend above the SVG (per-procedure outline colors). */
+  .fc-legend {
+    list-style: none; display: flex; flex-wrap: wrap; gap: 14px;
+    margin: 0 0 14px; padding: 0;
+  }
+  .fc-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+  .fc-legend-dot {
+    width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex: 0 0 auto;
+  }
+  .fc-legend-label { font-size: 12px; color: var(--text-secondary); }
+</style>
+{% endblock %}
+{% block body %}
+<a class="crumb" href="/controls/{{ control_id }}">← {{ control.title if control else control_id }}</a>
+<div class="page-head">
+  <h1>Logic</h1>
+  <p class="muted mono">{{ control_id }}</p>
+</div>
+{% if control %}{% include "_control_tabs.html" %}{% endif %}
+{% if logic_tab is defined %}{% include "partials/_logic_tabs.html" %}{% endif %}
+
+{% if diagram %}
+<div class="card">
+  <div class="card-head"><h2>Pipeline flowchart</h2></div>
+  {% include "partials/_pipe_diagram_card.html" %}
+</div>
+{% else %}
+<div class="card">
+  <div class="card-head"><h2>Pipeline flowchart</h2></div>
+  <p class="muted">No pipeline defined yet. Build one in the
+    <a href="/controls/{{ control_id }}/logic/builder">Builder</a> tab.</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,162 @@
+"""Settings ▸ Updates: the launch update check + (Task 9) the upgrade trigger.
+
+Egress discipline: the launch/badge check only runs when the toggle is ON; the
+"Check now" button is an explicit user action and may run regardless. No route
+makes a network call while the toggle is OFF. The toggle now defaults ON so the
+header update indicator is visible out of the box — turning it OFF restores
+strict zero egress (see STRATEGY.md; the off path is still guaranteed silent).
+"""
+
+from __future__ import annotations
+
+import shlex
+import sqlite3
+import sys
+from collections.abc import Callable, Generator
+
+from fastapi import Depends, FastAPI, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.upgrade.check import check_for_update, current_version
+from uticen_lite.upgrade.command import build_upgrade_command
+from uticen_lite.upgrade.detect import InstallMethod, detect_install, source_dir
+from uticen_lite.upgrade.spawn import schedule_shutdown, spawn_detached_upgrade
+
+
+def register(
+    app: FastAPI,
+    templates: Jinja2Templates,
+    get_conn: Callable[..., Generator[sqlite3.Connection, None, None]],
+) -> None:
+    @app.get("/settings/updates", response_class=HTMLResponse)
+    def updates_home(
+        request: Request,
+        conn: sqlite3.Connection = Depends(get_conn),
+    ) -> HTMLResponse:
+        method = detect_install()
+        return templates.TemplateResponse(
+            request,
+            "settings_updates.html",
+            {
+                "project": repo.get_project(conn) or {"name": ""},
+                "active": "updates",
+                "check_on_launch": repo.get_check_updates_on_launch(conn),
+                "current": current_version(),
+                "method": method.value,
+                "can_self_upgrade": method is not InstallMethod.UNKNOWN,
+            },
+        )
+
+    @app.post("/settings/updates/toggle")
+    async def toggle_updates(request: Request) -> RedirectResponse:
+        form = await request.form()
+        value = form.get("check_on_launch") is not None
+        conn = connect(request.app.state.project_root)  # per-handler conn (0002)
+        try:
+            repo.set_check_updates_on_launch(conn, value)
+        finally:
+            conn.close()
+        return RedirectResponse(url="/settings/updates", status_code=303)
+
+    @app.post("/settings/updates/check", response_class=HTMLResponse)
+    def check_now(request: Request) -> HTMLResponse:
+        method = detect_install()
+        info = check_for_update(method)
+        request.app.state.update_check = info  # cache for the dashboard badge
+        return templates.TemplateResponse(
+            request, "partials/update_result.html", {"info": info}
+        )
+
+    @app.get("/updates/badge", response_class=HTMLResponse)
+    def update_badge(
+        request: Request,
+        conn: sqlite3.Connection = Depends(get_conn),
+    ) -> HTMLResponse:
+        # OFF → zero egress, no badge.
+        if not repo.get_check_updates_on_launch(conn):
+            return HTMLResponse("")
+        info = getattr(request.app.state, "update_check", None)
+        if info is None:
+            info = check_for_update(detect_install())
+            request.app.state.update_check = info
+        if not info.available:
+            return HTMLResponse("")
+        return templates.TemplateResponse(
+            request, "partials/update_badge.html", {"info": info}
+        )
+
+    @app.get("/updates/indicator", response_class=HTMLResponse)
+    def update_indicator(
+        request: Request,
+        conn: sqlite3.Connection = Depends(get_conn),
+    ) -> HTMLResponse:
+        # Header indicator: OFF → no indicator; ON → show status + click-to-upgrade
+        if not repo.get_check_updates_on_launch(conn):
+            return HTMLResponse("")
+        info = getattr(request.app.state, "update_check", None)
+        if info is None:
+            info = check_for_update(detect_install())
+            request.app.state.update_check = info
+        return templates.TemplateResponse(
+            request,
+            "partials/header_update_indicator.html",
+            {"info": info, "current_version": current_version()},
+        )
+
+    @app.post("/updates/indicator/check", response_class=HTMLResponse)
+    def refresh_update_indicator(
+        request: Request,
+        conn: sqlite3.Connection = Depends(get_conn),
+    ) -> HTMLResponse:
+        if not repo.get_check_updates_on_launch(conn):
+            return HTMLResponse("")
+        info = check_for_update(detect_install())
+        request.app.state.update_check = info
+        return templates.TemplateResponse(
+            request,
+            "partials/header_update_indicator.html",
+            {"info": info, "current_version": current_version()},
+        )
+
+    @app.post("/upgrade", response_class=HTMLResponse)
+    def do_upgrade(request: Request) -> HTMLResponse:
+        method = detect_install()
+        current = current_version()
+        if method is InstallMethod.UNKNOWN:
+            return templates.TemplateResponse(
+                request, "upgrade_unavailable.html", {"current": current}
+            )
+        src = source_dir() if method is InstallMethod.GIT_EDITABLE else None
+        commands = build_upgrade_command(method, source_dir=str(src) if src else None)
+        restart_command = [
+            sys.executable,
+            "-m",
+            "uticen_lite.plane",
+            "--project",
+            str(request.app.state.project_root),
+            "--no-browser",
+        ]
+        if request.url.port:
+            restart_command.extend(["--port", str(request.url.port)])
+        spawn_detached_upgrade(
+            request.app.state.project_root,
+            commands,
+            current=current,
+            restart_command=restart_command,
+        )
+        schedule_shutdown()
+        # shlex.quote so the copyable re-run command is paste-and-run even when the
+        # engagement path contains spaces.
+        project_dir = shlex.quote(str(request.app.state.project_root))
+        return templates.TemplateResponse(
+            request,
+            "upgrading.html",
+            {
+                "current": current,
+                "project_dir": project_dir,
+                "app_url": str(request.base_url).rstrip("/"),
+            },
+        )

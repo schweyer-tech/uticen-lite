@@ -1,23 +1,23 @@
-# Visual-pipeline (graph) authoring of this control — a Custom Python pipeline.
+# Visual-pipeline (graph) authoring — a 2-procedure control showcasing the
+# procedures rollup over a shared trunk that forks into two terminals.
 #
-# Reshapes the demo so the one-click demo showcases a pipeline that drops to a
-# Custom Python node for logic the no-code grammar can't express (a row-local
-# comparison of reviewed_by vs prepared_by). The importer stores this graph in the
-# store-only `pipeline` column and COMPILES it to the existing bundle artifact
-# (learning 0010): the DAG has a Custom Python node, so it compiles to a generated
-# test(pop, sources) with the node emitted as a starved module-level function. The
-# bundle never learns the word "node". The companion test.py stays as documentation
-# but is not the executed artifact once this sidecar is present.
+# Finance.GL.1 is performed via two procedures over the same population (manual
+# journal entries with |amount| >= $50,000):
+#   P1 - Independent Review (Segregation of Duties): a manual JE must be reviewed
+#        by someone OTHER than the preparer. Flags self-review (reviewed_by present
+#        AND == prepared_by). Column-vs-column => Custom Python (the no-code grammar
+#        has no column-vs-column operator).
+#   P2 - Reviewer Assigned (Authorization / approval evidence): a manual JE must have
+#        a reviewer at all. Flags a missing reviewer (reviewed_by is_empty) => no-code.
 #
-# Shape: Import journal entries -> Filter to MANUAL entries -> Custom Python test
-# node that applies the $50k materiality threshold and flags entries that are
-# self-reviewed or have no reviewer.
+# Shared trunk: Import journal entries -> Filter to MANUAL -> Filter to materiality
+# (|amount| >= $50k, expressed no-code as any[amount >= 50000, amount <= -50000] since
+# the grammar has no abs()). The trunk forks into the two procedure terminals.
 #
-# The Custom Python node is intentionally starved: it only sees `rows` (the
-# filtered frame), never `sources` — cross-source work would go through Import/Join
-# nodes. It uses only the allowlisted constructs (no file I/O, no imports beyond the
-# pure set). Expected: 3 violations on the demo data (same as the Python test it
-# replaces).
+# Store-only; COMPILES to a union test(pop, sources) over the two terminals for the
+# single control.test_code (learning 0010) — the bundle never learns "node" or
+# "procedure". Expected on demo data: P1 flags 2 (JE-V01, JE-V03), P2 flags 1 (JE-V02);
+# union = 3 distinct exceptions; each procedure's distinct-items-examined population = 5.
 nodes:
   - id: je
     type: import
@@ -33,37 +33,72 @@ nodes:
         - column: entry_type
           op: eq
           value: manual
-  - id: flag
-    type: custom_python
+  - id: material
+    type: filter
     inputs: [manual]
+    narrative: Keep entries at or above the $50,000 materiality threshold (absolute value).
+    config:
+      logic: any
+      conditions:
+        - column: amount
+          op: ge
+          value: 50000
+        - column: amount
+          op: le
+          value: -50000
+  - id: sod
+    type: custom_python
+    inputs: [material]
     narrative: >-
-      Flag manual entries >= $50,000 that are self-reviewed or have no reviewer.
+      P1 — Segregation of duties: flag material manual entries reviewed by their own preparer.
     config:
       flavor: test
+      procedure_id: p1
+      item_key_column: entry_id
+      severity: high
       code: |
         out = []
         for _idx, _row in rows.iterrows():
             r = _row.to_dict()
-            try:
-                amount = float(r.get("amount"))
-            except (ValueError, TypeError):
-                continue
-            if abs(amount) < 50000:
-                continue
             prepared_by = str(r.get("prepared_by") or "").strip()
             reviewed_by = str(r.get("reviewed_by") or "").strip()
-            reviewer_missing = reviewed_by == ""
-            self_reviewed = (not reviewer_missing) and reviewed_by == prepared_by
-            if reviewer_missing or self_reviewed:
-                reason = (
-                    "No independent reviewer assigned"
-                    if reviewer_missing
-                    else "Entry reviewed by preparer (self-authorization)"
-                )
+            if reviewed_by != "" and reviewed_by == prepared_by:
                 out.append({
                     "item_key": str(r.get("entry_id")),
-                    "description": reason,
+                    "description": "Entry reviewed by preparer (self-authorization)",
                     "severity": "high",
-                    "details": {"amount": amount, "prepared_by": prepared_by},
+                    "details": {"prepared_by": prepared_by, "reviewed_by": reviewed_by},
                 })
         return out
+  - id: review
+    type: test
+    inputs: [material]
+    narrative: >-
+      P2 — Reviewer assigned: flag material manual entries with no independent reviewer.
+    config:
+      procedure_id: p2
+      item_key_column: entry_id
+      severity: high
+      description_template: "No independent reviewer assigned to entry {entry_id}"
+      logic: all
+      conditions:
+        - column: reviewed_by
+          op: is_empty
+procedures:
+  - id: p1
+    code: P1
+    name: Independent Review (SoD)
+    assertion: Segregation of duties
+    narrative: >-
+      Independent review (segregation of duties): every material manual journal entry
+      must be reviewed by someone other than its preparer. Flags entries a preparer
+      reviewed themselves.
+    position: 0
+  - id: p2
+    code: P2
+    name: Reviewer Assigned
+    assertion: Authorization / approval evidence
+    narrative: >-
+      Authorization evidence: every material manual journal entry must have an
+      independent reviewer recorded. Flags entries with no reviewer assigned.
+    position: 1

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — Settings{% endblock %}
+{% block body %}
+<div class="page-head">
+  <h1>Settings</h1>
+  <p class="lead">Manage this engagement and configure optional AI-assisted authoring.</p>
+</div>
+
+<div class="card">
+  <h2>Engagement</h2>
+  <p class="lead">
+    Rename the current engagement — the name shown top-right and on the exported
+    bundle. Uticen Lite is single-engagement by design.
+  </p>
+  <form method="post" action="/settings/rename">
+    <div class="field">
+      <label for="name">Engagement name</label>
+      <input type="text" id="name" name="name" value="{{ project.name }}"
+             placeholder="e.g. Acme Corp — FY26 SOX" required>
+    </div>
+    {% if project.framework %}
+    <div class="field">
+      <label>Framework</label>
+      <span class="field-value">{{ project.framework }}</span>
+    </div>
+    {% endif %}
+    <div class="page-actions">
+      <button class="btn btn-primary" type="submit">Rename engagement</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>AI-assisted authoring</h2>
+  <p class="lead">
+    Opt-in, offline by default. Choose a provider and model to let Uticen Lite
+    draft a no-code rule from a control objective — you review every draft
+    before saving.
+  </p>
+  <div class="page-actions">
+    <a class="btn" href="/settings/ai">Configure AI providers</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Updates</h2>
+  <p class="lead">
+    See the installed version and upgrade in place. An opt-in launch check (off by
+    default) can surface a banner when a newer version is available.
+  </p>
+  <div class="page-actions">
+    <a class="btn" href="/settings/updates">Manage updates</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Danger zone</h2>
+  <p class="lead">
+    Reset this engagement to the bundled Northwind demo. Use this to recover a
+    clean, runnable state after experimenting.
+  </p>
+  <div class="banner banner-error" role="alert">
+    <strong>This permanently deletes the current engagement.</strong>
+    Its sources, controls, and runs are erased and replaced with the Northwind
+    demo data. This cannot be undone.
+  </div>
+  <form method="post" action="/settings/reset-demo"
+        onsubmit="return confirm('This deletes the current engagement and reloads the Northwind demo data. Continue?')">
+    <div class="page-actions">
+      <button class="btn btn-danger" type="submit">Reset to demo data</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

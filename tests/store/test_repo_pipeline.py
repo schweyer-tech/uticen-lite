@@ -10,9 +10,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.migrations import SCHEMA_VERSION, migrate
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.migrations import SCHEMA_VERSION, migrate
 
 
 def _conn(tmp_path: Path):
@@ -26,11 +26,11 @@ def test_migration_adds_pipeline_column_and_bumps_store_version(tmp_path: Path):
     cols = {r[1] for r in conn.execute("PRAGMA table_info(controls)").fetchall()}
     assert "pipeline" in cols
     # Store schema bumped past the previous version (NOT the bundle schema_version).
-    assert SCHEMA_VERSION == 6
+    assert SCHEMA_VERSION == 7
 
 
 def test_v3_store_upgrades_to_pipeline_without_data_loss(tmp_path: Path):
-    from controlflow_sdk.store.migrations import _STEPS
+    from uticen_lite.store.migrations import _STEPS
 
     conn = connect(tmp_path)
     conn.executescript(_STEPS[0])  # v1

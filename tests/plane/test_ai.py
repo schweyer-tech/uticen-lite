@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import io
 
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
 
 
 def _make_source(client, sid="payments"):
@@ -56,7 +56,7 @@ def _patch_fake_backend(monkeypatch, spec):
             return spec
 
     monkeypatch.setattr(
-        "controlflow_sdk.ai.draft.get_provider", lambda provider: _Fake()
+        "uticen_lite.ai.draft.get_provider", lambda provider: _Fake()
     )
 
 
@@ -67,7 +67,7 @@ def test_draft_no_provider_configured_returns_partial(client, monkeypatch):
     _make_source(client)
     # No provider saved → friendly partial, 200, no exception, no backend call.
     monkeypatch.setattr(
-        "controlflow_sdk.ai.draft.get_provider",
+        "uticen_lite.ai.draft.get_provider",
         lambda provider: (_ for _ in ()).throw(AssertionError("must not call a backend")),
     )
     resp = client.post(
@@ -83,7 +83,7 @@ def test_draft_env_absent_returns_partial(client, monkeypatch):
     _configure_ai(client, provider="anthropic", model="claude-opus-4-8")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setattr(
-        "controlflow_sdk.ai.draft.get_provider",
+        "uticen_lite.ai.draft.get_provider",
         lambda provider: (_ for _ in ()).throw(AssertionError("must not call a backend")),
     )
     resp = client.post(
@@ -142,7 +142,7 @@ def test_draft_no_source_bound_returns_error_partial(client, monkeypatch):
     _configure_ai(client)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     monkeypatch.setattr(
-        "controlflow_sdk.ai.draft.get_provider",
+        "uticen_lite.ai.draft.get_provider",
         lambda provider: (_ for _ in ()).throw(AssertionError("must not call a backend")),
     )
     resp = client.post("/controls/ai/draft", data={"objective": "x", "source_ids": []})
@@ -195,7 +195,7 @@ def test_settings_post_persists_selection(client):
 
 
 # --------------------------------------------------------------------------- #
-# Editor affordance gating  (Logic ▸ Builder tab, not the Definition page)
+# Editor affordance gating  (Logic ▸ AI tab, not the Definition page)
 # --------------------------------------------------------------------------- #
 def _make_control(client, source_id="payments") -> str:
     """Create a minimal control bound to *source_id* and return its id."""
@@ -209,25 +209,29 @@ def _make_control(client, source_id="payments") -> str:
     return "AI-01"
 
 
-def test_editor_hides_draft_when_not_configured(client):
+def test_ai_tab_hides_draft_when_not_configured(client):
     _make_source(client)
     cid = _make_control(client)
-    page = client.get(f"/controls/{cid}/logic/builder").text
+    page = client.get(f"/controls/{cid}/logic/ai").text
     # Not configured → the affordance links to settings rather than posting a draft.
     assert 'href="/settings/ai"' in page
     assert 'hx-post="/controls/ai/draft"' not in page
 
 
-def test_editor_shows_draft_when_configured(client, monkeypatch):
+def test_ai_tab_shows_draft_when_configured(client, monkeypatch):
     _make_source(client)
     cid = _make_control(client)
     _configure_ai(client)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    page = client.get(f"/controls/{cid}/logic/ai").text
+    assert 'hx-post="/controls/ai/draft"' in page
+
+
+def test_builder_tab_no_longer_renders_draft_with_ai_card(client):
+    _make_source(client)
+    cid = _make_control(client)
     page = client.get(f"/controls/{cid}/logic/builder").text
-    # F3: the button now posts to the per-control ai-apply endpoint so the
-    # drafted conditions are applied directly into the Test node (not previewed
-    # in a separate panel).
-    assert f'hx-post="/controls/{cid}/logic/ai-apply"' in page
+    assert "Draft with AI" not in page
 
 
 # --------------------------------------------------------------------------- #
@@ -287,7 +291,7 @@ def test_ai_apply_no_provider_returns_oob_error(client, monkeypatch):
     _make_source(client)
     cid = _make_control(client)
     monkeypatch.setattr(
-        "controlflow_sdk.ai.draft.get_provider",
+        "uticen_lite.ai.draft.get_provider",
         lambda provider: (_ for _ in ()).throw(AssertionError("must not call")),
     )
     resp = client.post(

@@ -1,5 +1,5 @@
-from controlflow_sdk.rules.render_rule import rule_to_text
-from controlflow_sdk.rules.spec import parse_rule_spec
+from uticen_lite.rules.render_rule import rule_to_text
+from uticen_lite.rules.spec import parse_rule_spec
 
 
 def test_rule_to_text_reads_as_a_rule():
@@ -34,8 +34,8 @@ def test_any_logic_and_unary_op_render():
 
 import pandas as pd  # noqa: E402
 
-from controlflow_sdk.model.population import ColumnMeta, Population  # noqa: E402
-from controlflow_sdk.rules.evaluate import evaluate_rule  # noqa: E402
+from uticen_lite.model.population import ColumnMeta, Population  # noqa: E402
+from uticen_lite.rules.evaluate import evaluate_rule  # noqa: E402
 
 
 def _pop(df, key="user_id"):

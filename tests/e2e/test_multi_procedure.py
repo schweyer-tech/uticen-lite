@@ -18,8 +18,8 @@ Authoring sequence:
   1. Upload CSV source, create control.
   2. Open Builder — scaffold: Import(src) → Test(tst).
   3. For tst: set proc-title + threshold_count=5, add condition (user_id eq A1).
-     Each add-cond click serialises the current card state and submits the
-     form (full-page navigation); proc-title/threshold are saved via this POST.
+     Each add-cond click serialises the current card state and autosaves via fetch
+     (scroll-stable, in-place DOM swap); proc-title/threshold are saved via this POST.
   4. For tes1: the 2nd Test node is injected by submitting the complete pipeline
      JSON (with both nodes wired) directly to the builder POST endpoint via
      page.evaluate(fetch(...)). The builder route validates, compiles, and saves
@@ -43,9 +43,9 @@ Notes on tes1 authoring approach:
   "Save pipeline" would after setting up tes1 correctly.
 
 Selector notes (grounded against live rendered HTML):
-- Proc-title input:       ``[data-proc-title]`` (inside [data-node] card)
-- Threshold count input:  ``[data-threshold-count]``
-- Condition column:       ``[data-cond-col]``
+- Proc-name input (header):   ``[data-proc-head][data-proc-id="<id>"] [data-proc-name]``
+- Threshold count (header):   ``[data-proc-head][data-proc-id="<id>"] [data-proc-count]``
+- Condition column:           ``[data-cond-col]``
 - Condition op:           ``[data-cond-op]``
 - Condition value:        ``[data-cond-val]``
 - Input select:           ``[data-input]`` (upstream node selector)
@@ -61,7 +61,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Page, expect
 
-from controlflow_sdk.schema.validate import validate_bundle
+from uticen_lite.schema.validate import validate_bundle
 
 # Two rows. 'user_id eq A1' flags exactly A1 in both branches.
 # Branch A threshold_count=5 → PASS (1 ≤ 5).
@@ -105,20 +105,19 @@ def test_author_run_export_two_procedure_control(
     expect(import_card.locator("[data-source]")).to_have_value("mpusers")
 
     # ── 5. Author Test node "tst" (Branch A — passes its threshold) ─────────
-    #    Set proc-title + threshold_count=5 BEFORE clicking add-cond so they
-    #    are serialised and saved in the first add-cond POST.
+    #    Set severity/desc/itemkey BEFORE clicking add-cond so they are
+    #    serialised and saved in the first add-cond POST. proc-title and
+    #    failure_threshold_count are injected via the complete_graph in step 6
+    #    (they live in the procedure section header, not the Test node card).
     tst = page.locator('[data-node="tst"]')
-    tst.locator("[data-proc-title]").fill("High pass rate")
-    tst.locator("[data-threshold-count]").fill("5")
     tst.locator("[data-severity]").select_option("high")
     tst.locator("[data-desc]").fill("User {user_id} flagged in branch A")
     tst.locator("[data-itemkey]").select_option("user_id")
 
-    # Click "+ Add condition" → serialises card state (incl. proc-title/threshold)
-    # and submits the form. Server saves and 303-redirects to the Builder GET.
-    with page.expect_navigation():
-        tst.locator("[data-add-cond]").click()
-    expect(page).to_have_url(base + "/controls/fork/logic/builder")
+    # Click "+ Add condition" → serialises card state (severity/desc/item-key/conditions)
+    # and autosaves via fetch (scroll-stable, in-place DOM swap). Wait for response.
+    tst.locator("[data-add-cond]").click()
+    page.wait_for_load_state("networkidle")
 
     # Fill condition row 0 for "tst": user_id eq A1.
     tst = page.locator('[data-node="tst"]')
@@ -199,15 +198,23 @@ def test_author_run_export_two_procedure_control(
     expect(page.locator('[data-node="tst"]')).to_be_visible()
     expect(page.locator('[data-node="tes1"]')).to_be_visible()
 
-    # Confirm tes1's proc-title was persisted.
+    # Confirm the procedure section headers derive their names + thresholds from
+    # node config.title / config.failure_threshold_count (auto-procedures — no
+    # explicit procedures in the injected graph; proc id == terminal id).
+    expect(
+        page.locator('[data-proc-head][data-proc-id="tst"] [data-proc-name]')
+    ).to_have_value("High pass rate")
+    expect(
+        page.locator('[data-proc-head][data-proc-id="tes1"] [data-proc-name]')
+    ).to_have_value("Zero tolerance")
+    # Branch A's threshold (authored in node config, surfaced via auto-derivation)
+    # persists on the procedure header — migrated from the removed node-card field.
+    expect(
+        page.locator('[data-proc-head][data-proc-id="tst"] [data-proc-count]')
+    ).to_have_value("5")
+    # Confirm tes1's input wiring survived the save.
     tes1 = page.locator('[data-node="tes1"]')
-    expect(tes1.locator("[data-proc-title]")).to_have_value("Zero tolerance")
     expect(tes1.locator("[data-input]")).to_have_value("src")
-
-    # Confirm tst's proc-title + threshold were persisted.
-    tst = page.locator('[data-node="tst"]')
-    expect(tst.locator("[data-proc-title]")).to_have_value("High pass rate")
-    expect(tst.locator("[data-threshold-count]")).to_have_value("5")
 
     # ── 7. Run the control ──────────────────────────────────────────────────
     page.goto(base + "/")
@@ -215,30 +222,33 @@ def test_author_run_export_two_procedure_control(
     expect(page).to_have_url(re.compile(r"/controls/fork/runs/"))
 
     # ── 8. Assert the run view (main document) ──────────────────────────────
-    #    Both branches flag A1 → aggregate: Records tested=2.
-    #    The union aggregate concatenates violations from both procedures (A1
-    #    flagged once per branch) → Failed=2.
+    #    Both branches flag A1 → aggregate: Records tested=2 (distinct examined).
+    #    The control-level aggregate DEDUPLICATES violations by item-key across
+    #    procedures (_merge_violations): both branches flag A1, but A1 is one
+    #    distinct item → Exceptions=1 (run.failed == len(merged violations)).
     #    Branch B (tes1) fails implicit-zero threshold → "Operated with
     #    deficiencies".
     tiles = page.locator(".tile")
     expect(tiles.filter(has_text="Records tested").locator(".tile-value")).to_have_text("2")
-    expect(tiles.filter(has_text="Failed").locator(".tile-value")).to_have_text("2")
+    expect(tiles.filter(has_text="Exceptions").locator(".tile-value")).to_have_text("1")
     expect(page.get_by_text("Operated with deficiencies")).to_be_visible()
 
     # ── 9. Assert the workpaper iframe: two procedure sections ──────────────
     #    The workpaper is embedded in an <iframe srcdoc> so we access it via
-    #    frame_locator.  Per _emit_procedures() in render/html.py, each
-    #    procedure renders as <h3>P{i}: {title} <badge class="badge pass/fail">
-    #    PASS/FAIL</span></h3>.
+    #    frame_locator.  Per _emit_procedures() in render/html.py each procedure
+    #    renders as <h3>{code} &middot; {title} <badge>PASS/FAIL</span></h3> when it
+    #    carries a code (the auto procedures now do — P1/P2), else the legacy
+    #    <h3>P{i}: {title} …</h3>. The regexes below match the "P1"/"P2" prefix and
+    #    the title without pinning the separator, so they accept both formats.
     wp = page.frame_locator("iframe.workpaper-frame")
 
-    # Branch A: "P1: High pass rate PASS" (1 exception ≤ threshold_count=5)
-    p1_heading = wp.get_by_role("heading", name=re.compile(r"P1:.*High pass rate"))
+    # Branch A: "P1 · High pass rate PASS" (1 exception ≤ threshold_count=5)
+    p1_heading = wp.get_by_role("heading", name=re.compile(r"P1.*High pass rate"))
     expect(p1_heading).to_be_visible()
     expect(p1_heading.locator(".badge.pass")).to_be_visible()
 
-    # Branch B: "P2: Zero tolerance FAIL" (1 exception, implicit-zero threshold)
-    p2_heading = wp.get_by_role("heading", name=re.compile(r"P2:.*Zero tolerance"))
+    # Branch B: "P2 · Zero tolerance FAIL" (1 exception, implicit-zero threshold)
+    p2_heading = wp.get_by_role("heading", name=re.compile(r"P2.*Zero tolerance"))
     expect(p2_heading).to_be_visible()
     expect(p2_heading.locator(".badge.fail")).to_be_visible()
 

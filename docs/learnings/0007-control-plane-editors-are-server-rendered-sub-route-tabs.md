@@ -32,8 +32,25 @@ client-side JS tabs.** Register the specific sub-routes (`/{id}/data`, `/{id}/hi
 param route cannot shadow them, and keep the section's data-loading in its own handler. This keeps
 every section a real, linkable URL and matches the JS-light/HTMX ethos.
 
+## Corollary — drill-down/detail output is a real page (new tab), not an inline below-the-fold drawer
+
+The step-data inspector first shipped as an HTMX drawer swapped into a `#step-drawer` div at the
+**bottom** of the long builder page. Clicking a step's row-count appeared to do nothing — the swapped
+content rendered below the fold, so the author couldn't tell it had opened. The fix was to make the
+row-count a `target="_blank"` link to the existing server-rendered step page (`step_data.html`,
+`extends base.html`), opening the data in a **new tab** with a back-to-builder link and same-tab
+pagination — the same "real, linkable URL" ethos as the tabs above.
+
+So: render drill-down/detail output (a step's rows, an item's detail) as a **server-rendered page reached
+by a real URL** — open it in a new tab (`target="_blank" rel="noopener"`) or navigate to a sub-route —
+**not** an inline JS/HTMX panel appended at the bottom of a tall page. An inline drawer below the fold
+reads as a no-op; a page (or new tab) is unmistakable, bookmarkable, and back/forward-navigable.
+
 ## Reference
 
-- `controlflow_sdk/plane/templates/_source_tabs.html` (shared nav, `active` highlight).
-- `controlflow_sdk/plane/routes/sources.py` (`edit_source`, `source_data`, `source_history`).
+- `uticen_lite/plane/templates/_source_tabs.html` (shared nav, `active` highlight).
+- `uticen_lite/plane/routes/sources.py` (`edit_source`, `source_data`, `source_history`).
+- Drill-down-as-new-tab: `uticen_lite/plane/templates/step_data.html` (full page) + the
+  `target="_blank"` row-count link in `partials/_pipe_node.html` / `_pipe_diagram.html`;
+  `routes/pipeline.py::step_data`.
 - Connection rule for the writing handlers: learning [[0002]].

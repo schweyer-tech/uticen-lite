@@ -1,5 +1,5 @@
 id: Finance.GL.1
-title: Manual Journal Entry Review (Segregation of Duties)
+title: Manual Journal Entry Review
 objective: >
   Ensure that high-value manual journal entries are reviewed and approved by
   an individual other than the preparer, preventing self-authorization and

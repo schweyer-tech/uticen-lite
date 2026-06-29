@@ -34,7 +34,7 @@ This is the write-path analogue of [[0014]] (audit every call site when a model 
 field) and pairs with the store-only-state discipline in [[0006]].
 
 ## Reference
-- `controlflow_sdk/store/repo.py` (`upsert_source`, the `sheet=excluded.sheet` clause)
-- `controlflow_sdk/plane/routes/sources.py` (`confirm_refresh`, `save_source` — the two writers that nulled it)
+- `uticen_lite/store/repo.py` (`upsert_source`, the `sheet=excluded.sheet` clause)
+- `uticen_lite/plane/routes/sources.py` (`confirm_refresh`, `save_source` — the two writers that nulled it)
 - `tests/plane/test_sources_multiformat.py` (the survives-an-update regression tests)
 </content>

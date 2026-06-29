@@ -1,5 +1,5 @@
-import controlflow_sdk
+import uticen_lite
 
 
 def test_version():
-    assert controlflow_sdk.__version__
+    assert uticen_lite.__version__

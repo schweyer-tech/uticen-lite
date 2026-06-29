@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from controlflow_sdk.model.violation import Severity, Violation
+from uticen_lite.model.violation import Severity, Violation
 
 
 def test_minimal_violation_defaults_to_medium():

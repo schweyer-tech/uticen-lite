@@ -26,7 +26,7 @@ route returns empty **before any network path** — no call. The egress claim wa
 settings hint): "zero network egress **by default** … except an **opt-in** update check you can leave
 off." The OFF invariant is proved by a **call-counter test**: a spy on the network function asserts it
 ran **0 times** when the toggle is OFF (`test_badge_empty_when_toggle_off`), not merely that the badge
-was empty. Explicit user actions ("Check now", `cflow upgrade --check`) may reach the network; only the
+was empty. Explicit user actions ("Check now", `uticen-lite upgrade --check`) may reach the network; only the
 proactive/background path is toggle-gated.
 
 ## The rule
@@ -40,10 +40,34 @@ test** that asserts the network function was invoked **zero times** while OFF (a
 is not enough — it can pass while still making the call). Explicit, user-initiated checks may egress;
 silent ones may not.
 
+## Corollary (2026-06-29) — flipping an egress DEFAULT is the same fan-out as adding the capability
+
+Changing the toggle's **default** from OFF→ON re-falsifies the egress claim in exactly the same set
+of places adding the capability did. PR #110 flipped `get_check_updates_on_launch` to default **True**
+(so the header indicator shows out of the box) but reworded only the route/repo docstrings + settings
+hint — leaving "**zero network egress by default**" stale-and-now-false in `README.md` (×2),
+`docs/INSTALL.md` (×2), and `PRODUCT-MAP.md`. A follow-up PR fixed all of them. Rules when you flip an
+egress default ON:
+- **Re-run the grep.** `grep -rniE "zero[ -]?egress|by default|opt-in|off by default"` across
+  `README.md`/`docs/`/`PRODUCT-MAP.md`/source docstrings and reword EVERY copy — same discipline as
+  first shipping the capability. "Zero egress by default" is retired; the durable, still-true claim to
+  lead with is "**client data never leaves the machine**" (the check fetches only a version number),
+  plus "on by default — disable in Settings ▸ Updates for zero egress."
+- **Flip the OFF-path tests to set the toggle OFF explicitly.** The call-counter / empty-body tests
+  (`test_badge_empty_when_toggle_off`, `test_refresh_indicator_skips_check_when_toggle_off`) relied on
+  the OLD default to land in the OFF branch; under default-ON they must call
+  `set_check_updates_on_launch(conn, False)` first, or they silently stop exercising the zero-egress
+  path. Add a positive `test_default_is_true`.
+- **It is a product-direction change** — defaulting egress ON weakens the "zero-egress" positioning;
+  route it to `setting-strategy` to reconcile STRATEGY.md, don't just reword copy.
+
 ## Reference
 
-- `controlflow_sdk/plane/routes/updates.py` (`GET /updates/badge` returns empty before any check when
+- `uticen_lite/plane/routes/updates.py` (`GET /updates/badge` returns empty before any check when
   the toggle is OFF; `POST /settings/updates/check` is the explicit-action path that may egress).
-- `controlflow_sdk/store/repo.py` (`get/set_check_updates_on_launch`, default False, in `project.system`).
-- `tests/plane/test_dashboard_upgrade.py::test_badge_empty_when_toggle_off` (asserts the check ran 0×).
-- Reworded claim: `README.md`, `docs/INSTALL.md`.
+- `uticen_lite/store/repo.py` (`get/set_check_updates_on_launch`, **default True** since PR #110, in
+  `project.system`).
+- `tests/plane/test_dashboard_upgrade.py::test_badge_empty_when_toggle_off`,
+  `tests/plane/test_settings_updates.py::test_refresh_indicator_skips_check_when_toggle_off` (both set
+  the toggle OFF then assert the check ran 0×); `tests/store/test_repo_update_setting.py::test_default_is_true`.
+- Reworded claim sites: `README.md`, `docs/INSTALL.md`, `PRODUCT-MAP.md`.

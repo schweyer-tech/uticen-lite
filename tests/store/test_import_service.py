@@ -2,15 +2,16 @@ from pathlib import Path
 
 import pytest
 
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.import_service import (
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.import_service import (
     demo_source_dir,
     import_project,
     load_demo,
+    reset_to_demo,
 )
-from controlflow_sdk.store.migrations import migrate
-from controlflow_sdk.store.run_service import run_control_in_store
+from uticen_lite.store.migrations import migrate
+from uticen_lite.store.run_service import run_control_in_store
 
 
 def _fresh_store(tmp_path: Path):
@@ -22,9 +23,9 @@ def _fresh_store(tmp_path: Path):
 def test_import_project_returns_counts_and_rows(tmp_path: Path):
     conn = _fresh_store(tmp_path)
     n_controls, n_sources = import_project(conn, Path("examples/northwind-trading").resolve())
-    assert (n_controls, n_sources) == (8, 8)
-    assert len(repo.list_controls(conn)) == 8
-    assert len(repo.list_sources(conn)) == 8
+    assert (n_controls, n_sources) == (9, 9)
+    assert len(repo.list_controls(conn)) == 9
+    assert len(repo.list_sources(conn)) == 9
     assert repo.get_project(conn)["name"]
     # Author-facing source titles round-trip from sources.yaml into the store.
     invoices = repo.get_source(conn, "invoices")
@@ -51,13 +52,13 @@ def test_load_demo_copies_data_and_is_runnable(tmp_path: Path):
     conn = _fresh_store(tmp_path)
 
     n_controls, n_sources = load_demo(conn, tmp_path)
-    assert (n_controls, n_sources) == (8, 8)
+    assert (n_controls, n_sources) == (9, 9)
     # Engagement carries the friendly display name, not the "northwind-trading" slug.
     assert repo.get_project(conn)["name"] == "Northwind Trading Co."
 
     # CSVs landed in the engagement so stored data/<x>.csv paths resolve.
     copied = list((tmp_path / "data").glob("*.csv"))
-    assert len(copied) == 8
+    assert len(copied) == 9
 
     # End-to-end: a demo control actually runs against the copied data.
     control_id = repo.list_controls(conn)[0]["id"]
@@ -74,8 +75,61 @@ def test_load_demo_copies_data_and_is_runnable(tmp_path: Path):
         assert cur["uploaded_at"], src["id"]
 
 
+def test_reset_to_demo_wipes_junk_and_reloads(tmp_path: Path):
+    (tmp_path / "data").mkdir()
+    conn = _fresh_store(tmp_path)
+    # Seed the kind of junk a corrupted engagement accumulates: a stray project,
+    # source, and control with ids that the pristine demo never uses.
+    repo.upsert_project(conn, name="Junk Engagement")
+    repo.upsert_source(conn, id="junk_src", format="csv", path="data/junk.csv", key_config={})
+    repo.upsert_control(
+        conn, id="JUNK.1", title="junk", objective="", narrative="",
+        framework_refs={}, test_kind="rule", rule_spec={},
+    )
+
+    n_controls, n_sources = reset_to_demo(conn, tmp_path)
+    assert n_controls > 0 and n_sources > 0
+
+    control_ids = {c["id"] for c in repo.list_controls(conn)}
+    assert "Finance.AP.1" in control_ids  # demo restored (learning 0031: assert by id)
+    assert "JUNK.1" not in control_ids  # junk control wiped
+    assert repo.get_source(conn, "junk_src") is None  # junk source wiped
+
+
+def test_reset_to_demo_preserves_app_settings(tmp_path: Path):
+    (tmp_path / "data").mkdir()
+    conn = _fresh_store(tmp_path)
+    repo.upsert_project(
+        conn,
+        name="Junk",
+        system={
+            "ai": {"provider": "anthropic", "model": "claude-x"},
+            "check_updates_on_launch": True,
+        },
+    )
+
+    reset_to_demo(conn, tmp_path)
+
+    system = repo.get_project(conn)["system"]
+    assert system["ai"] == {"provider": "anthropic", "model": "claude-x"}
+    assert system["check_updates_on_launch"] is True
+
+
+def test_reset_to_demo_clears_stale_data_files(tmp_path: Path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    stale = data_dir / "stale.csv"
+    stale.write_text("garbage,not,a,real,extract\n", encoding="utf-8")
+    conn = _fresh_store(tmp_path)
+
+    reset_to_demo(conn, tmp_path)
+
+    assert not stale.exists()  # the stale extract is gone
+    assert list(data_dir.glob("*.csv"))  # demo CSVs were re-copied
+
+
 def test_demo_source_dir_missing_raises(monkeypatch, tmp_path: Path):
-    import controlflow_sdk.store.import_service as mod
+    import uticen_lite.store.import_service as mod
 
     # Point both candidate locations at a directory that does not exist.
     monkeypatch.setattr(mod, "__file__", str(tmp_path / "store" / "import_service.py"))

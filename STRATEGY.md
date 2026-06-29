@@ -1,20 +1,20 @@
-# Product Strategy — controlflow-sdk
+# Product Strategy — uticen-lite
 
-> Durable anchor — keep it short and slow-changing. The SDK is a **sub-product of ControlFlow**; the
-> ControlFlow app's own `STRATEGY.md` holds the broader product strategy. This doc covers the SDK
+> Durable anchor — keep it short and slow-changing. The SDK is a **sub-product of Uticen**; the
+> Uticen app's own `STRATEGY.md` holds the broader product strategy. This doc covers the SDK
 > specifically. Last updated: 2026-06-19.
 
 ## Core concept (read this first)
 
-`controlflow-sdk` is **"dbt for controls"**: a standalone, pure-Python tool to author a control test
+`uticen-lite` is **"dbt for controls"**: a standalone, pure-Python tool to author a control test
 once, run it over the **entire population** locally, and produce audit-grade evidence + a workpaper +
-an **import bundle** the ControlFlow app consumes 1:1. The hard part it automates is turning a control
+an **import bundle** the Uticen app consumes 1:1. The hard part it automates is turning a control
 + a messy real-world dataset into a correct, defensible, full-population test — and lowering *who can
 do that* from an expert developer toward a GRC analyst, and eventually toward AI.
 
 ## Why it exists (the wedge)
 
-ControlFlow is sold and implemented through consulting. The SDK is the **local authoring surface** of
+Uticen is sold and implemented through consulting. The SDK is the **local authoring surface** of
 that wedge: the operator (or the client's analyst) authors and runs full-population tests on-site —
 offline, file-first, no platform rollout — then hands a bundle to the SaaS, where the continuous
 monitoring loop lives. It meets authors where they are; the heavy CCM platform is not the place to
@@ -36,21 +36,21 @@ Every engagement should compound it.
 
 ## The one hard contract
 
-**Stay bundle-compatible with the ControlFlow app.** `contract/bundle.schema.json` is the single
+**Stay bundle-compatible with the Uticen app.** `contract/bundle.schema.json` is the single
 integration surface; everything else in the SDK can change freely, the bundle shape cannot — without
 coordinating both sides (bump `schema_version`, change the SDK schema AND the app's vendored copy
 together). **Never put raw population data in the bundle** (trust boundary: definitions + run
-provenance only). See `docs/CONTRACT.md` and learning [0001](docs/learnings/0001-stay-compatible-with-the-controlflow-app.md).
+provenance only). See `docs/CONTRACT.md` and learning [0001](docs/learnings/0001-stay-compatible-with-the-uticen-app.md).
 
 ## Scope / non-goals
 
 - **In scope:** author (metadata + a rule or Python test) · run full-population · render audit-grade
   workpaper + evidence · export the import bundle. File-first local data (CSV / Parquet / Excel).
 - **Not the CCM loop.** Exception lifecycle, disposition, self-heal, sign-off, continuous monitoring
-  live in the ControlFlow SaaS — not here. The control plane stops at **author → run → view →
+  live in the Uticen SaaS — not here. The control plane stops at **author → run → view →
   export**.
 - **Not a platform.** Single-user, localhost, **brittle-by-design** (trusts the folder convention;
-  the hardened, multi-user, validated experience is paid ControlFlow). No multi-tenant / auth /
+  the hardened, multi-user, validated experience is paid Uticen). No multi-tenant / auth /
   hosting.
 - **Not live connectors.** S3 / Snowflake / REST feeds are the SaaS's job; the SDK is file-first.
 - **Not a general data/analytics tool** — purpose-built for control testing, exceptions, evidence.

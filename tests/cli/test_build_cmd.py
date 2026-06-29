@@ -1,4 +1,4 @@
-"""Tests for the ``cflow build`` subcommand (store-backed)."""
+"""Tests for the ``uticen-lite build`` subcommand (store-backed)."""
 
 from __future__ import annotations
 
@@ -8,12 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from controlflow_sdk.bundle import read_bundle
-from controlflow_sdk.cli import main
-from controlflow_sdk.cli.build_cmd import build_cmd
-from controlflow_sdk.cli.import_cmd import import_cmd
-from controlflow_sdk.cli.run_cmd import run_cmd
-from controlflow_sdk.schema.validate import validate_bundle
+from uticen_lite.bundle import read_bundle
+from uticen_lite.cli import main
+from uticen_lite.cli.build_cmd import build_cmd
+from uticen_lite.cli.import_cmd import import_cmd
+from uticen_lite.cli.run_cmd import run_cmd
+from uticen_lite.schema.validate import validate_bundle
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -46,7 +46,7 @@ def test_run_then_build_from_store(tmp_path: Path) -> None:
     assert build_cmd(argparse.Namespace(dir=str(root), out=str(out), at=FIXED_AT)) == 0
     manifest = read_bundle(out)
     assert manifest["schema_version"] == "1.0"
-    assert len(manifest["controls"]) == 8
+    assert len(manifest["controls"]) == 9
     # contract conformance is asserted by tests/test_contract_export.py against the schema
 
 
@@ -100,9 +100,10 @@ class TestBuildHappyPath:
         out_zip = tmp_path / "bundle.zip"
         main(["build", str(root), "--out", str(out_zip), "--at", FIXED_AT])
         out = capsys.readouterr().out
-        # Summary line: "  BUNDLE  <path>  8 controls / 8 runs"
-        assert "8 controls" in out
-        assert "8 runs" in out
+        # Summary line: "  BUNDLE  <path>  9 controls / 11 runs"
+        # Finance.GL.1 fans out to 2 per-procedure + 1 aggregate = 3 runs; other 8 = 1 each → 11.
+        assert "9 controls" in out
+        assert "11 runs" in out
 
 
 # ---------------------------------------------------------------------------
@@ -112,7 +113,7 @@ class TestBuildHappyPath:
 
 class TestBuildNoRuns:
     def test_returns_1_when_no_runs(self, tmp_path: Path) -> None:
-        """build exits 1 when store has no runs (i.e. cflow run has not been run)."""
+        """build exits 1 when store has no runs (i.e. uticen-lite run has not been run)."""
         root = _engagement(tmp_path)
         out_zip = tmp_path / "bundle.zip"
         rc = main(["build", str(root), "--out", str(out_zip), "--at", FIXED_AT])
@@ -178,7 +179,7 @@ class TestBuildMissingStore:
     def test_build_on_dir_without_store_prints_actionable_message(
         self, tmp_path: Path, capsys: pytest.CaptureFixture
     ) -> None:
-        """The error must name the dir and point the user at `cflow import`,
+        """The error must name the dir and point the user at `uticen-lite import`,
         not leak the raw sqlite3 'no such table' text."""
         empty = tmp_path / "no-store"
         empty.mkdir()
@@ -186,5 +187,5 @@ class TestBuildMissingStore:
         main(["build", str(empty), "--out", str(out_zip), "--at", FIXED_AT])
         err = capsys.readouterr().err
         assert "No engagement store found" in err
-        assert "cflow import" in err
+        assert "uticen-lite import" in err
         assert "no such table" not in err

@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — {% if control %}Edit: {{ control.title }}{% else %}New Control{% endif %}{% endblock %}
+{% block head %}{% endblock %}
+{% block body %}
+{% if control %}
+{% set active = 'definition' %}{% include "partials/_control_header.html" %}
+{% else %}
+<a class="crumb" href="/">← Controls</a>
+<div class="page-head">
+  <h1>New control</h1>
+</div>
+{% endif %}
+
+{% if save_errors %}
+<div class="banner banner-error" role="alert">
+  <strong>This control wasn't saved.</strong>
+  <ul>
+    {% for err in save_errors %}<li>{{ err }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<form method="post" action="{% if control %}/controls/{{ control.id }}{% else %}/controls{% endif %}"{% if control %} data-source-autosave-form{% endif %}>
+  {% if control %}
+  {# Title is edited via the header pencil; carry it through so a metadata save
+     never clears it. The Control ID is an editable field below. #}
+  <input type="hidden" name="title" value="{{ control.title }}">
+  {% endif %}
+  <div class="card">
+    <h2>Details</h2>
+    <div class="field">
+      <label for="f-id">Control ID</label>
+      <input id="f-id" type="text" name="id" value="{{ control.id if control else '' }}"
+             placeholder="e.g. AC-2-01" required>
+      {% if control %}<span class="hint">Renames the control everywhere when you save.</span>{% endif %}
+    </div>
+    {% if not control %}
+    <div class="field">
+      <label for="f-title">Title</label>
+      <input id="f-title" type="text" name="title" value="" required>
+    </div>
+    {% endif %}
+    <div class="field">
+      <label for="f-obj">Objective</label>
+      <textarea id="f-obj" name="objective" rows="3">{{ control.objective if control else '' }}</textarea>
+    </div>
+    <div class="field">
+      <label for="f-narr">Narrative</label>
+      <textarea id="f-narr" name="narrative" rows="5">{{ control.narrative if control else '' }}</textarea>
+    </div>
+    <div class="field">
+      <label for="f-nist">NIST framework references</label>
+      <span class="hint">Comma-separated, e.g. AC-2, AC-5</span>
+      <input id="f-nist" type="text" name="framework_nist"
+             value="{{ control.framework_refs.nist | join(', ') if control and control.framework_refs and control.framework_refs.nist else '' }}">
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Failure thresholds</h2>
+    <p class="lead">Optional. The conclusion fails the control when either threshold is exceeded.</p>
+    <div class="field">
+      <label for="f-pct">Failure threshold %</label>
+      <input id="f-pct" type="number" step="0.01" name="failure_threshold_pct"
+             value="{{ control.failure_threshold_pct if control and control.failure_threshold_pct is not none else '' }}">
+    </div>
+    <div class="field">
+      <label for="f-cnt">Failure threshold count</label>
+      <input id="f-cnt" type="number" name="failure_threshold_count"
+             value="{{ control.failure_threshold_count if control and control.failure_threshold_count is not none else '' }}">
+    </div>
+    <div class="field">
+      <label for="f-rationale">Threshold rationale</label>
+      <span class="hint">Optional. Why this tolerance is acceptable — captured for the audit file.</span>
+      <textarea id="f-rationale" name="failure_threshold_rationale" rows="3">{{ control.failure_threshold_rationale if control and control.failure_threshold_rationale else '' }}</textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Data sources</h2>
+    {% if sources %}
+      {% if control %}
+      {# existing control: chips + searchable "+" picker, persisted via HTMX #}
+      {% include "partials/_bound_sources.html" %}
+      {% else %}
+      {# new control: checkboxes submitted with the create form (one-shot, no scroll issue) #}
+      <div class="check-list">
+        {% for source in sources %}
+        <div class="check-row">
+          <label>
+            <input type="checkbox" name="source_ids" value="{{ source.id }}">
+            <span class="src-name">{{ source.title or source.id }}</span>
+            {% if source.title %}<span class="mono muted">({{ source.id }})</span>{% endif %}
+          </label>
+          <a class="btn btn-sm btn-ghost" href="/sources/{{ source.id }}"
+             target="_blank" rel="noopener">View ↗</a>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% else %}
+    <p class="muted">No sources available. <a href="/sources">Add a source</a> first.</p>
+    {% endif %}
+  </div>
+
+  <div class="page-actions">
+    <button class="btn btn-primary" type="submit">{% if control %}Save changes{% else %}Create control{% endif %}</button>
+    <a class="btn btn-ghost" href="/">Cancel</a>
+  </div>
+</form>
+
+<script>
+// Searchable single-select data-source combobox. Clicking the ▾ arrow (or
+// focusing the field) opens the full list of sources; typing then narrows it.
+// Page-level so it survives HTMX fragment swaps (inline handlers re-bind).
+// 2026-06-28 review.
+function setSourceResultsOpen(box, open) {
+  const results = box.querySelector('.source-results');
+  const input = box.querySelector('.source-search');
+  if (results) results.hidden = !open;
+  if (input) input.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+function filterSourceOptions(input) {
+  const q = (input.value || '').trim().toLowerCase();
+  const box = input.closest('.source-combobox');
+  if (!box) return;
+  const results = box.querySelector('.source-results');
+  if (!results) return;
+  let shown = 0;
+  results.querySelectorAll('.source-option-row').forEach(function(row) {
+    const label = row.getAttribute('data-label') || '';
+    // Empty query shows every source; typing narrows to matches.
+    const match = q === '' || label.indexOf(q) !== -1;
+    row.style.display = match ? '' : 'none';
+    if (match) shown++;
+  });
+  const empty = results.querySelector('.source-no-match');
+  if (empty) empty.style.display = shown === 0 ? '' : 'none';
+  setSourceResultsOpen(box, true);
+}
+// The ▾ arrow toggles the list: open it (showing all) when closed, else collapse.
+function toggleSourceResults(button) {
+  const box = button.closest('.source-combobox');
+  if (!box) return;
+  const results = box.querySelector('.source-results');
+  if (results && !results.hidden) {
+    setSourceResultsOpen(box, false);
+  } else {
+    const input = box.querySelector('.source-search');
+    if (input) input.focus();
+    if (input) filterSourceOptions(input);
+  }
+}
+// Close on blur, but after a beat so a click on an option still registers.
+function closeSourceResults(input) {
+  setTimeout(function() {
+    const box = input.closest('.source-combobox');
+    if (box) setSourceResultsOpen(box, false);
+  }, 150);
+}
+</script>
+{% endblock %}

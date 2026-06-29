@@ -19,12 +19,12 @@ from __future__ import annotations
 import zipfile
 from pathlib import Path
 
-from controlflow_sdk.model.run import RunRecord, SourceProvenance
-from controlflow_sdk.model.violation import Violation
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.export_service import build_bundle
-from controlflow_sdk.store.migrations import migrate
+from uticen_lite.model.run import RunRecord, SourceProvenance
+from uticen_lite.model.violation import Violation
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.export_service import build_bundle
+from uticen_lite.store.migrations import migrate
 
 # --- distinctive literals so absence-assertions have real teeth ---------------
 SECRET_TOKEN = "Bearer SUPERSECRET-TOKEN-zzz123"

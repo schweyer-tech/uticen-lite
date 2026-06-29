@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import pytest
 
-from controlflow_sdk.model.run import RunRecord, SourceProvenance
-from controlflow_sdk.model.violation import Severity, Violation
-from controlflow_sdk.model.workpaper import Procedure, Workpaper
-from controlflow_sdk.render import render_html, render_markdown
+from uticen_lite.model.run import RunRecord, SourceProvenance
+from uticen_lite.model.violation import Severity, Violation
+from uticen_lite.model.workpaper import Procedure, Workpaper
+from uticen_lite.render import render_html, render_markdown
 
 # ── shared fixture ────────────────────────────────────────────────────────────
 
@@ -126,7 +126,7 @@ class TestRenderMarkdown:
         assert "no sampling" in md
 
     def test_data_source_authored_description_and_ca(self, workpaper: Workpaper) -> None:
-        from controlflow_sdk.model.workpaper import DataSample
+        from uticen_lite.model.workpaper import DataSample
 
         # The fixture's procedure already records provenance for source_id "src-1";
         # attach a render-only sample carrying authored prose for that same source.
@@ -176,9 +176,9 @@ class TestRenderMarkdown:
 
     def test_pipe_and_newline_in_violation_escaped(self) -> None:
         """Pipe in item_key and newline in description must not break the table row."""
-        from controlflow_sdk.model.run import RunRecord
-        from controlflow_sdk.model.violation import Severity, Violation
-        from controlflow_sdk.model.workpaper import Procedure, Workpaper
+        from uticen_lite.model.run import RunRecord
+        from uticen_lite.model.violation import Severity, Violation
+        from uticen_lite.model.workpaper import Procedure, Workpaper
 
         run = RunRecord(
             control_id="ctrl-x",
@@ -317,8 +317,8 @@ def _make_two_procedure_workpaper() -> Workpaper:
     Task 4's run service drives — so the renderer gets real per-procedure
     determinations.
     """
-    from controlflow_sdk.model.control import ControlDef, FrameworkRefs, Threshold
-    from controlflow_sdk.model.workpaper import ProcedureSpec, Workpaper
+    from uticen_lite.model.control import ControlDef, FrameworkRefs, Threshold
+    from uticen_lite.model.workpaper import ProcedureSpec, Workpaper
 
     control = ControlDef(
         id="ctrl-mp",

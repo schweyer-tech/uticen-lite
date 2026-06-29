@@ -1,17 +1,17 @@
 import pytest
 
-from controlflow_sdk.upgrade.command import build_upgrade_command
-from controlflow_sdk.upgrade.detect import InstallMethod
+from uticen_lite.upgrade.command import build_upgrade_command
+from uticen_lite.upgrade.detect import InstallMethod
 
 
 def test_pip_command():
     cmds = build_upgrade_command(InstallMethod.PIP, python="/py")
-    assert cmds == [["/py", "-m", "pip", "install", "-U", "controlflow-sdk"]]
+    assert cmds == [["/py", "-m", "pip", "install", "-U", "uticen-lite"]]
 
 
 def test_pipx_command():
     cmds = build_upgrade_command(InstallMethod.PIPX)
-    assert cmds == [["pipx", "upgrade", "controlflow-sdk"]]
+    assert cmds == [["pipx", "upgrade", "uticen-lite"]]
 
 
 def test_git_command_is_two_steps():

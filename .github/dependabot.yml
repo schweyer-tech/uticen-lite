@@ -1,5 +1,5 @@
 version: 2
-# controlflow-sdk is a main-only public package (no staging integration branch), so
+# uticen-lite is a main-only public package (no staging integration branch), so
 # Dependabot targets the default branch (main). Bumps auto-merge once CI (ruff + mypy +
 # pytest on 3.11/3.12) is green, via .github/workflows/dependabot-auto-merge.yml.
 # Updates are grouped so it opens one PR per ecosystem per week, not a flood.

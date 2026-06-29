@@ -14,7 +14,7 @@ from __future__ import annotations
 import io
 import json
 
-from controlflow_sdk.pipeline.lint import OFFRAMP_MESSAGE
+from uticen_lite.pipeline.lint import OFFRAMP_MESSAGE
 
 # The offramp message is HTML-escaped in the rendered page (the apostrophe in
 # "can't" becomes &#39;), so assert on an escaping-stable substring of it.
@@ -29,7 +29,7 @@ def _make_source(client, sid, csv):
 
 
 def _conn(client):
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store.db import connect
     return connect(client.app.state.project_root)
 
 
@@ -53,7 +53,7 @@ def test_save_pure_pipeline_derives_sources_and_compiles_to_rule_spec(client):
                        follow_redirects=False)
     assert resp.status_code in (302, 303)
 
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "pipe1")
     conn.close()
@@ -96,7 +96,7 @@ def test_save_cross_source_pipeline_compiles_to_test_code(client):
                        follow_redirects=False)
     assert resp.status_code in (302, 303)
 
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "pipe2")
     conn.close()
@@ -107,6 +107,45 @@ def test_save_cross_source_pipeline_compiles_to_test_code(client):
     assert c["test_code"] is not None
     assert "def test(pop, sources):" in c["test_code"]
     assert c["rule_spec"] is None
+
+
+def test_save_cross_source_pipeline_ignores_placeholder_filter_condition(client):
+    _make_source(client, "access_accounts",
+                 b"account_id,employee_id,is_active\nA1,E1,true\nA2,E2,true\n")
+    _make_source(client, "employees", b"employee_id,status\nE1,terminated\nE2,active\n")
+    graph = {"nodes": [
+        {"id": "acc", "type": "import", "source_id": "access_accounts"},
+        {"id": "active", "type": "filter", "inputs": ["acc"],
+         "config": {"logic": "all",
+                    "conditions": [
+                        {"column": "is_active", "op": "eq", "value": "true"},
+                        {"column": "", "op": "eq", "value": ""},
+                    ]}},
+        {"id": "emp", "type": "import", "source_id": "employees"},
+        {"id": "term", "type": "filter", "inputs": ["emp"],
+         "config": {"logic": "all",
+                    "conditions": [{"column": "status", "op": "eq", "value": "terminated"}]}},
+        {"id": "join", "type": "join", "inputs": ["active", "term"],
+         "config": {"left_key": "employee_id", "right_key": "employee_id", "mode": "inner"}},
+        {"id": "tst", "type": "test", "inputs": ["join"],
+         "config": {"logic": "any", "severity": "critical", "item_key_column": "account_id",
+                    "conditions": [{"column": "account_id", "op": "not_empty"}]}},
+    ]}
+    client.post("/controls", data={
+        "id": "pipe2b", "title": "Cross Blank", "objective": "", "narrative": "",
+    }, follow_redirects=False)
+    resp = client.post("/controls/pipe2b/logic/builder",
+                       data={"pipeline_json": json.dumps(graph)},
+                       follow_redirects=False)
+    assert resp.status_code in (302, 303)
+
+    from uticen_lite.store import repo
+    conn = _conn(client)
+    c = repo.get_control(conn, "pipe2b")
+    conn.close()
+    assert c["test_kind"] == "pipeline"
+    assert c["test_code"] is not None
+    assert c["source_ids"] == ["access_accounts", "employees"]
 
 
 # ---------------------------------------------------------------------------
@@ -146,7 +185,7 @@ def test_save_rejects_custom_node_that_reads_a_file(client):
     assert resp.status_code == 422
     assert _OFFRAMP_STABLE in resp.text
     # The control shell exists but the unsafe pipeline was NOT persisted.
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "bad1")
     conn.close()
@@ -161,7 +200,7 @@ def test_save_rejects_custom_node_using_read_csv(client):
     assert resp.status_code == 422
     assert "read_csv" in resp.text
     assert _OFFRAMP_STABLE in resp.text
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "bad2")
     conn.close()
@@ -174,7 +213,7 @@ def test_save_rejects_custom_node_using_dunder_import(client):
                           _custom_pipeline("m = __import__('os')\nrows = rows"))
     assert resp.status_code == 422
     assert "__import__" in resp.text
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "bad3")
     conn.close()
@@ -187,7 +226,7 @@ def test_save_rejects_custom_node_using_eval(client):
                           _custom_pipeline("rows = eval('rows')"))
     assert resp.status_code == 422
     assert "eval" in resp.text
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "bad4")
     conn.close()
@@ -201,7 +240,7 @@ def test_save_accepts_clean_custom_transform_node(client):
     resp = _post_pipeline(client, "ok1", graph)
     # A clean rows→rows node saves normally (303 redirect to the control).
     assert resp.status_code in (302, 303)
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "ok1")
     conn.close()
@@ -260,7 +299,7 @@ def test_save_single_import_test_with_not_exists_in_binds_both_sources(client):
                        follow_redirects=False)
     assert resp.status_code in (302, 303), f"save failed: {resp.status_code} {resp.text[:200]}"
 
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "cross1")
     conn.close()
@@ -330,3 +369,145 @@ def test_run_with_not_exists_in_condition_succeeds_without_unknown_source_error(
     view = client.get(run_url)
     assert view.status_code == 200
     assert "U3" in view.text  # the one violation (Carol, in terminated list)
+
+
+# ---------------------------------------------------------------------------
+# Regression: adding a blank condition via the Builder must not 500
+# ---------------------------------------------------------------------------
+
+def test_save_pipeline_with_blank_condition_placeholder_does_not_500(client):
+    """Regression for the "+Add condition" 500 in Logic Builder.
+
+    When the user clicks "+ Add condition" the JS submits the form with an empty
+    placeholder ``{column:'', op:'eq', value:''}``.  Before the fix,
+    ``_emit_terminal_rule`` called ``parse_rule_spec`` on the RAW (unfiltered)
+    conditions dict, raising ``RuleSpecError`` uncaught as a 500.
+
+    The save must succeed (303 redirect) with the blank condition silently
+    dropped from the compiled artifact; the stored ``pipeline`` column retains
+    it so the UI re-renders the empty row correctly.
+    """
+    _make_source(client, "blank_cond_src",
+                 b"emp_id,status\nE1,active\nE2,terminated\n")
+    _make_source(client, "blank_cond_src2",
+                 b"emp_id,dept\nE1,eng\nE2,hr\n")
+
+    # Non-pure pipeline (two Imports → Join → Test) with a blank condition
+    # placeholder on the Test node — exactly what "+Add condition" produces.
+    graph = {"nodes": [
+        {"id": "imp1", "type": "import", "source_id": "blank_cond_src",
+         "inputs": [], "config": {}},
+        {"id": "imp2", "type": "import", "source_id": "blank_cond_src2",
+         "inputs": [], "config": {}},
+        {"id": "join", "type": "join", "inputs": ["imp1", "imp2"],
+         "config": {"mode": "inner", "left_key": "emp_id", "right_key": "emp_id"}},
+        {"id": "tst", "type": "test", "inputs": ["join"],
+         "config": {"logic": "all", "item_key_column": "emp_id",
+                    "conditions": [
+                        {"column": "status", "op": "eq", "value": "active"},
+                        {"column": "", "op": "eq", "value": ""},  # blank placeholder
+                    ]}},
+    ]}
+    client.post("/controls", data={
+        "id": "blank1", "title": "Blank cond", "objective": "o", "narrative": "n",
+    }, follow_redirects=False)
+    resp = client.post("/controls/blank1/logic/builder",
+                       data={"pipeline_json": json.dumps(graph)},
+                       follow_redirects=False)
+    # Must be 303 redirect, NOT 500.
+    assert resp.status_code in (302, 303), (
+        f"expected redirect (303), got {resp.status_code} — "
+        f"blank condition 500 regression: {resp.text[:300]}"
+    )
+
+    from uticen_lite.store import repo
+    conn = _conn(client)
+    c = repo.get_control(conn, "blank1")
+    conn.close()
+    assert c is not None
+    # The blank condition must be stripped from the compiled artifact.
+    assert c["test_code"] is not None
+    assert '""' not in c["test_code"] or "column" not in c["test_code"]
+    # The stored pipeline graph retains the blank condition for UI round-trip.
+    assert c["pipeline"] is not None
+
+
+# ---------------------------------------------------------------------------
+# Autosave mode: in-place fragment response (no redirect)
+# ---------------------------------------------------------------------------
+
+def _make_simple_graph() -> dict:
+    """Single-Import + Test graph that compiles cleanly."""
+    return {"nodes": [
+        {"id": "imp", "type": "import", "source_id": "acct_as",
+         "narrative": "All accounts"},
+        {"id": "tst", "type": "test", "inputs": ["imp"],
+         "config": {"logic": "all", "severity": "high",
+                    "item_key_column": "account_id",
+                    "conditions": [{"column": "is_active", "op": "eq",
+                                    "value": "true"}]}},
+    ]}
+
+
+def test_autosave_returns_fragment_not_redirect(client):
+    """Posting autosave=1 on a valid graph MUST return 200 HTML fragment, NOT redirect."""
+    _make_source(client, "acct_as",
+                 b"account_id,is_active\nA1,true\nA2,false\n")
+    client.post("/controls", data={
+        "id": "as1", "title": "AS Test", "objective": "o", "narrative": "n",
+    }, follow_redirects=False)
+
+    resp = client.post(
+        "/controls/as1/logic/builder",
+        data={"pipeline_json": json.dumps(_make_simple_graph()), "autosave": "1"},
+        follow_redirects=False,
+    )
+
+    # Must be 200 fragment, not 302/303.
+    assert resp.status_code == 200, (
+        f"autosave should return 200 fragment, got {resp.status_code}"
+    )
+    # Must NOT be a redirect.
+    assert resp.status_code not in (302, 303)
+    # The fragment must contain card HTML (the pipe-insert affordance).
+    assert "pipe-insert" in resp.text, "expected pipe-cards fragment in autosave response"
+
+    # The control MUST still be persisted after autosave.
+    from uticen_lite.store import repo
+    conn = _conn(client)
+    c = repo.get_control(conn, "as1")
+    conn.close()
+    assert c is not None
+    assert c["test_kind"] == "pipeline"
+    assert c["pipeline"] is not None
+
+
+def test_autosave_validation_error_returns_422_not_redirect(client):
+    """Posting autosave=1 with an unsafe graph returns 422 (not redirect, not 500)."""
+    _make_source(client, "journal_entries", b"entry_id,amount\nE1,100\n")
+    client.post("/controls", data={
+        "id": "as2", "title": "AS Err", "objective": "o", "narrative": "n",
+    }, follow_redirects=False)
+
+    resp = client.post(
+        "/controls/as2/logic/builder",
+        data={
+            "pipeline_json": json.dumps(_custom_pipeline("rows = open('/etc/passwd').read()")),
+            "autosave": "1",
+        },
+        follow_redirects=False,
+    )
+
+    # Must be 422 (validation error), not a redirect, not a 500.
+    assert resp.status_code == 422, (
+        f"autosave error should return 422, got {resp.status_code}"
+    )
+    assert _OFFRAMP_STABLE in resp.text
+
+    # The pipeline must NOT be persisted after a failed autosave.
+    from uticen_lite.store import repo
+    conn = _conn(client)
+    c = repo.get_control(conn, "as2")
+    conn.close()
+    assert c is not None
+    assert c["pipeline"] is None

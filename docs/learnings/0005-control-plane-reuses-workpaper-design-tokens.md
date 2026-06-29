@@ -12,8 +12,8 @@ superseded_by: null
 
 ## Context
 
-The control plane (`controlflow_sdk/plane/`) and the workpaper renderer
-(`controlflow_sdk/render/html.py`) are two separate HTML surfaces, but they are the *same product*:
+The control plane (`uticen_lite/plane/`) and the workpaper renderer
+(`uticen_lite/render/html.py`) are two separate HTML surfaces, but they are the *same product*:
 the app is where a consultant authors a control, and the workpaper is the document that same run
 produces. They were restyled (PR #16) to share one design system so the authoring surface feels like
 the document it exports — the same dark navy palette, Inter + JetBrains Mono, 8px-radius cards,
@@ -21,7 +21,7 @@ green/amber/red status colors, pill badges, and metric tiles.
 
 The catch: the two surfaces **do not share a stylesheet.** The workpaper is a single self-contained
 HTML file with its CSS inlined in `render/html.py` (it has to be — it travels on its own, offline, no
-external assets). The app's CSS lives in `controlflow_sdk/plane/static/app.css`. So the shared look is
+external assets). The app's CSS lives in `uticen_lite/plane/static/app.css`. So the shared look is
 a **convention, not an import** — the token values are duplicated by hand in both files, and nothing
 mechanically keeps them aligned. A second consequence: a light/dark theme toggle was cheap to add to
 the app *only because every color was already a CSS custom property* — light mode is one
@@ -46,13 +46,20 @@ the app *only because every color was already a CSS custom property* — light m
 - **The embedded workpaper stays as-is inside the app.** `run_view.html` embeds the workpaper via an
   `<iframe srcdoc>`; it is a fixed, self-contained artifact (the SDK's contract output) and keeps its
   own dark styling in both app themes. Do not try to re-theme the embedded workpaper from the app.
+- **To restyle ONE page's use of a shared structural class, add a modifier class — never mutate the
+  base class.** `.page-head` is included by ~20 `plane/` templates; making `.page-head` itself
+  `display:flex` to push one page's button to the right silently re-lays-out every other page. Scope
+  it: keep the base rule, add `<div class="page-head control-head">` and a `.control-head { display:
+  flex; ... }` rule that only that page carries (2026-06-27: the control-editor split header). Same
+  guard for `.card`, `.field`, `.btn` — grep the template tree for the class before changing its base
+  rule, and put per-page behavior on a modifier.
 
 ## Reference
 
-- `controlflow_sdk/plane/static/app.css` — token definitions (`:root` + `[data-theme="light"]`); the
+- `uticen_lite/plane/static/app.css` — token definitions (`:root` + `[data-theme="light"]`); the
   header comment names `render/html.py` as the palette source of truth.
-- `controlflow_sdk/render/html.py` (CSS block, ~lines 62–332) — the workpaper's inlined tokens that
+- `uticen_lite/render/html.py` (CSS block, ~lines 62–332) — the workpaper's inlined tokens that
   the app mirrors.
-- `controlflow_sdk/plane/templates/base.html` — no-flash theme bootstrap script (head) + toggle.
-- `controlflow_sdk/plane/templates/control_edit.html` — dark CodeMirror override driven by `--cm-*`
+- `uticen_lite/plane/templates/base.html` — no-flash theme bootstrap script (head) + toggle.
+- `uticen_lite/plane/templates/control_edit.html` — dark CodeMirror override driven by `--cm-*`
   tokens (must load after `codemirror.min.css` to win).

@@ -1,6 +1,6 @@
-from controlflow_sdk.pipeline.compile import compile_pipeline
-from controlflow_sdk.pipeline.model import parse_pipeline
-from controlflow_sdk.plane.logic_view import derive_builder_graph, is_raw_python
+from uticen_lite.pipeline.compile import compile_pipeline
+from uticen_lite.pipeline.model import parse_pipeline
+from uticen_lite.plane.logic_view import derive_builder_graph, is_raw_python
 
 
 def test_stored_pipeline_is_returned_verbatim():

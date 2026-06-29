@@ -298,3 +298,55 @@ sources:
         display_name: Last Modified By
         data_type: text
         is_key: false
+
+  # Snapshotted from a PUBLIC API to demonstrate the "fetch from URL" on-ramp.
+  # The local CSV is the source of truth (one-time snapshot-to-file; see learning
+  # 0025) — origin: Open-Meteo (https://api.open-meteo.com/v1/forecast, no API key).
+  - id: datacenter_weather
+    type: file
+    title: Data Center Site Weather (Open-Meteo)
+    description: >
+      Current outdoor temperature/wind for each data-center site, snapshotted once
+      from the public Open-Meteo API (api.open-meteo.com) and frozen to a local CSV.
+    completeness_accuracy: One-time snapshot of the Open-Meteo current-conditions API for the 8 in-scope data-center sites.
+    extract_date: "2026-03-31"
+    config:
+      path: data/datacenter_weather.csv
+      format: csv
+    key_config:
+      mode: single
+      columns:
+        - site_id
+    column_mappings:
+      - original_name: site_id
+        display_name: Site ID
+        data_type: text
+        is_key: true
+      - original_name: city
+        display_name: City
+        data_type: text
+        is_key: false
+      - original_name: country
+        display_name: Country
+        data_type: text
+        is_key: false
+      - original_name: latitude
+        display_name: Latitude
+        data_type: number
+        is_key: false
+      - original_name: longitude
+        display_name: Longitude
+        data_type: number
+        is_key: false
+      - original_name: temperature_c
+        display_name: Temperature (°C)
+        data_type: number
+        is_key: false
+      - original_name: wind_kmh
+        display_name: Wind (km/h)
+        data_type: number
+        is_key: false
+      - original_name: observed_at
+        display_name: Observed At
+        data_type: text
+        is_key: false

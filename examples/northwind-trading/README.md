@@ -1,6 +1,6 @@
 # Northwind Trading Co.
 
-A complete, ready-to-run audit control example demonstrating the ControlFlow SDK on realistic financial, IT access, and procurement data.
+A complete, ready-to-run audit control example demonstrating the Uticen SDK on realistic financial, IT access, and procurement data.
 
 ## The Company
 
@@ -14,11 +14,11 @@ All data is **frozen as of 2026-03-31** — the control execution date. This ens
 
 ## The Controls
 
-Eight production-ready audit controls span financial, IT access, and procurement domains:
+Nine production-ready audit controls span financial, IT access, and procurement domains:
 
 | Control ID | Domain | Data Sources | NIST Ref | What It Flags | Exceptions |
 |---|---|---|---|---|---|
-| **manual-je-review** | Financial | journal_entries | AC-5 | Manual journal entries ≥$50k that are self-reviewed or lack a reviewer | 3 |
+| **manual-je-review** | Financial | journal_entries | AC-5 | **Two-procedure** showcase — **P1 · Independent Review** (self-reviewed material JE, Custom Python) + **P2 · Reviewer Assigned** (no reviewer assigned, no-code) — both over the \|amount\| ≥ $50k population | 3 |
 | **closed-period-postings** | Financial | journal_entries, closed_periods | — | Journal entries posted to accounting periods marked as closed | 2 |
 | **three-way-match** | Financial/Procurement | payments, invoices, purchase_orders | — | Payments without a matching approved PO (±1% tolerance) | 4 |
 | **terminated-access** | IT Access | access_accounts, employees | AC-2 | Active system accounts owned by terminated employees | 3 |
@@ -26,15 +26,18 @@ Eight production-ready audit controls span financial, IT access, and procurement
 | **mfa-enforcement** | IT Access | access_accounts | IA-2 | Active accounts without multi-factor authentication enabled | 0 ✓ |
 | **duplicate-payments** | Procurement | payments | — | Payments to the same vendor for the same amount within 5 days | 2 |
 | **vendor-master-sod** | Procurement | payments, vendor_master | AC-5 | Payments approved by the vendor master creator or last modifier | 2 |
+| **datacenter-temperature** | Facilities | datacenter_weather | PE-14 | Data-center sites running above the 27°C safe-operating ceiling | 2 |
 
 **Note:** `mfa-enforcement` is a passing control — all active accounts have MFA enabled. Its workpaper is included to demonstrate a clean audit result.
+
+**Public-API source:** `datacenter-temperature` is built on `datacenter_weather`, a source **snapshotted once from the public [Open-Meteo](https://open-meteo.com) API** (no API key) and frozen to `data/datacenter_weather.csv`. It demonstrates Uticen Lite's "fetch from URL" on-ramp — the local snapshot is the source of truth (one-time snapshot-to-file), so the test stays fully offline and deterministic. To reproduce the fetch in the app: **Sources → Add source → Fetch from URL** with an Open-Meteo `current=temperature_2m,wind_speed_10m` request.
 
 ## Run It Locally
 
 Execute the full population control test suite and generate HTML workpapers:
 
 ```bash
-cflow run . --at 2026-03-31T00:00:00Z
+uticen-lite run . --at 2026-03-31T00:00:00Z
 ```
 
 Results appear in `target/workpapers/`:
@@ -53,12 +56,12 @@ open target/workpapers/mfa-enforcement.html  # Clean control
 - Execution timestamp
 - Framework references (NIST 800-53, etc.)
 
-## Import Into ControlFlow
+## Import Into Uticen
 
-Build an importable bundle and upload it to the ControlFlow SaaS application:
+Build an importable bundle and upload it to the Uticen SaaS application:
 
 ```bash
-cflow build . --out import-bundle.zip --at 2026-03-31T00:00:00Z
+uticen-lite build . --out import-bundle.zip --at 2026-03-31T00:00:00Z
 ```
 
 Then in the app:
@@ -69,8 +72,8 @@ Then in the app:
 4. Select `import-bundle.zip`
 
 The import lands:
-- **8 controls** with full metadata (title, objective, narrative, NIST framework refs)
-- **8 workpapers** — one per control, including the passing `mfa-enforcement`
+- **9 controls** with full metadata (title, objective, narrative, NIST framework refs)
+- **9 workpapers** — one per control, including the passing `mfa-enforcement`
 - **18 exceptions** — flagged violations across all controls (the 3 controls with 0 exceptions show passing results)
 - **Full provenance** — SHA256 hashes and row counts embedded in each workpaper
 
@@ -145,7 +148,7 @@ dicts (`item_key`, `description`, `severity`, `details`):
 > logic stays inspectable in the builder. The `test.py` files kept in each control directory
 > are documentation of the equivalent logic, not the executed artifact.
 
-**For authoring controls**, refer to the [ControlFlow SDK README](../../README.md) for:
+**For authoring controls**, refer to the [Uticen SDK README](../../README.md) for:
 - Control YAML structure (objective, narrative, framework_refs)
 - The no-code rule grammar and the `test()` signature / exception format
 - Execution environment (pandas, numpy, standard library)
@@ -153,4 +156,4 @@ dicts (`item_key`, `description`, `severity`, `details`):
 
 ---
 
-**Questions?** See `docs/` in the ControlFlow SDK or reach out to the audit team.
+**Questions?** See `docs/` in the Uticen SDK or reach out to the audit team.

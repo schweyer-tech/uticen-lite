@@ -1,0 +1,14 @@
+<div class="card" style="border-color:var(--accent); margin-bottom:18px;">
+  <div class="card-head" style="border:none; padding:0; margin:0;">
+    <h2 style="margin:0;">⬆ Update available: {{ info.latest }}</h2>
+    <div class="spacer"></div>
+    <a class="btn btn-ghost btn-sm" target="_blank" rel="noopener"
+       href="https://github.com/schweyer-tech/uticen-lite/releases">What's new</a>
+    <button class="btn btn-primary btn-sm"
+            hx-post="/upgrade" hx-target="body" hx-swap="innerHTML"
+            hx-confirm="This will close the app and upgrade uticen-lite. Continue?">
+      Update now
+    </button>
+  </div>
+  <p class="lead" style="margin-bottom:0;">{{ info.message }}</p>
+</div>

@@ -1,4 +1,4 @@
-"""Tests for the cflow CLI (validate subcommand — deprecated stub)."""
+"""Tests for the uticen-lite CLI (validate subcommand — deprecated stub)."""
 
 from __future__ import annotations
 
@@ -6,10 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from controlflow_sdk.cli import main
+from uticen_lite.cli import main
 
 # ---------------------------------------------------------------------------
-# cflow validate (deprecated stub — returns 0)
+# uticen-lite validate (deprecated stub — returns 0)
 # ---------------------------------------------------------------------------
 
 
@@ -51,7 +51,7 @@ class TestUnknownSubcommand:
 
 
 # ---------------------------------------------------------------------------
-# cflow --version (argparse "version" action prints to stdout and exits 0)
+# uticen-lite --version (argparse "version" action prints to stdout and exits 0)
 # ---------------------------------------------------------------------------
 
 
@@ -68,11 +68,11 @@ class TestVersion:
         """--version prints the prog name and the installed distribution version."""
         from importlib.metadata import version
 
-        expected = version("controlflow-sdk")
+        expected = version("uticen-lite")
         with pytest.raises(SystemExit):
             main(["--version"])
         out = capsys.readouterr().out
-        assert "cflow" in out
+        assert "uticen-lite" in out
         assert expected in out
 
     def test_version_helper_falls_back_gracefully(self) -> None:
@@ -80,7 +80,7 @@ class TestVersion:
         from importlib.metadata import PackageNotFoundError
         from unittest.mock import patch
 
-        from controlflow_sdk.cli import _version
+        from uticen_lite.cli import _version
 
         with patch(
             "importlib.metadata.version", side_effect=PackageNotFoundError("x")

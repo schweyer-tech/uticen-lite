@@ -44,8 +44,8 @@ convention holds.
 
 ## Reference
 
-- `controlflow_sdk/store/migrations.py` (step 3: `source_files` + backfill).
-- `controlflow_sdk/store/repo.py` (`set_initial_file` / `record_current_file` / `archive_current_file`
+- `uticen_lite/store/migrations.py` (step 3: `source_files` + backfill).
+- `uticen_lite/store/repo.py` (`set_initial_file` / `record_current_file` / `archive_current_file`
   / `set_current_file_asof` — the last syncs `sources.extract_date`).
-- `controlflow_sdk/plane/routes/sources.py` (`create_source`, `confirm_refresh`, `update_asof`).
+- `uticen_lite/plane/routes/sources.py` (`create_source`, `confirm_refresh`, `update_asof`).
 - Cardinal contract: learning [[0001]]; gate `tests/test_contract_export.py` + `tests/schema/test_bundle_schema.py`.

@@ -37,8 +37,8 @@ fails on a real leak) catches it. Keep all of this store-only: it never touches 
 `schema_version` [[0001]].
 
 ## Reference
-- `controlflow_sdk/store/migrations.py` (`source_fetch` table, headers column comment)
-- `controlflow_sdk/plane/templates/source_new.html`, `source_data.html`, `source_history.html` (the warning callouts)
+- `uticen_lite/store/migrations.py` (`source_fetch` table, headers column comment)
+- `uticen_lite/plane/templates/source_new.html`, `source_data.html`, `source_history.html` (the warning callouts)
 - `tests/store/test_bundle_excludes_fetch_secrets.py` (the positive bundle-exclusion guard, with teeth-check)
 - Cardinal rule [[0001]]; egress discipline [[0017]]
 </content>

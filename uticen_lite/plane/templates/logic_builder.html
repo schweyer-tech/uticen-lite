@@ -1,0 +1,729 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — Logic Builder: {{ control.title if control else control_id }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="/static/codemirror.min.css">
+<style>
+  /* ── stacked node cards ─────────────────────────────────────────────── */
+  .pipe-cards { display: flex; flex-direction: column; gap: 0; }
+  /* Wrapping/expandable field textareas + pop-out modal (2026-06-27 review) */
+  .pipe-textarea {
+    flex: 1; min-width: 240px; resize: vertical; min-height: 38px;
+    font-family: inherit; font-size: 13px; line-height: 1.4;
+  }
+  .pipe-row-field { align-items: flex-start; }
+  .pipe-expand { flex: 0 0 auto; }
+  .field-modal {
+    width: min(820px, 92vw); border: 1px solid var(--border-strong);
+    border-radius: var(--radius-card); background: var(--bg-surface-1);
+    color: var(--text-primary); padding: 0;
+  }
+  .field-modal::backdrop { background: rgba(0, 0, 0, 0.5); }
+  .field-modal-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .field-modal-head { display: flex; align-items: center; justify-content: space-between; }
+  .field-modal-head h3 { margin: 0; }
+  .field-modal-text {
+    width: 100%; min-height: 320px; resize: vertical;
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.5;
+  }
+  .field-modal .CodeMirror { height: 360px; border: 1px solid var(--border-strong); border-radius: 6px; }
+  .pipe-card {
+    background: var(--bg-surface-1); border: 1px solid var(--border-default);
+    border-radius: var(--radius-card); padding: 14px 16px; position: relative;
+    box-shadow: var(--shadow-card);
+  }
+  .pipe-card.terminal { border-color: var(--accent-primary); }
+  .pipe-card.node-error { border-color: var(--status-critical); }
+  .pipe-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .pipe-kind {
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 2px 8px; border-radius: var(--radius-badge);
+    background: var(--accent-muted); color: var(--accent-primary);
+  }
+  .pipe-kind.k-import { background: var(--status-info-muted); color: var(--status-info); }
+  .pipe-kind.k-filter { background: var(--status-warning-muted); color: var(--status-warning); }
+  .pipe-kind.k-join { background: var(--accent-muted); color: var(--accent-primary); }
+  .pipe-kind.k-custom_python { background: var(--bg-surface-3); color: var(--text-secondary); }
+  .pipe-kind.k-test { background: var(--status-success-muted); color: var(--status-success); }
+  .pipe-id { font-family: var(--font-mono); font-size: 12px; color: var(--text-tertiary); }
+  .pipe-id-sub { font-size: 11px; color: var(--text-tertiary); opacity: 0.7; }
+  .pipe-count {
+    margin-left: auto; font-family: var(--font-mono); font-size: 12px;
+    color: var(--text-secondary); white-space: nowrap;
+  }
+  .pipe-count strong { color: var(--text-primary); }
+  .pipe-body { display: grid; gap: 8px; }
+  .pipe-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .pipe-row label { font-size: 12px; color: var(--text-secondary); min-width: 80px; }
+  .pipe-card select, .pipe-card input[type=text] {
+    font-size: 13px; padding: 5px 8px;
+    background: var(--bg-input); color: var(--text-primary);
+    border: 1px solid var(--border-default); border-radius: var(--radius-input);
+  }
+  .node-err-msg {
+    color: var(--status-critical); font-size: 12px; margin-top: 6px;
+    padding: 8px 10px; background: var(--status-critical-muted);
+    border-radius: var(--radius-input);
+  }
+  .pipe-cond { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+  /* ── inter-step insert affordances ──────────────────────────────────────
+     A "+" hub sits at every gap (start, between each card, end). It's always
+     visible (discoverable); clicking it opens an inline type menu and splices a
+     new step into the chain at that position. The mid zones also draw the
+     connector spine the old .pipe-connector used to. */
+  .pipe-insert {
+    position: relative; display: flex; flex-direction: column; align-items: center;
+    padding: 4px 0;
+  }
+  .pipe-insert.pipe-insert-mid { padding: 7px 0; }
+  .pipe-insert.pipe-insert-mid::before {
+    content: ""; position: absolute; top: 0; bottom: 0; left: 50%;
+    width: 2px; margin-left: -1px; background: var(--border-strong);
+  }
+  .pipe-insert-toggle {
+    position: relative; z-index: 1; width: 22px; height: 22px; padding: 0;
+    border-radius: 50%; border: 1px solid var(--border-strong);
+    background: var(--bg-surface-1); color: var(--text-tertiary);
+    font-size: 16px; line-height: 1; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: color .12s, border-color .12s, background .12s, transform .12s;
+  }
+  .pipe-insert-toggle:hover {
+    color: var(--accent-primary); border-color: var(--accent-primary);
+    background: var(--bg-surface-2);
+  }
+  .pipe-insert.open .pipe-insert-toggle {
+    background: var(--accent-muted); color: var(--accent-primary);
+    border-color: var(--accent-primary); transform: rotate(45deg);
+  }
+  .pipe-insert-menu {
+    display: none; align-items: center; justify-content: center;
+    gap: 6px; flex-wrap: wrap; margin-top: 8px;
+    padding: 8px 10px; background: var(--bg-surface-1);
+    border: 1px solid var(--border-default); border-radius: var(--radius-card);
+  }
+  .pipe-insert.open .pipe-insert-menu { display: flex; }
+  .pipe-insert-hint {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--text-tertiary); margin-right: 2px;
+  }
+  .pipe-insert-cue {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--border-strong);
+    color: var(--text-tertiary); font-size: 12px; line-height: 1; vertical-align: -3px;
+  }
+
+  /* ── raw-python notice ──────────────────────────────────────────────── */
+  .raw-python-notice {
+    padding: 16px 20px; border: 1px solid var(--border-default);
+    border-radius: var(--radius-card); background: var(--bg-surface-1);
+    color: var(--text-secondary); font-size: 14px;
+  }
+
+  /* ── autosave status affordance ─────────────────────────────────────── */
+  #autosave-status {
+    font-size: 12px; margin-left: 8px; color: var(--text-tertiary);
+    transition: color .15s;
+  }
+  #autosave-status.autosave-saving { color: var(--text-secondary); }
+  #autosave-status.autosave-saved  { color: var(--status-success); }
+  #autosave-status.autosave-error  { color: var(--status-critical); }
+</style>
+{% endblock %}
+{% block body %}
+{% if control %}
+{% set active = 'logic' %}{% include "partials/_control_header.html" %}
+{% else %}
+<a class="crumb" href="/controls/{{ control_id }}">← {{ control_id }}</a>
+<div class="page-head">
+  <h1>Logic</h1>
+  <p class="muted mono">{{ control_id }}</p>
+</div>
+{% endif %}
+{% if logic_tab is defined %}{% include "partials/_logic_tabs.html" %}{% endif %}
+
+<p class="lead">Build the control as a flow of typed steps. Data enters only through
+  <strong>Import</strong> nodes; the row-count after each step is your sanity check
+  (a step dropping to 0 is the tell).</p>
+
+{% if save_errors %}
+<div class="banner banner-error" role="alert">
+  <strong>This pipeline wasn't saved.</strong>
+  <ul>{% for err in save_errors %}<li>{{ err }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+{% if parse_error %}
+<div class="banner banner-error" role="alert">{{ parse_error }}</div>
+{% endif %}
+
+{% if raw_python %}
+<div class="card">
+  <div class="card-head"><h2>Steps</h2></div>
+  <div class="raw-python-notice">
+    This control's logic was authored directly in Python via the Python tab.
+    The visual builder is not available for hand-written Python controls.
+    Switch to the <a href="/controls/{{ control_id }}/logic/python">Python tab</a>
+    to edit the code directly.
+  </div>
+</div>
+{% else %}
+<form method="post" action="/controls/{{ control_id }}/logic/builder" id="pipeline-form">
+  <input type="hidden" name="pipeline_json" id="pipeline-json" value="">
+
+  <div class="card">
+    <div class="card-head"><h2>Steps</h2>
+      <div class="spacer"></div>
+      <span class="muted" style="font-size:12px;">Click a <span class="pipe-insert-cue">+</span>
+        between steps to insert one there</span>
+    </div>
+    {# Cards + per-gap insert affordances. Shared with the AI-apply HTMX swap so
+       inserting stays available after a draft is applied (handlers delegated). #}
+    <div class="pipe-cards" id="pipe-cards">
+      {% include "partials/_pipe_cards.html" %}
+    </div>
+
+    <div class="page-actions">
+      <button class="btn btn-primary" type="submit">Save pipeline</button>
+      <button class="btn btn-sm btn-ghost" type="button" id="recalc-btn"
+              title="Recalculate row counts and refresh the pipeline visualization">
+        ↻ Recalculate
+      </button>
+      <span id="autosave-status" aria-live="polite"></span>
+      <a class="btn btn-sm" href="/controls/{{ control_id }}/logic/export-steps.xlsx">
+        Export step workbook (.xlsx)</a>
+    </div>
+  </div>
+</form>
+
+{# Pop-out editor modal for narrative / Python code (2026-06-27 review). #}
+<dialog id="field-modal" class="field-modal">
+  <div class="field-modal-body">
+    <div class="field-modal-head">
+      <h3 id="field-modal-title">Edit</h3>
+      <button type="button" class="btn btn-sm btn-ghost" data-field-cancel aria-label="Close">×</button>
+    </div>
+    <textarea id="field-modal-text" class="field-modal-text"></textarea>
+    <div class="page-actions">
+      <button type="button" class="btn btn-primary" data-field-save>Save</button>
+      <button type="button" class="btn btn-ghost" data-field-cancel>Cancel</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- The whole graph as JSON; the editor script mutates it and the cards read it. -->
+<script src="/static/codemirror.min.js"></script>
+<script src="/static/codemirror-python.min.js"></script>
+<script id="graph-data" type="application/json">{{ graph_json | safe }}</script>
+<script>
+  (function () {
+    var graph = JSON.parse(document.getElementById('graph-data').textContent || '{"nodes":[]}');
+    var jsonField = document.getElementById('pipeline-json');
+
+    function serialize() {
+      // Read every card's controls back into the graph before submit/add/remove.
+      var nodes = [];
+      document.querySelectorAll('[data-node]').forEach(function (card) {
+        var id = card.getAttribute('data-node');
+        var type = card.getAttribute('data-type');
+        var node = { id: id, type: type, title: '', narrative: '', config: {}, inputs: [] };
+        var titleEl = card.querySelector('[data-node-title]');
+        if (titleEl) { node.title = titleEl.value; }
+        var narr = card.querySelector('[data-narrative]');
+        if (narr) { node.narrative = narr.value; }
+        if (type === 'import') {
+          var s = card.querySelector('[data-source]');
+          node.source_id = s ? s.value : null;
+        } else {
+          card.querySelectorAll('[data-input]').forEach(function (sel) {
+            if (sel.value) { node.inputs.push(sel.value); }
+          });
+        }
+        if (type === 'filter' || type === 'test') {
+          if (type === 'test') {
+            node.config.procedure_id = (card.querySelector('[data-procedure]') || {}).value || null;
+            node.config.severity = (card.querySelector('[data-severity]') || {}).value || 'medium';
+            node.config.description_template = (card.querySelector('[data-desc]') || {}).value || '';
+            node.config.item_key_column = (card.querySelector('[data-itemkey]') || {}).value || null;
+          }
+          node.config.logic = (card.querySelector('[data-logic]') || {}).value || 'all';
+          node.config.conditions = [];
+          card.querySelectorAll('[data-cond]').forEach(function (row) {
+            var col = (row.querySelector('[data-cond-col]') || {}).value || '';
+            var free = (row.querySelector('[data-cond-col-free]') || {}).value || '';
+            if (col === '__other__' && free) { col = free; }
+            var op = (row.querySelector('[data-cond-op]') || {}).value || 'eq';
+            var raw = (row.querySelector('[data-cond-val]') || {}).value;
+            var isXsrc = op === 'exists_in' || op === 'not_exists_in';
+            if (!col && !isXsrc) { return; }
+            var cond = { column: col, op: op };
+            if (isXsrc) {
+              var otherSrc = (row.querySelector('[data-xsrc-source]') || {}).value || '';
+              var thisKey = (row.querySelector('[data-xsrc-this]') || {}).value || '';
+              var otherKey = (row.querySelector('[data-xsrc-other]') || {}).value || '';
+              cond.other_source = otherSrc;
+              cond.this_key = thisKey;
+              cond.other_key = otherKey;
+              if (thisKey) { cond.column = thisKey; }
+            } else if (['is_empty', 'not_empty', 'is_duplicate'].indexOf(op) === -1) {
+              if (op === 'in' || op === 'not_in') {
+                cond.value = raw.split('|').map(function (p) { return typed(p.trim()); })
+                                .filter(function (p) { return p !== ''; });
+              } else {
+                cond.value = typed(raw);
+              }
+            }
+            node.config.conditions.push(cond);
+          });
+        } else if (type === 'join') {
+          node.config.mode = (card.querySelector('[data-join-mode]') || {}).value || 'inner';
+          node.config.left_key = (card.querySelector('[data-join-lk]') || {}).value || '';
+          node.config.right_key = (card.querySelector('[data-join-rk]') || {}).value || '';
+        } else if (type === 'custom_python') {
+          node.config.flavor = (card.querySelector('[data-flavor]') || {}).value || 'transform';
+          node.config.code = (card.querySelector('[data-code]') || {}).value || '';
+        }
+        nodes.push(node);
+      });
+      graph.nodes = nodes;
+      serializeProcedures();  // read the section headers into graph.procedures too
+    }
+
+    // Read every procedure SECTION header into graph.procedures. Each header is
+    // the <summary> of a <details> section inside #pipe-cards; reading them on
+    // every serialize() keeps procedure edits riding along with each save/autosave.
+    function serializeProcedures() {
+      var heads = document.querySelectorAll('[data-proc-head]');
+      graph.procedures = Array.prototype.map.call(heads, function (head, i) {
+        var pct = (head.querySelector('[data-proc-pct]') || {}).value || '';
+        var cnt = (head.querySelector('[data-proc-count]') || {}).value || '';
+        return {
+          id: head.getAttribute('data-proc-id'),
+          code: (head.querySelector('[data-proc-code]') || {}).value
+                 || (heads.length > 1 ? 'P' + (i + 1) : ''),
+          name: (head.querySelector('[data-proc-name]') || {}).value || '',
+          assertion: (head.querySelector('[data-proc-assert]') || {}).value || '',
+          narrative: (head.querySelector('[data-proc-narrative]') || {}).value || '',
+          failure_threshold_pct: pct === '' ? null : Number(pct),
+          failure_threshold_count: cnt === '' ? null : Number(cnt),
+          position: i
+        };
+      });
+    }
+
+    // ── Procedure section headers: add / remove sections + keep every Test's
+    // "Belongs to" ▾ in sync. A new procedure is selectable on the Test cards
+    // immediately (we inject its <option> into each [data-procedure]) — no server
+    // round-trip needed; the mapping is persisted on Save (serializeProcedures()).
+    function procOptionLabel(code, name) {
+      return (code || '') + ' · ' + (name || '');
+    }
+    function addProcedureOption(pid, code, name) {
+      document.querySelectorAll('[data-procedure]').forEach(function (sel) {
+        if (sel.querySelector('option[value="' + pid + '"]')) { return; }
+        var opt = document.createElement('option');
+        opt.value = pid;
+        opt.textContent = procOptionLabel(code, name);
+        sel.appendChild(opt);
+      });
+    }
+    function updateProcedureOption(pid, code, name) {
+      document.querySelectorAll('[data-procedure] option[value="' + pid + '"]')
+        .forEach(function (opt) { opt.textContent = procOptionLabel(code, name); });
+    }
+    function removeProcedureOption(pid) {
+      document.querySelectorAll('[data-procedure] option[value="' + pid + '"]')
+        .forEach(function (opt) { opt.parentNode.removeChild(opt); });
+    }
+    // A new procedure is an empty <details> SECTION appended before the Add button
+    // (inside #pipe-cards). Its header carries the procedure editor; its body has a
+    // single Test insert zone so the author can give the procedure a terminal.
+    function newProcedureSection(pid, code) {
+      var sec = document.createElement('details');
+      sec.className = 'proc-section';
+      sec.setAttribute('data-proc-section', '');
+      sec.setAttribute('data-band-key', pid);
+      sec.setAttribute('open', '');
+      // Deliberately NO inline `style="--proc:…"`: the per-procedure accent colour
+      // (stripe + code-chip tint) is assigned server-side by position order, which the
+      // client can't know. A new section renders with the neutral `var(--proc, <token>)`
+      // fallbacks until the next #pipe-cards server render fills in the palette colour.
+      sec.innerHTML =
+        '<summary class="band-head proc-head-row">' +
+        '<span class="band-caret" aria-hidden="true">▸</span>' +
+        '<span class="proc-head" data-proc-head data-proc-id="' + pid + '">' +
+        '<div class="proc-identity">' +
+        '<input class="proc-in proc-code-chip" data-proc-code placeholder="P1" aria-label="Code">' +
+        '<input class="proc-in proc-name-title" type="text" data-proc-name placeholder="Procedure name" aria-label="Procedure name">' +
+        '<button type="button" class="proc-name-pencil" data-proc-name-edit aria-label="Edit procedure name"></button>' +
+        '<span class="proc-identity-spacer"></span>' +
+        '<button type="button" class="proc-del-btn" data-proc-del aria-label="Remove procedure">✕</button>' +
+        '</div>' +
+        '<div class="proc-settings">' +
+        '<div class="proc-field proc-field-assert">' +
+        '<label class="proc-field-label">Assertion ' +
+        '<span class="proc-help" tabindex="0" role="img" aria-label="What is an assertion?" ' +
+        'title="The audit assertion this procedure verifies — the specific claim it proves about the control (for example: Segregation of duties, Authorization, Completeness, Existence). Shown as the procedure subtitle in the workpaper.">ⓘ</span>' +
+        '</label>' +
+        '<input class="proc-in proc-assert-in" data-proc-assert placeholder="e.g. Segregation of duties" aria-label="Assertion">' +
+        '</div>' +
+        '<div class="proc-field proc-field-tol">' +
+        '<label class="proc-field-label">Tolerance</label>' +
+        '<div class="proc-tol-row">' +
+        '<span class="proc-tol-op">≤</span>' +
+        '<input class="proc-in proc-thr-in" data-proc-pct placeholder="—" aria-label="Threshold percent">' +
+        '<span class="proc-tol-op">% or</span>' +
+        '<input class="proc-in proc-thr-in" data-proc-count placeholder="—" aria-label="Threshold count">' +
+        '<span class="proc-tol-op">items</span>' +
+        '<span class="proc-tol-hint">· blank = zero</span>' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+        '<div class="proc-field proc-field-narr">' +
+        '<label class="proc-field-label">Narrative</label>' +
+        '<textarea class="proc-in proc-narr" data-proc-narrative rows="2" ' +
+        'placeholder="What this procedure tests and why" ' +
+        'aria-label="Procedure narrative"></textarea>' +
+        '</div>' +
+        '</span></summary>' +
+        '<div class="band-body"><p class="muted proc-empty">No test yet — insert a ' +
+        '<strong>Test</strong> below to give this procedure a result.</p>' +
+        '<div class="pipe-insert pipe-insert-empty">' +
+        '<button type="button" class="pipe-insert-toggle" data-insert-toggle aria-label="Insert a step here">+</button>' +
+        '<div class="pipe-insert-menu"><span class="pipe-insert-hint">Insert step</span>' +
+        '<button type="button" class="btn btn-sm btn-add" data-insert data-type="test" data-up="" data-down="" data-proc="' + pid + '">Test</button>' +
+        '</div></div></div>';
+      sec.querySelector('[data-proc-code]').value = code;
+      return sec;
+    }
+    var cardsRoot = document.getElementById('pipe-cards');
+    cardsRoot.addEventListener('click', function (e) {
+      var pencil = e.target.closest('[data-proc-name-edit]');
+      if (pencil) {
+        e.preventDefault();        // don't toggle the <details>
+        e.stopPropagation();
+        var head = pencil.closest('[data-proc-head]');
+        var nameInput = head && head.querySelector('[data-proc-name]');
+        if (nameInput) { nameInput.focus(); }
+        return;
+      }
+      var add = e.target.closest('#proc-add');
+      if (add) {
+        var pid = 'p_' + Math.random().toString(36).slice(2, 8);
+        var n = cardsRoot.querySelectorAll('[data-proc-head]').length + 1;
+        var code = 'P' + n;
+        add.parentNode.insertBefore(newProcedureSection(pid, code), add);
+        addProcedureOption(pid, code, '');
+        return;
+      }
+      var del = e.target.closest('[data-proc-del]');
+      if (del) {
+        var sec = del.closest('[data-proc-section]');
+        if (sec) {
+          removeProcedureOption(sec.getAttribute('data-band-key'));
+          sec.parentNode.removeChild(sec);
+        }
+        return;
+      }
+    });
+    cardsRoot.addEventListener('input', function (e) {
+      if (!e.target.matches('[data-proc-code], [data-proc-name]')) { return; }
+      var head = e.target.closest('[data-proc-head]');
+      if (!head) { return; }
+      updateProcedureOption(head.getAttribute('data-proc-id'),
+        (head.querySelector('[data-proc-code]') || {}).value || '',
+        (head.querySelector('[data-proc-name]') || {}).value || '');
+    });
+
+    // ── autosave: post the graph and swap only #pipe-cards ───────────────
+    // Callers must set jsonField.value = JSON.stringify(graph) before calling.
+    // The Save pipeline button continues to use the form's native submit event,
+    // which issues a full-page POST (no autosave=1) and follows the redirect.
+    var _autosaveSeq = 0;  // monotonic counter — guards against stale responses
+    function autosaveSubmit() {
+      var seq = ++_autosaveSeq;  // claim this request's slot
+      var statusEl = document.getElementById('autosave-status');
+      var form = document.getElementById('pipeline-form');
+      var scrollY = window.scrollY;
+      if (statusEl) { statusEl.textContent = 'Saving\u2026'; statusEl.className = 'autosave-saving'; }
+      var fd = new FormData();
+      fd.append('pipeline_json', jsonField.value);
+      fd.append('autosave', '1');
+      fetch(form.action, { method: 'POST', body: fd })
+        .then(function (resp) {
+          // Read the body regardless of HTTP status — a 422 carries the
+          // cards fragment with inline errors and must still update the DOM.
+          return resp.text().then(function (html) {
+            return { ok: resp.ok, html: html };
+          });
+        })
+        .then(function (result) {
+          if (seq !== _autosaveSeq) { return; }  // stale response — discard
+          var cardsEl = document.getElementById('pipe-cards');
+          cardsEl.innerHTML = result.html;
+          window.scrollTo(0, scrollY);
+          bindCards(cardsEl);
+          restoreCollapse();  // re-apply persisted collapse state after the swap
+          if (!result.ok) {
+            if (statusEl) {
+              statusEl.textContent = 'Validation error';
+              statusEl.className = 'autosave-error';
+            }
+          } else {
+            if (statusEl) {
+              statusEl.textContent = 'Saved';
+              statusEl.className = 'autosave-saved';
+              setTimeout(function () {
+                if (statusEl.className === 'autosave-saved') { statusEl.textContent = ''; }
+              }, 2000);
+            }
+          }
+        })
+        .catch(function (err) {
+          if (seq !== _autosaveSeq) { return; }  // stale request — discard
+          if (statusEl) {
+            statusEl.textContent = 'Error saving — ' + err.message;
+            statusEl.className = 'autosave-error';
+          }
+        });
+    }
+
+    function typed(v) {
+      if (v === '') { return ''; }
+      var low = v.toLowerCase();
+      if (low === 'true') { return true; }
+      if (low === 'false') { return false; }
+      var n = Number(v);
+      return isNaN(n) ? v : n;
+    }
+
+    function genId(type) {
+      var base = type.slice(0, 3);
+      var i = 1;
+      while (graph.nodes.some(function (n) { return n.id === base + i; })) { i++; }
+      return base + i;
+    }
+
+    function reload() {
+      serialize();
+      jsonField.value = JSON.stringify(graph);
+      // Re-render server-side so cards/diagram/counts reflect the new graph.
+      autosaveSubmit();
+    }
+
+    function newNode(type) {
+      var node = { id: genId(type), type: type, title: '', narrative: '', config: {}, inputs: [] };
+      if (type === 'import') { node.source_id = null; }
+      if (type === 'custom_python') { node.config.flavor = 'transform'; node.config.code = 'rows = rows'; }
+      if (type === 'filter' || type === 'test') { node.config.logic = 'all'; node.config.conditions = []; }
+      if (type === 'join') { node.config.mode = 'inner'; }
+      return node;
+    }
+
+    // Insert a step at a gap. `upId`/`downId` are the cards above/below the gap
+    // ('' at the very top/bottom). For non-import steps we wire up→new and then
+    // re-point the downstream card from up→new, so the new step lands *between*
+    // them (a clean splice). An import is a new root, so it's never spliced.
+    function insertStep(upId, downId, type, procId) {
+      serialize();
+      var node = newNode(type);
+      if (type === 'test' && procId) { node.config.procedure_id = procId; }
+      // An empty procedure section's insert zone has no upstream card (data-up="").
+      // Default any non-import step's upstream to the LAST shared (Inputs-band) node
+      // so a Test added into an empty section is a VALID wired terminal — an unwired
+      // terminal fails parse_pipeline and the save 500s/422s (e2e-documented).
+      if (!upId && type !== 'import') {
+        var shared = document.querySelectorAll('[data-band-key="__inputs__"] [data-node]');
+        if (shared.length) { upId = shared[shared.length - 1].getAttribute('data-node'); }
+      }
+      var splice = (type !== 'import');
+      if (splice && upId) { node.inputs = [upId]; }
+      graph.nodes.push(node);
+      if (splice && upId && downId) {
+        graph.nodes.forEach(function (n) {
+          if (n.id !== downId) { return; }
+          n.inputs = (n.inputs || []).map(function (i) { return i === upId ? node.id : i; });
+        });
+      }
+      jsonField.value = JSON.stringify(graph);
+      autosaveSubmit();
+    }
+
+    // Insert affordances are delegated on #pipe-cards so they keep working after
+    // the AI-apply HTMX swap replaces the cards fragment.
+    var cardsEl = document.getElementById('pipe-cards');
+    cardsEl.addEventListener('click', function (e) {
+      var toggle = e.target.closest('[data-insert-toggle]');
+      if (toggle) {
+        var zone = toggle.closest('.pipe-insert');
+        var wasOpen = zone.classList.contains('open');
+        cardsEl.querySelectorAll('.pipe-insert.open').forEach(function (z) {
+          z.classList.remove('open');
+        });
+        if (!wasOpen) { zone.classList.add('open'); }
+        return;
+      }
+      var ins = e.target.closest('[data-insert]');
+      if (ins) {
+        insertStep(ins.getAttribute('data-up'), ins.getAttribute('data-down'),
+                   ins.getAttribute('data-type'), ins.getAttribute('data-proc'));
+      }
+    });
+
+    document.getElementById('pipeline-form').addEventListener('submit', function () {
+      serialize();
+      jsonField.value = JSON.stringify(graph);
+    });
+
+    // ── bind interactive widgets on a set of condition rows / cards ──────────
+    function syncCond(row) {
+      var sel = row.querySelector('[data-cond-col]');
+      var free = row.querySelector('[data-cond-col-free]');
+      if (sel && free) { free.style.display = (sel.value === '__other__') ? '' : 'none'; }
+    }
+    function syncCondOp(row) {
+      var opSel = row.querySelector('[data-cond-op]');
+      if (!opSel) { return; }
+      var xsrc = opSel.value === 'exists_in' || opSel.value === 'not_exists_in';
+      var valInput = row.querySelector('[data-cond-val]');
+      var xsrcSpan = row.querySelector('[data-xsrc]');
+      if (valInput) { valInput.style.display = xsrc ? 'none' : ''; }
+      if (xsrcSpan) { xsrcSpan.style.display = xsrc ? '' : 'none'; }
+    }
+
+    function bindCards(root) {
+      var scope = root || document;
+      scope.querySelectorAll('[data-cond]').forEach(function (row) {
+        var sel = row.querySelector('[data-cond-col]');
+        if (sel) { sel.addEventListener('change', function () { syncCond(row); }); }
+        syncCond(row);
+        var opSel = row.querySelector('[data-cond-op]');
+        if (opSel) { opSel.addEventListener('change', function () { syncCondOp(row); }); }
+        syncCondOp(row);
+      });
+      scope.querySelectorAll('[data-add-cond]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          serialize();
+          var card = btn.closest('[data-node]');
+          var node = graph.nodes.filter(function (n) { return n.id === card.getAttribute('data-node'); })[0];
+          if (node) {
+            node.config.conditions = node.config.conditions || [];
+            node.config.conditions.push({ column: '', op: 'eq', value: '' });
+            jsonField.value = JSON.stringify(graph);
+            autosaveSubmit();
+          }
+        });
+      });
+      scope.querySelectorAll('[data-remove]').forEach(function (btn) {
+        if (!btn._removeBound) {
+          btn._removeBound = true;
+          btn.addEventListener('click', function () {
+            serialize();
+            var id = btn.getAttribute('data-remove');
+            graph.nodes = graph.nodes.filter(function (n) { return n.id !== id; });
+            graph.nodes.forEach(function (n) {
+              n.inputs = (n.inputs || []).filter(function (i) { return i !== id; });
+            });
+            jsonField.value = JSON.stringify(graph);
+            autosaveSubmit();
+          });
+        }
+      });
+      // Changing a Test's "Belongs to" re-groups it: serialize + autosave so the
+      // server re-renders the card under its new procedure section.
+      scope.querySelectorAll('[data-procedure]').forEach(function (sel) {
+        if (sel._procBound) { return; }
+        sel._procBound = true;
+        sel.addEventListener('change', function () {
+          serialize();
+          jsonField.value = JSON.stringify(graph);
+          autosaveSubmit();   // re-render regroups the card under its new section
+        });
+      });
+    }
+
+    // Initial bind on page load.
+    bindCards(document);
+
+    // ── <details> collapse persistence (per control + band) ──────────────────
+    // Each band/section persists its open/closed state to localStorage so the
+    // author's collapse choices survive an HTMX cards-swap and a page reload.
+    var COLLAPSE_PREFIX = 'cflow.logic.collapse.' + {{ control_id | tojson }} + '.';
+    function restoreCollapse() {
+      document.querySelectorAll('[data-band-key]').forEach(function (d) {
+        var v = null;
+        try { v = window.localStorage.getItem(COLLAPSE_PREFIX + d.getAttribute('data-band-key')); }
+        catch (e) { v = null; }
+        if (v === 'closed') { d.removeAttribute('open'); }
+        else if (v === 'open') { d.setAttribute('open', ''); }
+      });
+    }
+    document.addEventListener('toggle', function (e) {
+      var d = e.target;
+      if (!d.matches || !d.matches('[data-band-key]')) { return; }
+      try {
+        window.localStorage.setItem(COLLAPSE_PREFIX + d.getAttribute('data-band-key'),
+                                    d.open ? 'open' : 'closed');
+      } catch (err) { /* localStorage unavailable — collapse just won't persist */ }
+    }, true);
+    // Typing in a header input must not toggle its <details> section.
+    document.addEventListener('click', function (e) {
+      if (e.target.closest('.proc-head') && e.target.closest('summary')) { e.preventDefault(); }
+    });
+    restoreCollapse();
+
+    // Recalculate button: re-serialize and refresh row counts
+    var recalcBtn = document.getElementById('recalc-btn');
+    if (recalcBtn) {
+      recalcBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        reload();  // serialize + autosaveSubmit to refresh row counts
+      });
+    }
+
+    // ── Pop-out field editor (narrative / Python code) ───────────────────
+    // The expand buttons live inside cards (re-rendered on autosave), so they
+    // call this page-level function via inline onclick. Saving writes back to
+    // the inline field and reloads (serialize + scroll-preserving autosave).
+    var _fmTarget = null, _fmCM = null;
+    function openFieldModal(btn, kind) {
+      var card = btn.closest('.pipe-card');
+      if (!card) { return; }
+      _fmTarget = card.querySelector(kind === 'code' ? '[data-code]' : '[data-narrative]');
+      if (!_fmTarget) { return; }
+      var ta = document.getElementById('field-modal-text');
+      ta.value = _fmTarget.value;
+      document.getElementById('field-modal-title').textContent =
+        (kind === 'code') ? 'Edit Python code' : 'Edit narrative';
+      document.getElementById('field-modal').showModal();
+      if (kind === 'code' && window.CodeMirror) {
+        _fmCM = window.CodeMirror.fromTextArea(ta, {
+          mode: 'python', lineNumbers: true, indentUnit: 4, matchBrackets: true
+        });
+        setTimeout(function () { if (_fmCM) { _fmCM.refresh(); } }, 0);
+      }
+    }
+    function closeFieldModal() {
+      if (_fmCM) { _fmCM.toTextArea(); _fmCM = null; }
+      var dlg = document.getElementById('field-modal');
+      if (dlg.open) { dlg.close(); }
+      _fmTarget = null;
+    }
+    function saveFieldModal() {
+      if (_fmTarget) {
+        _fmTarget.value = _fmCM ? _fmCM.getValue()
+                                : document.getElementById('field-modal-text').value;
+      }
+      closeFieldModal();
+      reload();  // persist the change + re-render the cards
+    }
+    window.openFieldModal = openFieldModal;  // reachable from inline onclick
+    document.querySelectorAll('[data-field-cancel]').forEach(function (b) {
+      b.addEventListener('click', closeFieldModal);
+    });
+    var fmSave = document.querySelector('[data-field-save]');
+    if (fmSave) { fmSave.addEventListener('click', saveFieldModal); }
+
+  })();
+</script>
+{% endif %}
+{% endblock %}

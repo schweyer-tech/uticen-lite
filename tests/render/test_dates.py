@@ -1,10 +1,10 @@
-"""Tests for the shared display-date formatter (controlflow_sdk.render.dates)."""
+"""Tests for the shared display-date formatter (uticen_lite.render.dates)."""
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from controlflow_sdk.render.dates import format_display_date
+from uticen_lite.render.dates import format_display_date
 
 
 def test_date_only_string_is_not_timezone_shifted() -> None:
