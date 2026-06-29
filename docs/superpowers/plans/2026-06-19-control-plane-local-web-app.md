@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a pip-installable, SQLite-backed local web app ("control plane") to the ControlFlow SDK that replaces hand-edited YAML/Python authoring with forms + a no-code rule builder (Python escape hatch), reusing the existing run/render/bundle core.
+**Goal:** Add a pip-installable, SQLite-backed local web app ("control plane") to the Uticen SDK that replaces hand-edited YAML/Python authoring with forms + a no-code rule builder (Python escape hatch), reusing the existing run/render/bundle core.
 
 **Architecture:** Three new layers over the unchanged core: `store/` (SQLite source of truth + versioned migrator + repo), `rules/` (rule_spec → violation dicts via vectorized pandas), and `plane/` (FastAPI + Jinja + HTMX web app). The existing `ControlDef`/runner are extended to carry inline test code and a rule spec and to branch execution accordingly; everything downstream (`Workpaper.assemble`, `render_html`, `assemble_bundle`, `write_bundle`) is reused. An engagement is one folder with `controlplane.db`, `data/`, and `target/`.
 
@@ -10,8 +10,8 @@
 
 ## Global Constraints
 
-- Python floor: `requires-python = ">=3.11"`; ruff `target-version = "py311"`, `line-length = 100`, `select = ["E","F","I","UP"]`. Keep `ruff check .` and `mypy controlflow_sdk` green every task. No `Any` leaks in new public signatures where avoidable.
-- SQLite is the single source of truth; the web app is the primary surface. **Brittle-by-design:** trust the folder convention (`controlplane.db`, `data/`, `target/`), do only light validation. Robustness is paid ControlFlow's job.
+- Python floor: `requires-python = ">=3.11"`; ruff `target-version = "py311"`, `line-length = 100`, `select = ["E","F","I","UP"]`. Keep `ruff check .` and `mypy uticen_lite` green every task. No `Any` leaks in new public signatures where avoidable.
+- SQLite is the single source of truth; the web app is the primary surface. **Brittle-by-design:** trust the folder convention (`controlplane.db`, `data/`, `target/`), do only light validation. Robustness is paid Uticen's job.
 - The web app binds `127.0.0.1` only, no auth, **zero network egress**; CodeMirror is vendored (no CDN). No Node, no build step.
 - The export bundle MUST validate against `contract/bundle.schema.json` (unchanged) — the control plane is a new *producer* of the existing bundle shape. Required control keys: `id, title, objective, narrative, framework_refs, sources, test_code, workpaper, runs`. Required run keys: `run_id, executed_at, passed, failed, total, pass_rate, summary, details, control_id, provenance`.
 - Scope stops at author → run → view → export. No local exception disposition/sign-off, no multi-source rule builder, no Pyodide sandbox, no network connectors.
@@ -30,26 +30,26 @@
 
 ## File Structure (what each new/changed file owns)
 
-**New — `controlflow_sdk/store/`**
+**New — `uticen_lite/store/`**
 - `db.py` — open a connection to `controlplane.db`, apply pragmas, expose `connect(project_root) -> sqlite3.Connection`.
 - `migrations.py` — ordered DDL steps + `migrate(conn)`; `SCHEMA_VERSION` constant.
 - `repo.py` — typed CRUD over the tables (project, sources, columns, controls, control_sources, runs, violations). One module; functions, not classes.
 - `loader.py` — `load_project_from_store(conn, root) -> Project` (builds `ProjectConfig` + `dict[str, SourceBinding]` + `list[ControlDef]`).
 - `run_service.py` — `run_control_in_store(conn, root, control_id, executed_at) -> RunRecord` (run + persist + render workpaper to `target/`).
 
-**New — `controlflow_sdk/rules/`**
+**New — `uticen_lite/rules/`**
 - `spec.py` — `RuleSpec` dataclass + `parse_rule_spec(raw: dict) -> RuleSpec` (validates operators/logic; raises `RuleSpecError`).
 - `evaluate.py` — `evaluate_rule(spec: RuleSpec, pop: Population) -> list[dict]` (vectorized).
 - `render_rule.py` — `rule_to_text(spec: RuleSpec) -> str` (human-readable "test that ran").
 
-**New — `controlflow_sdk/plane/`**
+**New — `uticen_lite/plane/`**
 - `__main__.py` — `main(argv=None) -> int`: arg parse, bootstrap folder/db, launch uvicorn, open browser.
 - `app.py` — `create_app(project_root: Path) -> FastAPI`: routes, templates, static mount, per-request db.
 - `routes/` — `dashboard.py`, `sources.py`, `controls.py`, `runs.py`, `export.py` (route functions registered by `app.py`).
 - `templates/` — Jinja2 (`base.html`, `dashboard.html`, `sources.html`, `source_edit.html`, `control_edit.html`, `run_view.html`, partials under `templates/partials/`).
 - `static/` — vendored CodeMirror (`codemirror.min.js`, `codemirror.min.css`, python mode) + `app.css` + `htmx.min.js`.
 
-**New — `controlflow_sdk/cli/import_cmd.py`** — `import_cmd(args) -> int` (YAML project → store).
+**New — `uticen_lite/cli/import_cmd.py`** — `import_cmd(args) -> int` (YAML project → store).
 
 **Modified core**
 - `model/control.py` — extend `ControlDef`: add `test_code: str | None = None`, `rule_spec: dict[str, Any] | None = None`; make `test_path: str = ""`; add `test_kind` property; update `to_dict`.
@@ -65,7 +65,7 @@
 ### Task 1: SQLite connection + versioned migrator
 
 **Files:**
-- Create: `controlflow_sdk/store/__init__.py` (empty), `controlflow_sdk/store/db.py`, `controlflow_sdk/store/migrations.py`
+- Create: `uticen_lite/store/__init__.py` (empty), `uticen_lite/store/db.py`, `uticen_lite/store/migrations.py`
 - Test: `tests/store/__init__.py` (empty), `tests/store/test_migrations.py`
 
 **Interfaces:**
@@ -77,8 +77,8 @@
 # tests/store/test_migrations.py
 from pathlib import Path
 
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.migrations import SCHEMA_VERSION, migrate
+from uticen_lite.store.db import connect
+from uticen_lite.store.migrations import SCHEMA_VERSION, migrate
 
 
 def _user_version(conn) -> int:
@@ -111,12 +111,12 @@ def test_migrate_is_idempotent(tmp_path: Path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `pytest tests/store/test_migrations.py -v`
-Expected: FAIL with `ModuleNotFoundError: controlflow_sdk.store`.
+Expected: FAIL with `ModuleNotFoundError: uticen_lite.store`.
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# controlflow_sdk/store/db.py
+# uticen_lite/store/db.py
 from __future__ import annotations
 
 import sqlite3
@@ -135,7 +135,7 @@ def connect(project_root: Path) -> sqlite3.Connection:
 ```
 
 ```python
-# controlflow_sdk/store/migrations.py
+# uticen_lite/store/migrations.py
 from __future__ import annotations
 
 import sqlite3
@@ -236,7 +236,7 @@ Expected: PASS (both tests).
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/store tests/store
+git add uticen_lite/store tests/store
 git commit -m "feat(store): sqlite connection + versioned migrator"
 git push -u origin HEAD
 ```
@@ -244,7 +244,7 @@ git push -u origin HEAD
 ### Task 2: Extend `ControlDef` with inline code + rule spec
 
 **Files:**
-- Modify: `controlflow_sdk/model/control.py` (`ControlDef` dataclass + `to_dict`)
+- Modify: `uticen_lite/model/control.py` (`ControlDef` dataclass + `to_dict`)
 - Test: `tests/model/test_control.py` (append cases)
 
 **Interfaces:**
@@ -254,7 +254,7 @@ git push -u origin HEAD
 
 ```python
 # tests/model/test_control.py  (append)
-from controlflow_sdk.model.control import ControlDef, FrameworkRefs, Threshold
+from uticen_lite.model.control import ControlDef, FrameworkRefs, Threshold
 
 
 def _base(**kw):
@@ -292,7 +292,7 @@ Expected: FAIL — `ControlDef.__init__() got an unexpected keyword argument 'te
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `controlflow_sdk/model/control.py`, change the `ControlDef` dataclass fields and `to_dict` (keep all existing fields; add the three new ones with defaults; make `test_path` default to `""`):
+In `uticen_lite/model/control.py`, change the `ControlDef` dataclass fields and `to_dict` (keep all existing fields; add the three new ones with defaults; make `test_path` default to `""`):
 
 ```python
 @dataclass
@@ -346,7 +346,7 @@ Expected: PASS (new + all existing control tests).
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/model/control.py tests/model/test_control.py
+git add uticen_lite/model/control.py tests/model/test_control.py
 git commit -m "feat(model): ControlDef carries inline test_code + rule_spec"
 git push -u origin HEAD
 ```
@@ -354,7 +354,7 @@ git push -u origin HEAD
 ### Task 3: Repo CRUD — project, sources, columns
 
 **Files:**
-- Create: `controlflow_sdk/store/repo.py`
+- Create: `uticen_lite/store/repo.py`
 - Test: `tests/store/test_repo_sources.py`
 
 **Interfaces:**
@@ -369,9 +369,9 @@ git push -u origin HEAD
 
 ```python
 # tests/store/test_repo_sources.py
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.migrations import migrate
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.migrations import migrate
 
 
 def _db(tmp_path):
@@ -426,7 +426,7 @@ Expected: FAIL — `ImportError: cannot import name 'repo'` / `AttributeError`.
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# controlflow_sdk/store/repo.py
+# uticen_lite/store/repo.py
 from __future__ import annotations
 
 import json
@@ -539,7 +539,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/store/repo.py tests/store/test_repo_sources.py
+git add uticen_lite/store/repo.py tests/store/test_repo_sources.py
 git commit -m "feat(store): repo CRUD for project, sources, columns"
 git push -u origin HEAD
 ```
@@ -547,7 +547,7 @@ git push -u origin HEAD
 ### Task 4: Repo CRUD — controls + bindings
 
 **Files:**
-- Modify: `controlflow_sdk/store/repo.py` (append control functions)
+- Modify: `uticen_lite/store/repo.py` (append control functions)
 - Test: `tests/store/test_repo_controls.py`
 
 **Interfaces:**
@@ -561,9 +561,9 @@ git push -u origin HEAD
 
 ```python
 # tests/store/test_repo_controls.py
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.migrations import migrate
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.migrations import migrate
 
 
 def _db(tmp_path):
@@ -616,7 +616,7 @@ def test_set_control_sources_orders_by_index(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `pytest tests/store/test_repo_controls.py -v`
-Expected: FAIL — `AttributeError: module 'controlflow_sdk.store.repo' has no attribute 'upsert_control'`.
+Expected: FAIL — `AttributeError: module 'uticen_lite.store.repo' has no attribute 'upsert_control'`.
 
 - [ ] **Step 3: Write minimal implementation** (append to `store/repo.py`)
 
@@ -689,7 +689,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/store/repo.py tests/store/test_repo_controls.py
+git add uticen_lite/store/repo.py tests/store/test_repo_controls.py
 git commit -m "feat(store): repo CRUD for controls + source bindings"
 git push -u origin HEAD
 ```
@@ -697,7 +697,7 @@ git push -u origin HEAD
 ### Task 5: Repo CRUD — runs + violations
 
 **Files:**
-- Modify: `controlflow_sdk/store/repo.py` (append run functions)
+- Modify: `uticen_lite/store/repo.py` (append run functions)
 - Test: `tests/store/test_repo_runs.py`
 
 **Interfaces:**
@@ -711,11 +711,11 @@ git push -u origin HEAD
 
 ```python
 # tests/store/test_repo_runs.py
-from controlflow_sdk.model.run import RunRecord, SourceProvenance
-from controlflow_sdk.model.violation import Severity, Violation
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.migrations import migrate
+from uticen_lite.model.run import RunRecord, SourceProvenance
+from uticen_lite.model.violation import Severity, Violation
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.migrations import migrate
 
 
 def _db(tmp_path):
@@ -764,7 +764,7 @@ def test_latest_run(tmp_path):
 Run: `pytest tests/store/test_repo_runs.py -v`
 Expected: FAIL — `AttributeError: ... has no attribute 'insert_run'`.
 
-- [ ] **Step 3: Write minimal implementation** (append to `store/repo.py`; add `from controlflow_sdk.model.run import RunRecord` at top)
+- [ ] **Step 3: Write minimal implementation** (append to `store/repo.py`; add `from uticen_lite.model.run import RunRecord` at top)
 
 ```python
 def insert_run(conn: sqlite3.Connection, run: "RunRecord") -> None:
@@ -834,7 +834,7 @@ Expected: PASS (2 tests).
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/store/repo.py tests/store/test_repo_runs.py
+git add uticen_lite/store/repo.py tests/store/test_repo_runs.py
 git commit -m "feat(store): repo CRUD for runs + violations"
 git push -u origin HEAD
 ```
@@ -842,7 +842,7 @@ git push -u origin HEAD
 ### Task 6: Store loader → `Project`
 
 **Files:**
-- Create: `controlflow_sdk/store/loader.py`
+- Create: `uticen_lite/store/loader.py`
 - Test: `tests/store/test_store_loader.py`
 
 **Interfaces:**
@@ -853,10 +853,10 @@ git push -u origin HEAD
 
 ```python
 # tests/store/test_store_loader.py
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.loader import load_project_from_store
-from controlflow_sdk.store.migrations import migrate
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.loader import load_project_from_store
+from uticen_lite.store.migrations import migrate
 
 
 def _seed(tmp_path):
@@ -900,25 +900,25 @@ def test_load_project_from_store(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `pytest tests/store/test_store_loader.py -v`
-Expected: FAIL — `ModuleNotFoundError: controlflow_sdk.store.loader`.
+Expected: FAIL — `ModuleNotFoundError: uticen_lite.store.loader`.
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# controlflow_sdk/store/loader.py
+# uticen_lite/store/loader.py
 from __future__ import annotations
 
 import sqlite3
 
-from controlflow_sdk.model.control import (
+from uticen_lite.model.control import (
     ControlDef,
     FrameworkRefs,
     SourceBinding,
     Threshold,
 )
-from controlflow_sdk.project.discovery import Project
-from controlflow_sdk.project.loader import ProjectConfig
-from controlflow_sdk.store import repo
+from uticen_lite.project.discovery import Project
+from uticen_lite.project.loader import ProjectConfig
+from uticen_lite.store import repo
 
 
 def _binding(src: dict) -> SourceBinding:
@@ -991,7 +991,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/store/loader.py tests/store/test_store_loader.py
+git add uticen_lite/store/loader.py tests/store/test_store_loader.py
 git commit -m "feat(store): build a Project from the SQLite store"
 git push -u origin HEAD
 ```
@@ -1003,7 +1003,7 @@ git push -u origin HEAD
 ### Task 7: `RuleSpec` + validation
 
 **Files:**
-- Create: `controlflow_sdk/rules/__init__.py` (empty), `controlflow_sdk/rules/spec.py`
+- Create: `uticen_lite/rules/__init__.py` (empty), `uticen_lite/rules/spec.py`
 - Test: `tests/rules/__init__.py` (empty), `tests/rules/test_spec.py`
 
 **Interfaces:**
@@ -1015,7 +1015,7 @@ git push -u origin HEAD
 # tests/rules/test_spec.py
 import pytest
 
-from controlflow_sdk.rules.spec import (
+from uticen_lite.rules.spec import (
     OPERATORS,
     RuleSpec,
     RuleSpecError,
@@ -1065,12 +1065,12 @@ def test_conditions_must_be_list():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `pytest tests/rules/test_spec.py -v`
-Expected: FAIL — `ModuleNotFoundError: controlflow_sdk.rules`.
+Expected: FAIL — `ModuleNotFoundError: uticen_lite.rules`.
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# controlflow_sdk/rules/spec.py
+# uticen_lite/rules/spec.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -1143,7 +1143,7 @@ Expected: PASS (5 tests).
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/rules tests/rules/test_spec.py tests/rules/__init__.py
+git add uticen_lite/rules tests/rules/test_spec.py tests/rules/__init__.py
 git commit -m "feat(rules): RuleSpec model + validation"
 git push -u origin HEAD
 ```
@@ -1151,7 +1151,7 @@ git push -u origin HEAD
 ### Task 8: Rule evaluator
 
 **Files:**
-- Create: `controlflow_sdk/rules/evaluate.py`
+- Create: `uticen_lite/rules/evaluate.py`
 - Test: `tests/rules/test_evaluate.py`
 
 **Interfaces:**
@@ -1164,9 +1164,9 @@ git push -u origin HEAD
 # tests/rules/test_evaluate.py
 import pandas as pd
 
-from controlflow_sdk.model.population import ColumnMeta, Population
-from controlflow_sdk.rules.evaluate import evaluate_rule
-from controlflow_sdk.rules.spec import parse_rule_spec
+from uticen_lite.model.population import ColumnMeta, Population
+from uticen_lite.rules.evaluate import evaluate_rule
+from uticen_lite.rules.spec import parse_rule_spec
 
 
 def _pop(df: pd.DataFrame, key="user_id") -> Population:
@@ -1252,20 +1252,20 @@ def test_unknown_template_placeholder_left_literal():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `pytest tests/rules/test_evaluate.py -v`
-Expected: FAIL — `ModuleNotFoundError: controlflow_sdk.rules.evaluate`.
+Expected: FAIL — `ModuleNotFoundError: uticen_lite.rules.evaluate`.
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# controlflow_sdk/rules/evaluate.py
+# uticen_lite/rules/evaluate.py
 from __future__ import annotations
 
 from typing import Any
 
 import pandas as pd
 
-from controlflow_sdk.model.population import Population
-from controlflow_sdk.rules.spec import Condition, RuleSpec, referenced_columns
+from uticen_lite.model.population import Population
+from uticen_lite.rules.spec import Condition, RuleSpec, referenced_columns
 
 
 class _SafeDict(dict):
@@ -1347,7 +1347,7 @@ Expected: PASS (8 tests).
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/rules/evaluate.py tests/rules/test_evaluate.py
+git add uticen_lite/rules/evaluate.py tests/rules/test_evaluate.py
 git commit -m "feat(rules): vectorized rule evaluator → violation dicts"
 git push -u origin HEAD
 ```
@@ -1355,7 +1355,7 @@ git push -u origin HEAD
 ### Task 9: Render a rule as readable test text
 
 **Files:**
-- Create: `controlflow_sdk/rules/render_rule.py`
+- Create: `uticen_lite/rules/render_rule.py`
 - Test: `tests/rules/test_render_rule.py`
 
 **Interfaces:**
@@ -1366,8 +1366,8 @@ git push -u origin HEAD
 
 ```python
 # tests/rules/test_render_rule.py
-from controlflow_sdk.rules.render_rule import rule_to_text
-from controlflow_sdk.rules.spec import parse_rule_spec
+from uticen_lite.rules.render_rule import rule_to_text
+from uticen_lite.rules.spec import parse_rule_spec
 
 
 def test_rule_to_text_reads_as_a_rule():
@@ -1404,10 +1404,10 @@ Expected: FAIL — `ModuleNotFoundError`.
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# controlflow_sdk/rules/render_rule.py
+# uticen_lite/rules/render_rule.py
 from __future__ import annotations
 
-from controlflow_sdk.rules.spec import Condition, RuleSpec
+from uticen_lite.rules.spec import Condition, RuleSpec
 
 _BINARY = {
     "eq": "=", "ne": "!=", "gt": ">", "ge": ">=", "lt": "<", "le": "<=",
@@ -1445,7 +1445,7 @@ Expected: PASS (2 tests).
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/rules/render_rule.py tests/rules/test_render_rule.py
+git add uticen_lite/rules/render_rule.py tests/rules/test_render_rule.py
 git commit -m "feat(rules): render a rule_spec as readable test text"
 git push -u origin HEAD
 ```
@@ -1457,7 +1457,7 @@ git push -u origin HEAD
 ### Task 10: `load_test_callable` accepts inline code
 
 **Files:**
-- Modify: `controlflow_sdk/project/discovery.py` (`load_test_callable`)
+- Modify: `uticen_lite/project/discovery.py` (`load_test_callable`)
 - Test: `tests/project/test_discovery.py` (append)
 
 **Interfaces:**
@@ -1467,8 +1467,8 @@ git push -u origin HEAD
 
 ```python
 # tests/project/test_discovery.py  (append)
-from controlflow_sdk.model.control import ControlDef, FrameworkRefs
-from controlflow_sdk.project.discovery import load_test_callable
+from uticen_lite.model.control import ControlDef, FrameworkRefs
+from uticen_lite.project.discovery import load_test_callable
 
 
 def _control(**kw):
@@ -1492,7 +1492,7 @@ Expected: FAIL — `load_test_callable` tries to read an empty `test_path` and r
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `controlflow_sdk/project/discovery.py`, at the top of `load_test_callable`, before the file-import path:
+In `uticen_lite/project/discovery.py`, at the top of `load_test_callable`, before the file-import path:
 
 ```python
 def load_test_callable(control: ControlDef) -> Callable[..., list[Any]]:
@@ -1520,7 +1520,7 @@ Expected: PASS (new + existing).
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/project/discovery.py tests/project/test_discovery.py
+git add uticen_lite/project/discovery.py tests/project/test_discovery.py
 git commit -m "feat(runner): load_test_callable supports inline test_code"
 git push -u origin HEAD
 ```
@@ -1528,7 +1528,7 @@ git push -u origin HEAD
 ### Task 11: `run_control` branches on rule vs python
 
 **Files:**
-- Modify: `controlflow_sdk/runner/execute.py` (`run_control`)
+- Modify: `uticen_lite/runner/execute.py` (`run_control`)
 - Test: `tests/runner/test_execute.py` (append)
 
 **Interfaces:**
@@ -1542,8 +1542,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from controlflow_sdk.model.control import ControlDef, FrameworkRefs, SourceBinding
-from controlflow_sdk.runner.execute import run_control
+from uticen_lite.model.control import ControlDef, FrameworkRefs, SourceBinding
+from uticen_lite.runner.execute import run_control
 
 
 def _csv(tmp_path: Path) -> Path:
@@ -1601,13 +1601,13 @@ Expected: FAIL — `run_control` tries `load_test_callable` on a control with no
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `controlflow_sdk/runner/execute.py`, locate the section that selects the primary population and calls the test callable (around lines 185–195). Replace the "load + dispatch" block with a branch:
+In `uticen_lite/runner/execute.py`, locate the section that selects the primary population and calls the test callable (around lines 185–195). Replace the "load + dispatch" block with a branch:
 
 ```python
     # primary already selected as `primary`; sources_by_id already built.
     if control.rule_spec is not None:
-        from controlflow_sdk.rules.evaluate import evaluate_rule
-        from controlflow_sdk.rules.spec import parse_rule_spec
+        from uticen_lite.rules.evaluate import evaluate_rule
+        from uticen_lite.rules.spec import parse_rule_spec
 
         raw_result: Any = evaluate_rule(parse_rule_spec(control.rule_spec), primary)
     else:
@@ -1630,7 +1630,7 @@ Expected: PASS (new rule test + all existing python-callable tests).
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/runner/execute.py tests/runner/test_execute.py
+git add uticen_lite/runner/execute.py tests/runner/test_execute.py
 git commit -m "feat(runner): run_control executes a rule_spec or python test"
 git push -u origin HEAD
 ```
@@ -1638,7 +1638,7 @@ git push -u origin HEAD
 ### Task 12: Store-backed run service (run + persist + render)
 
 **Files:**
-- Create: `controlflow_sdk/store/run_service.py`
+- Create: `uticen_lite/store/run_service.py`
 - Test: `tests/store/test_run_service.py`
 
 **Interfaces:**
@@ -1653,10 +1653,10 @@ from pathlib import Path
 
 import pandas as pd
 
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.migrations import migrate
-from controlflow_sdk.store.run_service import run_control_in_store
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.migrations import migrate
+from uticen_lite.store.run_service import run_control_in_store
 
 
 def _seed(tmp_path: Path):
@@ -1707,25 +1707,25 @@ def test_run_persists_and_renders(tmp_path: Path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `pytest tests/store/test_run_service.py -v`
-Expected: FAIL — `ModuleNotFoundError: controlflow_sdk.store.run_service`.
+Expected: FAIL — `ModuleNotFoundError: uticen_lite.store.run_service`.
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# controlflow_sdk/store/run_service.py
+# uticen_lite/store/run_service.py
 from __future__ import annotations
 
 import json
 import sqlite3
 from pathlib import Path
 
-from controlflow_sdk.model.run import RunRecord
-from controlflow_sdk.model.workpaper import Workpaper
-from controlflow_sdk.render.html import render_html
-from controlflow_sdk.render.markdown import render_markdown
-from controlflow_sdk.runner.execute import collect_data_samples, run_control
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.loader import load_project_from_store
+from uticen_lite.model.run import RunRecord
+from uticen_lite.model.workpaper import Workpaper
+from uticen_lite.render.html import render_html
+from uticen_lite.render.markdown import render_markdown
+from uticen_lite.runner.execute import collect_data_samples, run_control
+from uticen_lite.store import repo
+from uticen_lite.store.loader import load_project_from_store
 
 
 def run_control_in_store(
@@ -1764,16 +1764,16 @@ Expected: PASS.
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/store/run_service.py tests/store/test_run_service.py
+git add uticen_lite/store/run_service.py tests/store/test_run_service.py
 git commit -m "feat(store): run a control from the store, persist + render"
 git push -u origin HEAD
 ```
 
-### Task 13: `cflow import` (YAML project → store)
+### Task 13: `uticen-lite import` (YAML project → store)
 
 **Files:**
-- Create: `controlflow_sdk/cli/import_cmd.py`
-- Modify: `controlflow_sdk/cli/__init__.py` (register `import` subcommand)
+- Create: `uticen_lite/cli/import_cmd.py`
+- Modify: `uticen_lite/cli/__init__.py` (register `import` subcommand)
 - Test: `tests/cli/test_import_cmd.py`
 
 **Interfaces:**
@@ -1787,9 +1787,9 @@ git push -u origin HEAD
 import argparse
 from pathlib import Path
 
-from controlflow_sdk.cli.import_cmd import import_cmd
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
+from uticen_lite.cli.import_cmd import import_cmd
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
 
 
 def test_import_northwind(tmp_path: Path):
@@ -1812,21 +1812,21 @@ def test_import_northwind(tmp_path: Path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `pytest tests/cli/test_import_cmd.py -v`
-Expected: FAIL — `ModuleNotFoundError: controlflow_sdk.cli.import_cmd`.
+Expected: FAIL — `ModuleNotFoundError: uticen_lite.cli.import_cmd`.
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# controlflow_sdk/cli/import_cmd.py
+# uticen_lite/cli/import_cmd.py
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
 
-from controlflow_sdk.project.discovery import Project
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.migrations import migrate
+from uticen_lite.project.discovery import Project
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.migrations import migrate
 
 
 def import_cmd(args: argparse.Namespace) -> int:
@@ -1889,15 +1889,15 @@ Expected: PASS.
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/cli/import_cmd.py controlflow_sdk/cli/__init__.py tests/cli/test_import_cmd.py
-git commit -m "feat(cli): cflow import — YAML project into controlplane.db"
+git add uticen_lite/cli/import_cmd.py uticen_lite/cli/__init__.py tests/cli/test_import_cmd.py
+git commit -m "feat(cli): uticen-lite import — YAML project into controlplane.db"
 git push -u origin HEAD
 ```
 
-### Task 14: Route `cflow run`/`build` through the store; drop `init`/`new`
+### Task 14: Route `uticen-lite run`/`build` through the store; drop `init`/`new`
 
 **Files:**
-- Modify: `controlflow_sdk/cli/run_cmd.py`, `controlflow_sdk/cli/build_cmd.py`, `controlflow_sdk/cli/__init__.py`
+- Modify: `uticen_lite/cli/run_cmd.py`, `uticen_lite/cli/build_cmd.py`, `uticen_lite/cli/__init__.py`
 - Test: `tests/cli/test_run_cmd.py`, `tests/cli/test_build_cmd.py` (adjust to store), `tests/cli/test_cli.py` (drop init/new dispatch assertions)
 
 **Interfaces:**
@@ -1910,10 +1910,10 @@ git push -u origin HEAD
 import argparse
 from pathlib import Path
 
-from controlflow_sdk.cli.build_cmd import build_cmd
-from controlflow_sdk.cli.import_cmd import import_cmd
-from controlflow_sdk.cli.run_cmd import run_cmd
-from controlflow_sdk.bundle.archive import read_bundle
+from uticen_lite.cli.build_cmd import build_cmd
+from uticen_lite.cli.import_cmd import import_cmd
+from uticen_lite.cli.run_cmd import run_cmd
+from uticen_lite.bundle.archive import read_bundle
 
 
 def _engagement(tmp_path: Path) -> Path:
@@ -1948,9 +1948,9 @@ Expected: FAIL — `run_cmd`/`build_cmd` still call `Project.load` (YAML) and wo
 In `run_cmd.py`: replace `project = Project.load(root)` with:
 
 ```python
-    from controlflow_sdk.store.db import connect
-    from controlflow_sdk.store.loader import load_project_from_store
-    from controlflow_sdk.store.run_service import run_control_in_store
+    from uticen_lite.store.db import connect
+    from uticen_lite.store.loader import load_project_from_store
+    from uticen_lite.store.run_service import run_control_in_store
 
     conn = connect(root)
     project = load_project_from_store(conn)
@@ -1969,9 +1969,9 @@ In `run_cmd.py`: replace `project = Project.load(root)` with:
 In `build_cmd.py`: replace `read_runs(target_dir)` with store reads:
 
 ```python
-    from controlflow_sdk.store.db import connect
-    from controlflow_sdk.store.loader import load_project_from_store
-    from controlflow_sdk.store import repo
+    from uticen_lite.store.db import connect
+    from uticen_lite.store.loader import load_project_from_store
+    from uticen_lite.store import repo
 
     conn = connect(root)
     project = load_project_from_store(conn)
@@ -1980,7 +1980,7 @@ In `build_cmd.py`: replace `read_runs(target_dir)` with store reads:
     }
     runs_by_control = {cid: runs for cid, runs in runs_by_control.items() if runs}
     if not runs_by_control:
-        print("No runs found. Run controls first with `cflow run`.")
+        print("No runs found. Run controls first with `uticen-lite run`.")
         return 1
     # store run dicts -> bundle run shape: reconstruct via RunRecord.to_dict()
     manifest = assemble_bundle(project, _to_run_dicts(runs_by_control), generated_at)
@@ -1991,8 +1991,8 @@ Add a helper in `build_cmd.py` that turns store run dicts into the `RunRecord.to
 
 ```python
 def _to_run_dicts(runs_by_control: dict[str, list[dict]]) -> dict[str, list[dict]]:
-    from controlflow_sdk.model.run import RunRecord, SourceProvenance
-    from controlflow_sdk.model.violation import Violation
+    from uticen_lite.model.run import RunRecord, SourceProvenance
+    from uticen_lite.model.violation import Violation
 
     out: dict[str, list[dict]] = {}
     for cid, runs in runs_by_control.items():
@@ -2019,7 +2019,7 @@ Expected: PASS — store-backed run/build; update/remove any `test_cli.py` asser
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/cli tests/cli
+git add uticen_lite/cli tests/cli
 git commit -m "feat(cli): run/build operate over the store; retire init/new"
 git push -u origin HEAD
 ```
@@ -2027,7 +2027,7 @@ git push -u origin HEAD
 ### Task 15: Bundle projection resolves rule controls' `test_code`
 
 **Files:**
-- Modify: `controlflow_sdk/bundle/assemble.py` (test_code resolution)
+- Modify: `uticen_lite/bundle/assemble.py` (test_code resolution)
 - Test: `tests/bundle/test_assemble.py` (append) + rely on `tests/test_contract_export.py`
 
 **Interfaces:**
@@ -2037,10 +2037,10 @@ git push -u origin HEAD
 
 ```python
 # tests/bundle/test_assemble.py  (append)
-from controlflow_sdk.bundle.assemble import assemble_bundle
-from controlflow_sdk.model.control import ControlDef, FrameworkRefs
-from controlflow_sdk.project.discovery import Project
-from controlflow_sdk.project.loader import ProjectConfig
+from uticen_lite.bundle.assemble import assemble_bundle
+from uticen_lite.model.control import ControlDef, FrameworkRefs
+from uticen_lite.project.discovery import Project
+from uticen_lite.project.loader import ProjectConfig
 
 
 def test_rule_control_bundles_readable_test_code():
@@ -2074,8 +2074,8 @@ In `bundle/assemble.py`, where the control block's `test_code` is currently read
 
 ```python
 def _resolve_test_code(control) -> str:
-    from controlflow_sdk.rules.render_rule import rule_to_text
-    from controlflow_sdk.rules.spec import parse_rule_spec
+    from uticen_lite.rules.render_rule import rule_to_text
+    from uticen_lite.rules.spec import parse_rule_spec
 
     if getattr(control, "test_code", None):
         return control.test_code
@@ -2097,7 +2097,7 @@ Expected: PASS — including contract-schema conformance.
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/bundle/assemble.py tests/bundle/test_assemble.py
+git add uticen_lite/bundle/assemble.py tests/bundle/test_assemble.py
 git commit -m "feat(bundle): resolve test_code from inline code or rendered rule"
 git push -u origin HEAD
 ```
@@ -2111,7 +2111,7 @@ git push -u origin HEAD
 ### Task 16: App factory + `controlplane` entry + bootstrap
 
 **Files:**
-- Create: `controlflow_sdk/plane/__init__.py` (empty), `controlflow_sdk/plane/app.py`, `controlflow_sdk/plane/__main__.py`, `controlflow_sdk/plane/templates/base.html`, `controlflow_sdk/plane/templates/dashboard.html`, `controlflow_sdk/plane/static/app.css`
+- Create: `uticen_lite/plane/__init__.py` (empty), `uticen_lite/plane/app.py`, `uticen_lite/plane/__main__.py`, `uticen_lite/plane/templates/base.html`, `uticen_lite/plane/templates/dashboard.html`, `uticen_lite/plane/static/app.css`
 - Test: `tests/plane/__init__.py` (empty), `tests/plane/conftest.py`, `tests/plane/test_app.py`
 
 **Interfaces:**
@@ -2126,10 +2126,10 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from controlflow_sdk.plane.app import create_app
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.migrations import migrate
+from uticen_lite.plane.app import create_app
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.migrations import migrate
 
 
 @pytest.fixture
@@ -2163,12 +2163,12 @@ def test_static_css_served(client):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `pytest tests/plane/test_app.py -v`
-Expected: FAIL — `ModuleNotFoundError: controlflow_sdk.plane.app` (and fastapi import). Ensure `[plane]` deps are installed in the dev env: `pip install fastapi uvicorn jinja2 python-multipart` (Task 23 records them in pyproject).
+Expected: FAIL — `ModuleNotFoundError: uticen_lite.plane.app` (and fastapi import). Ensure `[plane]` deps are installed in the dev env: `pip install fastapi uvicorn jinja2 python-multipart` (Task 23 records them in pyproject).
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# controlflow_sdk/plane/app.py
+# uticen_lite/plane/app.py
 from __future__ import annotations
 
 import sqlite3
@@ -2178,9 +2178,9 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.migrations import migrate
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.migrations import migrate
 
 _HERE = Path(__file__).parent
 templates = Jinja2Templates(directory=str(_HERE / "templates"))
@@ -2200,11 +2200,11 @@ def create_app(project_root: Path) -> FastAPI:
     (project_root / "data").mkdir(parents=True, exist_ok=True)
     migrate(connect(project_root))
 
-    app = FastAPI(title="ControlFlow Control Plane")
+    app = FastAPI(title="Uticen Control Plane")
     app.state.project_root = project_root
     app.mount("/static", StaticFiles(directory=str(_HERE / "static")), name="static")
 
-    from controlflow_sdk.plane.routes import controls, dashboard, export, runs, sources
+    from uticen_lite.plane.routes import controls, dashboard, export, runs, sources
 
     dashboard.register(app, templates, get_conn)
     sources.register(app, templates, get_conn)
@@ -2215,11 +2215,11 @@ def create_app(project_root: Path) -> FastAPI:
 ```
 
 ```python
-# controlflow_sdk/plane/routes/__init__.py  (empty)
+# uticen_lite/plane/routes/__init__.py  (empty)
 ```
 
 ```python
-# controlflow_sdk/plane/routes/dashboard.py
+# uticen_lite/plane/routes/dashboard.py
 from __future__ import annotations
 
 import sqlite3
@@ -2227,7 +2227,7 @@ import sqlite3
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse
 
-from controlflow_sdk.store import repo
+from uticen_lite.store import repo
 
 
 def register(app: FastAPI, templates, get_conn) -> None:
@@ -2246,7 +2246,7 @@ def register(app: FastAPI, templates, get_conn) -> None:
 ```
 
 ```html
-<!-- controlflow_sdk/plane/templates/base.html -->
+<!-- uticen_lite/plane/templates/base.html -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -2257,14 +2257,14 @@ def register(app: FastAPI, templates, get_conn) -> None:
   <script src="/static/htmx.min.js" defer></script>
 </head>
 <body>
-  <header><strong>ControlFlow Control Plane</strong> — {{ project.name }}</header>
+  <header><strong>Uticen Control Plane</strong> — {{ project.name }}</header>
   <main>{% block body %}{% endblock %}</main>
 </body>
 </html>
 ```
 
 ```html
-<!-- controlflow_sdk/plane/templates/dashboard.html -->
+<!-- uticen_lite/plane/templates/dashboard.html -->
 {% extends "base.html" %}
 {% block title %}{{ project.name }} — Controls{% endblock %}
 {% block body %}
@@ -2296,7 +2296,7 @@ def register(app: FastAPI, templates, get_conn) -> None:
 ```
 
 ```css
-/* controlflow_sdk/plane/static/app.css */
+/* uticen_lite/plane/static/app.css */
 :root { color-scheme: light; }
 body { font-family: Inter, system-ui, sans-serif; margin: 0; }
 header { padding: 12px 20px; border-bottom: 1px solid #ddd; }
@@ -2308,7 +2308,7 @@ th, td { border: 1px solid #e2e2e2; padding: 6px 10px; text-align: left; }
 Add a placeholder `static/htmx.min.js` (vendored in Task 23; an empty file is fine for Task 16 tests). 
 
 ```python
-# controlflow_sdk/plane/__main__.py
+# uticen_lite/plane/__main__.py
 from __future__ import annotations
 
 import argparse
@@ -2326,7 +2326,7 @@ def main(argv: list[str] | None = None) -> int:
 
     import uvicorn
 
-    from controlflow_sdk.plane.app import create_app
+    from uticen_lite.plane.app import create_app
 
     app = create_app(Path(args.project))
     if not args.no_browser:
@@ -2347,7 +2347,7 @@ Expected: PASS (2 tests). Empty route modules `sources.py`/`controls.py`/`runs.p
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/plane tests/plane
+git add uticen_lite/plane tests/plane
 git commit -m "feat(plane): FastAPI app factory, dashboard, controlplane entry"
 git push -u origin HEAD
 ```
@@ -2355,8 +2355,8 @@ git push -u origin HEAD
 ### Task 17: Source manager — upload + column mapping
 
 **Files:**
-- Modify: `controlflow_sdk/plane/routes/sources.py`
-- Create: `controlflow_sdk/plane/templates/sources.html`, `controlflow_sdk/plane/templates/source_edit.html`
+- Modify: `uticen_lite/plane/routes/sources.py`
+- Create: `uticen_lite/plane/templates/sources.html`, `uticen_lite/plane/templates/source_edit.html`
 - Test: `tests/plane/test_sources.py`
 
 **Interfaces:**
@@ -2398,8 +2398,8 @@ def test_save_column_mapping(client):
     }, follow_redirects=False)
     assert resp.status_code in (302, 303)
     # persisted
-    from controlflow_sdk.store.db import connect
-    from controlflow_sdk.store import repo
+    from uticen_lite.store.db import connect
+    from uticen_lite.store import repo
     src = repo.get_source(connect(client.app.state.project_root), "tx")
     assert src["key_config"] == {"mode": "single", "columns": ["user_id"]}
     amount = next(c for c in src["columns"] if c["original_name"] == "amount")
@@ -2414,7 +2414,7 @@ Expected: FAIL — routes return 404 (stub `register` does nothing).
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# controlflow_sdk/plane/routes/sources.py
+# uticen_lite/plane/routes/sources.py
 from __future__ import annotations
 
 import csv as csvmod
@@ -2424,7 +2424,7 @@ import sqlite3
 from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from controlflow_sdk.store import repo
+from uticen_lite.store import repo
 
 
 def register(app: FastAPI, templates, get_conn) -> None:
@@ -2500,7 +2500,7 @@ Expected: PASS (2 tests).
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/plane/routes/sources.py controlflow_sdk/plane/templates/sources.html controlflow_sdk/plane/templates/source_edit.html tests/plane/test_sources.py
+git add uticen_lite/plane/routes/sources.py uticen_lite/plane/templates/sources.html uticen_lite/plane/templates/source_edit.html tests/plane/test_sources.py
 git commit -m "feat(plane): source manager — upload + column mapping"
 git push -u origin HEAD
 ```
@@ -2508,8 +2508,8 @@ git push -u origin HEAD
 ### Task 18: Control editor — metadata + binding + python tab
 
 **Files:**
-- Modify: `controlflow_sdk/plane/routes/controls.py`
-- Create: `controlflow_sdk/plane/templates/control_edit.html`
+- Modify: `uticen_lite/plane/routes/controls.py`
+- Create: `uticen_lite/plane/templates/control_edit.html`
 - Test: `tests/plane/test_controls.py`
 
 **Interfaces:**
@@ -2538,8 +2538,8 @@ def test_create_python_control(client):
         "source_ids": ["users"],
     }, follow_redirects=False)
     assert resp.status_code in (302, 303)
-    from controlflow_sdk.store.db import connect
-    from controlflow_sdk.store import repo
+    from uticen_lite.store.db import connect
+    from uticen_lite.store import repo
     c = repo.get_control(connect(client.app.state.project_root), "py1")
     assert c["test_kind"] == "python"
     assert c["framework_refs"] == {"nist": ["AC-2", "AC-5"]}
@@ -2565,7 +2565,7 @@ Expected: FAIL — routes 404.
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# controlflow_sdk/plane/routes/controls.py
+# uticen_lite/plane/routes/controls.py
 from __future__ import annotations
 
 import sqlite3
@@ -2573,7 +2573,7 @@ import sqlite3
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from controlflow_sdk.store import repo
+from uticen_lite.store import repo
 
 
 def _ctx(conn, request, control):
@@ -2643,7 +2643,7 @@ Expected: PASS (2 tests).
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/plane/routes/controls.py controlflow_sdk/plane/templates/control_edit.html tests/plane/test_controls.py
+git add uticen_lite/plane/routes/controls.py uticen_lite/plane/templates/control_edit.html tests/plane/test_controls.py
 git commit -m "feat(plane): control editor — metadata, binding, python tab"
 git push -u origin HEAD
 ```
@@ -2651,8 +2651,8 @@ git push -u origin HEAD
 ### Task 19: Rule builder (HTMX condition rows → rule_spec)
 
 **Files:**
-- Modify: `controlflow_sdk/plane/routes/controls.py` (`_rule_spec_from_form` + an HTMX partial route)
-- Create: `controlflow_sdk/plane/templates/partials/rule_condition.html`, `controlflow_sdk/plane/templates/partials/rule_builder.html`
+- Modify: `uticen_lite/plane/routes/controls.py` (`_rule_spec_from_form` + an HTMX partial route)
+- Create: `uticen_lite/plane/templates/partials/rule_condition.html`, `uticen_lite/plane/templates/partials/rule_builder.html`
 - Test: `tests/plane/test_rule_builder.py`
 
 **Interfaces:**
@@ -2684,8 +2684,8 @@ def test_rule_builder_builds_spec_from_conditions(client):
         "cond_value": ["true", "true"],
         "source_ids": ["users"],
     }, follow_redirects=False)
-    from controlflow_sdk.store.db import connect
-    from controlflow_sdk.store import repo
+    from uticen_lite.store.db import connect
+    from uticen_lite.store import repo
     c = repo.get_control(connect(client.app.state.project_root), "sod")
     assert c["test_kind"] == "rule"
     spec = c["rule_spec"]
@@ -2770,7 +2770,7 @@ Expected: PASS (2 tests).
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/plane/routes/controls.py controlflow_sdk/plane/templates/partials tests/plane/test_rule_builder.py
+git add uticen_lite/plane/routes/controls.py uticen_lite/plane/templates/partials tests/plane/test_rule_builder.py
 git commit -m "feat(plane): no-code rule builder → rule_spec (HTMX condition rows)"
 git push -u origin HEAD
 ```
@@ -2778,8 +2778,8 @@ git push -u origin HEAD
 ### Task 20: Run + run view (embeds the workpaper)
 
 **Files:**
-- Modify: `controlflow_sdk/plane/routes/runs.py`
-- Create: `controlflow_sdk/plane/templates/run_view.html`
+- Modify: `uticen_lite/plane/routes/runs.py`
+- Create: `uticen_lite/plane/templates/run_view.html`
 - Test: `tests/plane/test_runs.py`
 
 **Interfaces:**
@@ -2827,7 +2827,7 @@ Expected: FAIL — routes 404.
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# controlflow_sdk/plane/routes/runs.py
+# uticen_lite/plane/routes/runs.py
 from __future__ import annotations
 
 import sqlite3
@@ -2836,8 +2836,8 @@ from datetime import UTC, datetime
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.run_service import run_control_in_store
+from uticen_lite.store import repo
+from uticen_lite.store.run_service import run_control_in_store
 
 
 def register(app: FastAPI, templates, get_conn) -> None:
@@ -2874,7 +2874,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/plane/routes/runs.py controlflow_sdk/plane/templates/run_view.html tests/plane/test_runs.py
+git add uticen_lite/plane/routes/runs.py uticen_lite/plane/templates/run_view.html tests/plane/test_runs.py
 git commit -m "feat(plane): run a control + run view with embedded workpaper"
 git push -u origin HEAD
 ```
@@ -2882,11 +2882,11 @@ git push -u origin HEAD
 ### Task 21: Export bundle from the web app
 
 **Files:**
-- Modify: `controlflow_sdk/plane/routes/export.py`
+- Modify: `uticen_lite/plane/routes/export.py`
 - Test: `tests/plane/test_export.py`
 
 **Interfaces:**
-- Consumes: the same store-backed assembly as `build_cmd` (Task 14). Factor the build into a reusable `controlflow_sdk/store/export_service.py:build_bundle(conn, root, out_path, generated_at) -> Path` and call it from both `build_cmd` and this route. (If Task 14 inlined the logic, extract it here and have `build_cmd` import it — note the small refactor.)
+- Consumes: the same store-backed assembly as `build_cmd` (Task 14). Factor the build into a reusable `uticen_lite/store/export_service.py:build_bundle(conn, root, out_path, generated_at) -> Path` and call it from both `build_cmd` and this route. (If Task 14 inlined the logic, extract it here and have `build_cmd` import it — note the small refactor.)
 - Produces route: `GET /export` (a page with a button), `POST /export` (builds `target/bundle.zip`, returns it as a `FileResponse` download).
 
 - [ ] **Step 1: Write the failing test**
@@ -2930,24 +2930,24 @@ Expected: FAIL — route 404.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `controlflow_sdk/store/export_service.py`:
+Create `uticen_lite/store/export_service.py`:
 
 ```python
-# controlflow_sdk/store/export_service.py
+# uticen_lite/store/export_service.py
 from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
 
-from controlflow_sdk.bundle.archive import write_bundle
-from controlflow_sdk.bundle.assemble import assemble_bundle
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.loader import load_project_from_store
+from uticen_lite.bundle.archive import write_bundle
+from uticen_lite.bundle.assemble import assemble_bundle
+from uticen_lite.store import repo
+from uticen_lite.store.loader import load_project_from_store
 
 
 def _to_run_dicts(conn, controls) -> dict[str, list[dict]]:
-    from controlflow_sdk.model.run import RunRecord, SourceProvenance
-    from controlflow_sdk.model.violation import Violation
+    from uticen_lite.model.run import RunRecord, SourceProvenance
+    from uticen_lite.model.violation import Violation
 
     out: dict[str, list[dict]] = {}
     for c in controls:
@@ -2980,7 +2980,7 @@ def build_bundle(conn: sqlite3.Connection, root: Path, out_path: Path,
 Refactor `build_cmd.py` (Task 14) to call `build_bundle` instead of its inline `_to_run_dicts`. Then the route:
 
 ```python
-# controlflow_sdk/plane/routes/export.py
+# uticen_lite/plane/routes/export.py
 from __future__ import annotations
 
 import sqlite3
@@ -2989,8 +2989,8 @@ from datetime import UTC, datetime
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse
 
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.export_service import build_bundle
+from uticen_lite.store import repo
+from uticen_lite.store.export_service import build_bundle
 
 
 def register(app: FastAPI, templates, get_conn) -> None:
@@ -3018,7 +3018,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/store/export_service.py controlflow_sdk/cli/build_cmd.py controlflow_sdk/plane/routes/export.py controlflow_sdk/plane/templates/export.html tests/plane/test_export.py
+git add uticen_lite/store/export_service.py uticen_lite/cli/build_cmd.py uticen_lite/plane/routes/export.py uticen_lite/plane/templates/export.html tests/plane/test_export.py
 git commit -m "feat(plane): export bundle from the web app (shared build_bundle)"
 git push -u origin HEAD
 ```
@@ -3031,11 +3031,11 @@ git push -u origin HEAD
 
 **Files:**
 - Modify: `pyproject.toml`
-- Create: `controlflow_sdk/plane/static/codemirror.min.js`, `controlflow_sdk/plane/static/codemirror.min.css`, `controlflow_sdk/plane/static/codemirror-python.min.js`, `controlflow_sdk/plane/static/htmx.min.js` (vendored library files)
+- Create: `uticen_lite/plane/static/codemirror.min.js`, `uticen_lite/plane/static/codemirror.min.css`, `uticen_lite/plane/static/codemirror-python.min.js`, `uticen_lite/plane/static/htmx.min.js` (vendored library files)
 - Test: `tests/plane/test_packaging.py`
 
 **Interfaces:**
-- Produces: `[project.optional-dependencies] plane = ["fastapi>=0.110","uvicorn>=0.27","jinja2>=3.1","python-multipart>=0.0.9"]`; `[project.scripts] controlplane = "controlflow_sdk.plane.__main__:main"`; hatch wheel includes `plane/templates/**` and `plane/static/**`.
+- Produces: `[project.optional-dependencies] plane = ["fastapi>=0.110","uvicorn>=0.27","jinja2>=3.1","python-multipart>=0.0.9"]`; `[project.scripts] controlplane = "uticen_lite.plane.__main__:main"`; hatch wheel includes `plane/templates/**` and `plane/static/**`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -3052,11 +3052,11 @@ def test_pyproject_declares_plane_extra_and_entry():
     joined = " ".join(extras["plane"])
     for dep in ("fastapi", "uvicorn", "jinja2", "python-multipart"):
         assert dep in joined
-    assert data["project"]["scripts"]["controlplane"] == "controlflow_sdk.plane.__main__:main"
+    assert data["project"]["scripts"]["controlplane"] == "uticen_lite.plane.__main__:main"
 
 
 def test_main_entrypoint_importable():
-    from controlflow_sdk.plane.__main__ import main
+    from uticen_lite.plane.__main__ import main
     assert callable(main)
 ```
 
@@ -3079,15 +3079,15 @@ dev = ["pytest>=8.0", "ruff>=0.5", "mypy>=1.8", "types-PyYAML", "types-jsonschem
   "httpx>=0.27"]   # httpx for fastapi TestClient
 
 [project.scripts]
-cflow = "controlflow_sdk.cli:main"
-controlplane = "controlflow_sdk.plane.__main__:main"
+uticen-lite = "uticen_lite.cli:main"
+controlplane = "uticen_lite.plane.__main__:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["controlflow_sdk"]
+packages = ["uticen_lite"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"controlflow_sdk/plane/templates" = "controlflow_sdk/plane/templates"
-"controlflow_sdk/plane/static" = "controlflow_sdk/plane/static"
+"uticen_lite/plane/templates" = "uticen_lite/plane/templates"
+"uticen_lite/plane/static" = "uticen_lite/plane/static"
 ```
 
 Vendor the real minified library files into `plane/static/` (download once into the repo; they are committed assets, no CDN at runtime): `htmx.min.js` (htmx 1.x), `codemirror.min.js` + `codemirror.min.css` + the Python mode. `control_edit.html` references them with `<link>`/`<script src="/static/...">` and initializes CodeMirror over the `test_code` textarea.
@@ -3100,7 +3100,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add pyproject.toml controlflow_sdk/plane/static tests/plane/test_packaging.py
+git add pyproject.toml uticen_lite/plane/static tests/plane/test_packaging.py
 git commit -m "build: package [plane] extra, controlplane entry, vendor CodeMirror/HTMX"
 git push -u origin HEAD
 ```
@@ -3123,10 +3123,10 @@ import argparse
 import shutil
 from pathlib import Path
 
-from controlflow_sdk.bundle.archive import read_bundle
-from controlflow_sdk.cli.build_cmd import build_cmd
-from controlflow_sdk.cli.import_cmd import import_cmd
-from controlflow_sdk.cli.run_cmd import run_cmd
+from uticen_lite.bundle.archive import read_bundle
+from uticen_lite.cli.build_cmd import build_cmd
+from uticen_lite.cli.import_cmd import import_cmd
+from uticen_lite.cli.run_cmd import run_cmd
 
 
 def test_northwind_import_run_build(tmp_path: Path):
@@ -3147,19 +3147,19 @@ def test_northwind_import_run_build(tmp_path: Path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `pytest tests/examples/test_northwind.py -v`
-Expected: FAIL if the old test asserted the YAML `cflow run` path; now it exercises import→run→build.
+Expected: FAIL if the old test asserted the YAML `uticen-lite run` path; now it exercises import→run→build.
 
 - [ ] **Step 3: Make it pass + rewrite README**
 
 Ensure the import→run→build path is green (it depends on Tasks 13–15). Then rewrite `README.md`:
-- Lead with the control plane: `pip install 'controlflow-sdk[plane]'` → `controlplane` → author in the browser.
-- "See it in action" becomes: `cflow import examples/northwind-trading --into demo` → `controlplane --project demo` (or `cflow run demo` / `cflow build demo` headless).
-- Replace the `cflow init` / `cflow new control` authoring sections with the web-app workflow (new source, new control, rule builder, Python escape hatch) and keep the `Population` / data-types / key-config reference.
+- Lead with the control plane: `pip install 'uticen-lite[plane]'` → `controlplane` → author in the browser.
+- "See it in action" becomes: `uticen-lite import examples/northwind-trading --into demo` → `controlplane --project demo` (or `uticen-lite run demo` / `uticen-lite build demo` headless).
+- Replace the `uticen-lite init` / `uticen-lite new control` authoring sections with the web-app workflow (new source, new control, rule builder, Python escape hatch) and keep the `Population` / data-types / key-config reference.
 - State the brittle-by-design folder convention and the localhost/offline guarantee.
 
 - [ ] **Step 4: Run the full suite**
 
-Run: `pytest -q && ruff check . && mypy controlflow_sdk`
+Run: `pytest -q && ruff check . && mypy uticen_lite`
 Expected: all green.
 
 - [ ] **Step 5: Commit + push**
@@ -3181,7 +3181,7 @@ git push -u origin HEAD
 - Rule engine (spec, evaluator, render) → Tasks 7–9
 - Runner branch + inline code → Tasks 10–11
 - Run + persist + render → Task 12
-- `cflow import` + headless run/build over store + retire init/new → Tasks 13–14
+- `uticen-lite import` + headless run/build over store + retire init/new → Tasks 13–14
 - Bundle projection (contract conformance) → Task 15
 - Web app: app/dashboard/sources/control editor/rule builder/run view/export → Tasks 16–21
 - Packaging + Northwind demo + README + non-goals respected → Tasks 22–23

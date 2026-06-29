@@ -15,8 +15,8 @@ superseded_by: null
 To ship `plane/templates` + `plane/static` (HTML, CSS, vendored JS) in the wheel, a
 `[tool.hatch.build.targets.wheel.force-include]` mapping was added pointing those paths back at
 themselves. The wheel build then failed: `ValueError: A second file is being added to the wheel
-archive at the same path: 'controlflow_sdk/plane/static/app.css'`. Root cause: hatchling's
-`packages = ["controlflow_sdk"]` already includes **every** file under the package directory (data
+archive at the same path: 'uticen_lite/plane/static/app.css'`. Root cause: hatchling's
+`packages = ["uticen_lite"]` already includes **every** file under the package directory (data
 files too, not just `.py`), so force-including paths already inside the package duplicates them. The
 packaging unit test stayed green the whole time — it only parsed `pyproject.toml` and never built a
 wheel.
@@ -35,9 +35,9 @@ wheel.
 ### Corollary — shipping out-of-package data to pip users (the legitimate force-include case)
 
 To ship data that lives **outside** the package (e.g. `examples/` — the demo a
-pip-installed feature needs but which is not under `controlflow_sdk/`), force-include it
+pip-installed feature needs but which is not under `uticen_lite/`), force-include it
 INTO the package namespace and keep the original as the single source of truth:
-`[tool.hatch.build.targets.wheel.force-include]` → `"examples/x" = "controlflow_sdk/_demo/x"`.
+`[tool.hatch.build.targets.wheel.force-include]` → `"examples/x" = "uticen_lite/_demo/x"`.
 Map only the files the feature needs, not the whole dir.
 
 - **force-include runs for the BUILT wheel, not for editable/source installs.** So any
@@ -51,10 +51,10 @@ Map only the files the feature needs, not the whole dir.
 
 ## Reference
 
-- `pyproject.toml` (`[tool.hatch.build.targets.wheel] packages = ["controlflow_sdk"]` ships
+- `pyproject.toml` (`[tool.hatch.build.targets.wheel] packages = ["uticen_lite"]` ships
   `plane/templates` + `plane/static`; a later `force-include` block maps
-  `examples/northwind-trading` → `controlflow_sdk/_demo/...` for the demo loader).
-- `controlflow_sdk/store/import_service.py` (`demo_source_dir()` — packaged-first, repo-path
+  `examples/northwind-trading` → `uticen_lite/_demo/...` for the demo loader).
+- `uticen_lite/store/import_service.py` (`demo_source_dir()` — packaged-first, repo-path
   fallback resolver).
 - `tests/plane/test_packaging.py` (asserts the `plane` extra + `controlplane` script — a
   pyproject-only check; pair it with a real `python -m build` when touching packaging).

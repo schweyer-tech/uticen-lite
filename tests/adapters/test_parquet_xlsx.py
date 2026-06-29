@@ -8,10 +8,10 @@ from typing import Any
 
 import pandas as pd
 
-from controlflow_sdk.adapters.base import Source
-from controlflow_sdk.adapters.files import source_for
-from controlflow_sdk.model.control import SourceBinding
-from controlflow_sdk.model.population import Population
+from uticen_lite.adapters.base import Source
+from uticen_lite.adapters.files import source_for
+from uticen_lite.model.control import SourceBinding
+from uticen_lite.model.population import Population
 
 # ---------------------------------------------------------------------------
 # Shared test data
@@ -105,7 +105,7 @@ def _make_binding(
 
 class TestSourceForNewFormats:
     def test_parquet_returns_parquet_source(self, tmp_path: Path) -> None:
-        from controlflow_sdk.adapters.files import ParquetSource
+        from uticen_lite.adapters.files import ParquetSource
 
         _make_parquet_file(tmp_path)
         binding = _make_binding("parquet", "gl.parquet")
@@ -113,7 +113,7 @@ class TestSourceForNewFormats:
         assert isinstance(src, ParquetSource)
 
     def test_xlsx_returns_xlsx_source(self, tmp_path: Path) -> None:
-        from controlflow_sdk.adapters.files import XlsxSource
+        from uticen_lite.adapters.files import XlsxSource
 
         _make_xlsx_file(tmp_path)
         binding = _make_binding("xlsx", "gl.xlsx")

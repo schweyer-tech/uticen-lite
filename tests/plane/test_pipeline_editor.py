@@ -18,7 +18,7 @@ import zipfile
 
 import pytest
 
-from controlflow_sdk.pipeline.lint import OFFRAMP_MESSAGE
+from uticen_lite.pipeline.lint import OFFRAMP_MESSAGE
 
 _OFFRAMP_STABLE = "pull data in with an Import node, or convert this control"
 assert _OFFRAMP_STABLE in OFFRAMP_MESSAGE
@@ -33,7 +33,7 @@ def _make_source(client, sid, csv):
 
 
 def _conn(client):
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store.db import connect
     return connect(client.app.state.project_root)
 
 
@@ -71,7 +71,7 @@ def _type_column_boolean(client, sid, col):
     """Map a source column's data_type to boolean (as an analyst would in the
     source editor) so it loads as a REAL bool dtype — the Stage-3 gotcha: the
     Filter value for a bool column is python True, surfaced as a typed value."""
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     src = repo.get_source(conn, sid)
     cols = [dict(c) for c in src["columns"]]
@@ -149,8 +149,8 @@ def test_diagram_lays_join_branches_in_separate_converging_lanes():
     """The multi-lane view-model puts a Join's two feeder branches in distinct
     lanes that converge at the Join, while keeping every edge a real input→node
     relationship (presentation-only — never reorders execution)."""
-    from controlflow_sdk.pipeline.model import parse_pipeline
-    from controlflow_sdk.plane.routes.pipeline import _diagram
+    from uticen_lite.pipeline.model import parse_pipeline
+    from uticen_lite.plane.routes.pipeline import _diagram
 
     pipeline = parse_pipeline(_terminated_access_graph())
     diagram = _diagram(pipeline, counts={})
@@ -194,7 +194,7 @@ def test_authoring_terminated_access_pipeline_runs_with_right_exceptions(client)
     _make_control(client, "C1")
     _save_pipeline(client, "C1", _terminated_access_graph())
 
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "C1")
     conn.close()
@@ -243,7 +243,7 @@ def test_convert_to_python_sets_kind_and_prefills_code(client):
     assert resp.status_code in (302, 303)
     assert resp.headers["location"] == "/controls/C1/logic/python"
 
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "C1")
     conn.close()
@@ -271,7 +271,7 @@ def test_convert_pure_pipeline_yields_runnable_test(client):
     ]}
     _save_pipeline(client, "C3", graph)
 
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "C3")
     conn.close()
@@ -311,7 +311,7 @@ def test_custom_node_with_open_shows_inline_offramp_error(client):
     assert _OFFRAMP_STABLE in resp.text
     # The error is pinned on the offending node card (inline), not just a banner.
     assert "node-error" in resp.text
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "C2")
     conn.close()
@@ -464,7 +464,7 @@ def test_builder_derives_graph_for_rule_control_and_save_persists(client):
     assert resp.status_code in (302, 303), f"save returned {resp.status_code}"
 
     # 4. The control must now have a persisted pipeline (not None).
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, cid)
     conn.close()
@@ -610,7 +610,7 @@ def test_cross_source_condition_preserved_through_builder_save(client):
     r2 = _save_pipeline(client, "CS1", embedded_graph)
     assert r2.status_code in (302, 303), f"re-save returned {r2.status_code}"
 
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     ctrl = repo.get_control(conn, "CS1")
     conn.close()
@@ -655,7 +655,7 @@ def test_builder_degrades_gracefully_on_incomplete_test_condition(client):
     # Construct the stored graph directly via repo so the save path's validation
     # is bypassed (the save route would reject it; we need the GET to survive it
     # when the graph is already in that state — e.g. after a partial migration).
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     ctrl = repo.get_control(conn, "INC1")
     incomplete_graph = {
@@ -712,7 +712,7 @@ def test_python_save_does_not_clobber_graph_control(client):
     _make_control(client, "G1")
     _save_pipeline(client, "G1", _terminated_access_graph())
 
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     before = repo.get_control(conn, "G1")
     conn.close()
@@ -746,7 +746,7 @@ def test_python_save_works_for_raw_python_control(client):
                        follow_redirects=False)
     assert resp.status_code in (302, 303), f"expected redirect, got {resp.status_code}"
 
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, cid)
     conn.close()
@@ -813,7 +813,7 @@ def test_forked_control_bundle_has_n_procedures(client):
     - The two procedure titles are distinct
     - control["test_code"] is non-empty (the union test())
     """
-    from controlflow_sdk.schema.validate import validate_bundle
+    from uticen_lite.schema.validate import validate_bundle
 
     _seed_forked_bundle_control(client)
 
@@ -938,8 +938,8 @@ def test_diagram_marks_all_terminals_for_forked_control():
     After the fix it uses ``n.id in {t.id for t in pipeline.terminals}`` so ALL
     terminal boxes are marked.
     """
-    from controlflow_sdk.pipeline.model import parse_pipeline
-    from controlflow_sdk.plane.routes.pipeline import _diagram
+    from uticen_lite.pipeline.model import parse_pipeline
+    from uticen_lite.plane.routes.pipeline import _diagram
 
     graph = _forked_graph_with_titles()
     pipeline = parse_pipeline(graph)
@@ -988,8 +988,8 @@ def test_single_terminal_back_compat(client):
     assert "data-threshold-count" not in html, "data-threshold-count should be gone"
 
     # The flowchart marks the single terminal correctly.
-    from controlflow_sdk.pipeline.model import parse_pipeline
-    from controlflow_sdk.plane.routes.pipeline import _diagram
+    from uticen_lite.pipeline.model import parse_pipeline
+    from uticen_lite.plane.routes.pipeline import _diagram
     pipeline = parse_pipeline(graph)
     diagram = _diagram(pipeline, counts={})
     terminal_boxes = [b for b in diagram["boxes"] if b["terminal"]]
@@ -999,8 +999,8 @@ def test_single_terminal_back_compat(client):
 def test_diagram_boxes_carry_node_narrative():
     """Each flowchart box exposes its node's narrative so the SVG can show the
     beginning of it (truncated) with the full text on hover."""
-    from controlflow_sdk.pipeline.model import parse_pipeline
-    from controlflow_sdk.plane.routes.pipeline import _diagram
+    from uticen_lite.pipeline.model import parse_pipeline
+    from uticen_lite.plane.routes.pipeline import _diagram
 
     diagram = _diagram(parse_pipeline(_terminated_access_graph()), counts={})
     narr = {b["id"]: b["narrative"] for b in diagram["boxes"]}
@@ -1047,8 +1047,8 @@ def test_builder_has_per_gap_insert_affordances_not_only_bottom_toolbar(client):
     Builder groups cards into a shared Inputs band + one section per procedure, so
     the per-gap count is one zone before each card plus one end zone per non-empty
     band."""
-    from controlflow_sdk.pipeline.model import parse_pipeline
-    from controlflow_sdk.plane.routes.pipeline import (
+    from uticen_lite.pipeline.model import parse_pipeline
+    from uticen_lite.plane.routes.pipeline import (
         _card_bands,
         _card_vm,
         _procedure_context,

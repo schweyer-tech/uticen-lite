@@ -33,7 +33,7 @@ sufficient — run the **whole** `tests/store` suite before the task gate, becau
 constant-equality assertions live in sibling tests, not the new one.
 
 ## Reference
-- `controlflow_sdk/store/migrations.py` (`_STEPS`, `migrate`, `SCHEMA_VERSION`)
+- `uticen_lite/store/migrations.py` (`_STEPS`, `migrate`, `SCHEMA_VERSION`)
 - `tests/store/test_migrations.py`, `tests/store/test_repo_pipeline.py` (the `== SCHEMA_VERSION` asserts)
 - Cardinal-rule contrast: [[0001]] (bundle `schema_version` stays frozen; only the store version moves)
 </content>

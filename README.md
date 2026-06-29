@@ -1,13 +1,13 @@
-# controlflow-sdk
+# uticen-lite
 
-Author and run full-population control tests; export audit-grade workpapers importable into ControlFlow.
+Author and run full-population control tests; export audit-grade workpapers importable into Uticen.
 
 ## About
 
-ControlFlow SDK is a pure-Python library for authoring, running, and packaging control tests against
+Uticen SDK is a pure-Python library for authoring, running, and packaging control tests against
 full populations of data. The **control plane** (`controlplane`) is a local web app — served entirely
 on `127.0.0.1`, zero network egress by default — where you author sources and controls through a browser UI, run
-tests, and export an import bundle for the ControlFlow audit platform.
+tests, and export an import bundle for the Uticen audit platform.
 
 Test results and workpapers produced by the SDK are structurally equivalent to those generated
 in-app: the same section model, the same NIST 800-53 references, and the same bundle format that
@@ -16,7 +16,7 @@ lands controls, runs, exceptions, and workpapers directly into your tenant.
 ## Installation
 
 ```bash
-pip install 'controlflow-sdk[plane]'
+pip install 'uticen-lite[plane]'
 ```
 
 This installs the SDK plus the local web app dependencies (FastAPI, uvicorn, Jinja2). For source
@@ -29,11 +29,11 @@ pip install -e ".[plane]"
 For CSV/Parquet/Excel adapter support, add `adapters`:
 
 ```bash
-pip install 'controlflow-sdk[plane,adapters]'
+pip install 'uticen-lite[plane,adapters]'
 ```
 
 [pipx](https://pipx.pypa.io/) works too if you want the commands isolated on your PATH:
-`pipx install 'controlflow-sdk[plane]'`.
+`pipx install 'uticen-lite[plane]'`.
 
 **Corporate / offline install.** Behind a firewall, air-gapped, or on an internal package index?
 See **[docs/INSTALL.md](docs/INSTALL.md)** for pipx, internal-index (`--index-url`/`--extra-index-url`),
@@ -52,7 +52,7 @@ controlplane --project my-audit
 script on your PATH, the exact equivalent is to run the module:
 
 ```bash
-python -m controlflow_sdk.plane --project my-audit
+python -m uticen_lite.plane --project my-audit
 ```
 
 Both accept the same flags: `--project <dir>` (engagement directory, default `.`),
@@ -77,12 +77,12 @@ extracts.
 **Import it, then browse or run headless:**
 
 ```bash
-git clone https://github.com/dom-schweyer-tech/controlflow-sdk
-cd controlflow-sdk
+git clone https://github.com/schweyer-tech/uticen-lite
+cd uticen-lite
 pip install -e ".[plane,adapters]"
 
 # Import the YAML project into a local engagement store
-cflow import examples/northwind-trading --into demo
+uticen-lite import examples/northwind-trading --into demo
 ```
 
 **Option A — browser authoring and viewing (recommended):**
@@ -97,8 +97,8 @@ From the dashboard you can browse sources, run controls, view workpapers, and ex
 **Option B — headless CLI:**
 
 ```bash
-cflow run demo --at 2026-03-31T00:00:00Z
-cflow build demo --out bundle.zip --at 2026-03-31T00:00:00Z
+uticen-lite run demo --at 2026-03-31T00:00:00Z
+uticen-lite build demo --out bundle.zip --at 2026-03-31T00:00:00Z
 ```
 
 ```text
@@ -122,7 +122,7 @@ See the [Northwind catalog README](examples/northwind-trading/README.md) for wha
 ## Authoring with the web app
 
 Start the control plane in any engagement directory (or a fresh one) — via the
-`controlplane` command or the equivalent `python -m controlflow_sdk.plane`:
+`controlplane` command or the equivalent `python -m uticen_lite.plane`:
 
 ```bash
 controlplane --project my-audit
@@ -205,14 +205,14 @@ appear under the Runs tab.
 **Headless:**
 
 ```bash
-cflow run my-audit                          # run all controls
-cflow run my-audit --control Finance.GL.1  # run one control
-cflow run my-audit --at 2026-03-31T00:00:00Z  # deterministic timestamp
+uticen-lite run my-audit                          # run all controls
+uticen-lite run my-audit --control Finance.GL.1  # run one control
+uticen-lite run my-audit --at 2026-03-31T00:00:00Z  # deterministic timestamp
 
-cflow build my-audit --out bundle.zip      # package for ControlFlow import
+uticen-lite build my-audit --out bundle.zip      # package for Uticen import
 ```
 
-Then upload `bundle.zip` at **Settings → Imports** in the ControlFlow app.
+Then upload `bundle.zip` at **Settings → Imports** in the Uticen app.
 
 ## Design principles
 
@@ -221,7 +221,7 @@ Then upload `bundle.zip` at **Settings → Imports** in the ControlFlow app.
   Copy or zip the folder and you have a portable snapshot.
 - **Brittle by design.** The SDK trusts the folder convention. It has no locking, no user accounts,
   and no conflict resolution — it is a local, single-user tool. The hardened multi-user experience
-  (access control, concurrency, audit trails, sign-off workflows) is the paid ControlFlow app.
+  (access control, concurrency, audit trails, sign-off workflows) is the paid Uticen app.
 - **Localhost only, zero network egress by default.** `controlplane` listens on `127.0.0.1:8765` and
   makes no outbound connections — the one exception is an **opt-in** update check (Settings ▸ Updates,
   off by default) that, only when you enable it, asks your configured package index for the latest
@@ -229,8 +229,8 @@ Then upload `bundle.zip` at **Settings → Imports** in the ControlFlow app.
 
 ## Workpaper quality
 
-`cflow run` / `controlplane` produce HTML workpapers that are **structurally equivalent and visually
-close** to ControlFlow's in-app workpaper view: the same section model (Results, Objective & scope,
+`uticen-lite run` / `controlplane` produce HTML workpapers that are **structurally equivalent and visually
+close** to Uticen's in-app workpaper view: the same section model (Results, Objective & scope,
 Control, Data sources, Procedures, Exceptions, Conclusion), sticky results bar, jump-nav sidebar, and
 shared design tokens (dark enterprise palette, Inter / JetBrains Mono). The Conclusion states the
 pass/fail threshold determination — a control may set `failure_threshold_pct` /
@@ -266,7 +266,7 @@ def test(pop):
 Column metadata available on `pop.columns`:
 
 ```python
-from controlflow_sdk import ColumnMeta
+from uticen_lite import ColumnMeta
 
 # col.original_name  → str (column name from the source file)
 # col.display_name   → str (human-readable label)
@@ -312,24 +312,24 @@ from controlflow_sdk import ColumnMeta
 
 ### Bundle / import flow
 
-`cflow build` reads the engagement store, projects each control + its latest run + workpaper HTML into
+`uticen-lite build` reads the engagement store, projects each control + its latest run + workpaper HTML into
 a `manifest.json`, and writes `bundle.zip`. Upload the zip at **Settings → Imports** (admin) in the
-ControlFlow app. The import is idempotent on `control_id` — re-importing the same bundle updates
+Uticen app. The import is idempotent on `control_id` — re-importing the same bundle updates
 existing records.
 
 ## CLI reference
 
 | Command | Description |
 |---------|-------------|
-| `cflow import <src> --into <dir>` | Import a YAML project into an engagement store |
-| `cflow run <dir> [--control <id>] [--at <iso>]` | Run all (or one) controls, persist results |
-| `cflow build <dir> [--out <file>] [--at <iso>]` | Package runs into an importable zip bundle |
-| `cflow validate [<dir>]` | Light schema check (deprecated stub; prefer the web app) |
+| `uticen-lite import <src> --into <dir>` | Import a YAML project into an engagement store |
+| `uticen-lite run <dir> [--control <id>] [--at <iso>]` | Run all (or one) controls, persist results |
+| `uticen-lite build <dir> [--out <file>] [--at <iso>]` | Package runs into an importable zip bundle |
+| `uticen-lite validate [<dir>]` | Light schema check (deprecated stub; prefer the web app) |
 | `controlplane [--project <dir>] [--port <n>]` | Launch the local web UI |
 
 ## License
 
 Apache-2.0 — see [LICENSE](LICENSE).
 
-ControlFlow SDK is intended for use authoring control tests that integrate with the
-[ControlFlow](https://controlflow.app) audit platform.
+Uticen SDK is intended for use authoring control tests that integrate with the
+[Uticen](https://uticen.app) audit platform.

@@ -14,7 +14,7 @@
 - **Never put raw population in the bundle** (trust boundary). Per-procedure threshold/verdict/color stay render+store-only (learning 0015).
 - **No store-schema migration:** procedures ride inside the existing `pipeline` TEXT blob; do **not** bump store `SCHEMA_VERSION` (learning 0022). Old blobs lacking `procedures` derive the default one-per-terminal at read time.
 - **Pyodide-safe core:** `model/`, `pipeline/compile.py` stay pandas-free; pandas only in `pipeline/materialize.py` and adapters. Custom Python nodes stay file/source-starved (allowlist AST lint + lexical starvation + export gate — learning 0008).
-- **Gates per task:** `python -m pytest -q` pristine (no stray warnings), `python -m ruff check .` clean, `python -m mypy controlflow_sdk` clean.
+- **Gates per task:** `python -m pytest -q` pristine (no stray warnings), `python -m ruff check .` clean, `python -m mypy uticen_lite` clean.
 - **Determinism:** any serialization the bundle depends on uses `json.dumps(..., sort_keys=True)` (learning 0028); procedures ordered by `position`.
 - **Graceful degradation, never 500:** unassigned tests, missing item-keys, incomplete graphs degrade (learnings 0013, 0033).
 
@@ -29,7 +29,7 @@
   git push -u origin HEAD
   ```
   (No project-specific post-push command for this Python repo.)
-- Keep the dev gates green at every commit: `python -m pytest -q`, `python -m ruff check .`, `python -m mypy controlflow_sdk`.
+- Keep the dev gates green at every commit: `python -m pytest -q`, `python -m ruff check .`, `python -m mypy uticen_lite`.
 
 ---
 
@@ -37,19 +37,19 @@
 
 | File | Responsibility | Action |
 | ---- | -------------- | ------ |
-| `controlflow_sdk/pipeline/model.py` | `ProcedureDef` dataclass + `Pipeline.procedures` field + parse/round-trip | Modify |
-| `controlflow_sdk/pipeline/procedures.py` | Pure helpers: effective procedures (defined-or-derived), tests-for-procedure, derived support-node membership | **Create** |
-| `controlflow_sdk/pipeline/compile.py` | Terminal-**set** closure slice; `compile_pipeline_procedures` keyed off procedure defs; `CompiledProcedure` gains code/assertion | Modify |
-| `controlflow_sdk/store/run_service.py` | Per-check runs + merge-by-item-key; distinct-examined population; `ProcedureSpec` with code/assertion | Modify |
-| `controlflow_sdk/model/workpaper.py` | `ProcedureSpec`/`Procedure` gain `code`+`assertion`; `Procedure.to_dict()` emits them | Modify |
-| `controlflow_sdk/render/html.py`, `render/markdown.py` | Render code · name, assertion subtitle, per-check breakdown, union exceptions table | Modify |
-| `controlflow_sdk/schema/bundle.schema.json` (+ `contract/bundle.schema.json`) | Add optional `code`/`assertion` to `$defs/procedure` | Modify |
-| `controlflow_sdk/bundle/assemble.py` | Thread `code`/`assertion` through `procedure_info_by_control` | Modify |
-| `controlflow_sdk/plane/routes/pipeline.py` | `_editor_context`: procedures + derived colors; `save_pipeline`: accept procedures; `_diagram`: per-procedure color | Modify |
-| `controlflow_sdk/plane/templates/partials/_procedures_panel.html` | The Procedures definition panel | **Create** |
-| `controlflow_sdk/plane/templates/partials/_pipe_node.html` | Per-Test "Procedure ▾" selector + derived color chip | Modify |
-| `controlflow_sdk/plane/templates/logic_builder.html` | Serialize procedures + per-Test `procedure_id`; render panel | Modify |
-| `controlflow_sdk/plane/templates/partials/_pipe_diagram.html`, `logic_flowchart.html` | Per-procedure box color + legend | Modify |
+| `uticen_lite/pipeline/model.py` | `ProcedureDef` dataclass + `Pipeline.procedures` field + parse/round-trip | Modify |
+| `uticen_lite/pipeline/procedures.py` | Pure helpers: effective procedures (defined-or-derived), tests-for-procedure, derived support-node membership | **Create** |
+| `uticen_lite/pipeline/compile.py` | Terminal-**set** closure slice; `compile_pipeline_procedures` keyed off procedure defs; `CompiledProcedure` gains code/assertion | Modify |
+| `uticen_lite/store/run_service.py` | Per-check runs + merge-by-item-key; distinct-examined population; `ProcedureSpec` with code/assertion | Modify |
+| `uticen_lite/model/workpaper.py` | `ProcedureSpec`/`Procedure` gain `code`+`assertion`; `Procedure.to_dict()` emits them | Modify |
+| `uticen_lite/render/html.py`, `render/markdown.py` | Render code · name, assertion subtitle, per-check breakdown, union exceptions table | Modify |
+| `uticen_lite/schema/bundle.schema.json` (+ `contract/bundle.schema.json`) | Add optional `code`/`assertion` to `$defs/procedure` | Modify |
+| `uticen_lite/bundle/assemble.py` | Thread `code`/`assertion` through `procedure_info_by_control` | Modify |
+| `uticen_lite/plane/routes/pipeline.py` | `_editor_context`: procedures + derived colors; `save_pipeline`: accept procedures; `_diagram`: per-procedure color | Modify |
+| `uticen_lite/plane/templates/partials/_procedures_panel.html` | The Procedures definition panel | **Create** |
+| `uticen_lite/plane/templates/partials/_pipe_node.html` | Per-Test "Procedure ▾" selector + derived color chip | Modify |
+| `uticen_lite/plane/templates/logic_builder.html` | Serialize procedures + per-Test `procedure_id`; render panel | Modify |
+| `uticen_lite/plane/templates/partials/_pipe_diagram.html`, `logic_flowchart.html` | Per-procedure box color + legend | Modify |
 | `examples/northwind-trading/**`, `README.md`, `PRODUCT-MAP.md` | Uniform-population fan-out (learning 0031) | Modify |
 
 ---
@@ -57,8 +57,8 @@
 ## Task 1: Pipeline model — `ProcedureDef` + `Pipeline.procedures` + helpers
 
 **Files:**
-- Modify: `controlflow_sdk/pipeline/model.py`
-- Create: `controlflow_sdk/pipeline/procedures.py`
+- Modify: `uticen_lite/pipeline/model.py`
+- Create: `uticen_lite/pipeline/procedures.py`
 - Test: `tests/pipeline/test_procedures_model.py` (create)
 
 **Interfaces:**
@@ -76,8 +76,8 @@
 Create `tests/pipeline/test_procedures_model.py`:
 
 ```python
-from controlflow_sdk.pipeline.model import ProcedureDef, parse_pipeline
-from controlflow_sdk.pipeline.procedures import (
+from uticen_lite.pipeline.model import ProcedureDef, parse_pipeline
+from uticen_lite.pipeline.procedures import (
     derived_membership,
     effective_procedures,
     tests_for_procedure,
@@ -164,7 +164,7 @@ Expected: FAIL — `ImportError: cannot import name 'ProcedureDef'` / `procedure
 
 - [ ] **Step 3: Add `ProcedureDef` + `Pipeline.procedures` + parsing in `model.py`**
 
-In `controlflow_sdk/pipeline/model.py`, add the dataclass near `Node` (after the `Node` definition):
+In `uticen_lite/pipeline/model.py`, add the dataclass near `Node` (after the `Node` definition):
 
 ```python
 @dataclass(frozen=True)
@@ -232,7 +232,7 @@ In `parse_pipeline`, after the nodes are validated and before `return Pipeline(.
 
 (Confirm `field` is already imported from `dataclasses` at the top of `model.py`; it is, since `Node` uses `field(default_factory=...)`.)
 
-- [ ] **Step 4: Create `controlflow_sdk/pipeline/procedures.py`**
+- [ ] **Step 4: Create `uticen_lite/pipeline/procedures.py`**
 
 ```python
 """Pure (pandas-free) helpers turning a :class:`Pipeline`'s procedure defs +
@@ -241,7 +241,7 @@ and per-node derived membership. No store, no render, no pandas — Pyodide-safe
 
 from __future__ import annotations
 
-from controlflow_sdk.pipeline.model import Node, Pipeline, ProcedureDef
+from uticen_lite.pipeline.model import Node, Pipeline, ProcedureDef
 
 
 def _ancestors(pipeline: Pipeline, node_id: str) -> set[str]:
@@ -342,7 +342,7 @@ def derived_membership(pipeline: Pipeline) -> dict[str, set[str]]:
 - [ ] **Step 5: Run the tests and make sure they pass**
 
 Run: `python -m pytest tests/pipeline/test_procedures_model.py -q`
-Expected: PASS (5 tests). Then `python -m ruff check controlflow_sdk/pipeline` and `python -m mypy controlflow_sdk/pipeline` clean.
+Expected: PASS (5 tests). Then `python -m ruff check uticen_lite/pipeline` and `python -m mypy uticen_lite/pipeline` clean.
 
 - [ ] **Step 6: Confirm existing pipeline tests still pass (round-trip safety)**
 
@@ -352,7 +352,7 @@ Expected: PASS — no existing pipeline test regresses (procedures default to `[
 - [ ] **Step 7: Commit + push**
 
 ```bash
-git add controlflow_sdk/pipeline/model.py controlflow_sdk/pipeline/procedures.py tests/pipeline/test_procedures_model.py
+git add uticen_lite/pipeline/model.py uticen_lite/pipeline/procedures.py tests/pipeline/test_procedures_model.py
 git commit -m "feat(pipeline): first-class ProcedureDef + procedure-membership helpers" \
   -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>" \
   -m "Claude-Session: https://claude.ai/code/session_013JpkfZUEVoutkGJAYHqrKJ"
@@ -364,7 +364,7 @@ git push -u origin HEAD
 ## Task 2: Compile — procedure-keyed compilation over a terminal-set closure
 
 **Files:**
-- Modify: `controlflow_sdk/pipeline/compile.py`
+- Modify: `uticen_lite/pipeline/compile.py`
 - Test: `tests/pipeline/test_compile_procedures.py` (create)
 
 **Interfaces:**
@@ -379,10 +379,10 @@ git push -u origin HEAD
 Create `tests/pipeline/test_compile_procedures.py`:
 
 ```python
-from controlflow_sdk.pipeline.compile import compile_pipeline_procedures
-from controlflow_sdk.pipeline.model import parse_pipeline
-from controlflow_sdk.rules.evaluate import evaluate_rule  # canonical interpreter
-from controlflow_sdk.model.population import Population
+from uticen_lite.pipeline.compile import compile_pipeline_procedures
+from uticen_lite.pipeline.model import parse_pipeline
+from uticen_lite.rules.evaluate import evaluate_rule  # canonical interpreter
+from uticen_lite.model.population import Population
 import pandas as pd
 
 
@@ -447,7 +447,7 @@ Expected: FAIL — `CompiledProcedure` has no `code`/`assertion`, and `compile_p
 
 - [ ] **Step 3: Add the terminal-set closure + extend `CompiledProcedure`**
 
-In `controlflow_sdk/pipeline/compile.py`, refactor `_subpipeline_for` to delegate to a set-based variant and add the new function:
+In `uticen_lite/pipeline/compile.py`, refactor `_subpipeline_for` to delegate to a set-based variant and add the new function:
 
 ```python
 def _subpipeline_for_terminals(pipeline: Pipeline, terminals: list[Node]) -> Pipeline:
@@ -500,7 +500,7 @@ def compile_pipeline_procedures(pipeline: Pipeline) -> list[CompiledProcedure]:
     union emit produces one ``test()`` returning the concatenation of the checks'
     violations). Falls back to one-procedure-per-terminal when none are defined.
     """
-    from controlflow_sdk.pipeline.procedures import (
+    from uticen_lite.pipeline.procedures import (
         effective_procedures,
         tests_for_procedure,
     )
@@ -528,12 +528,12 @@ def compile_pipeline_procedures(pipeline: Pipeline) -> list[CompiledProcedure]:
 - [ ] **Step 5: Run the tests and make sure they pass**
 
 Run: `python -m pytest tests/pipeline/test_compile_procedures.py tests/pipeline -q`
-Expected: PASS, including existing `tests/pipeline/test_compile.py` (single-terminal + forked cases still compile identically — a forked pipeline with no `procedures` derives one-per-terminal, matching prior output). Run `ruff`/`mypy` on `controlflow_sdk/pipeline`.
+Expected: PASS, including existing `tests/pipeline/test_compile.py` (single-terminal + forked cases still compile identically — a forked pipeline with no `procedures` derives one-per-terminal, matching prior output). Run `ruff`/`mypy` on `uticen_lite/pipeline`.
 
 - [ ] **Step 6: Commit + push**
 
 ```bash
-git add controlflow_sdk/pipeline/compile.py tests/pipeline/test_compile_procedures.py
+git add uticen_lite/pipeline/compile.py tests/pipeline/test_compile_procedures.py
 git commit -m "feat(compile): compile per effective procedure over a terminal-set closure" \
   -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>" \
   -m "Claude-Session: https://claude.ai/code/session_013JpkfZUEVoutkGJAYHqrKJ"
@@ -545,7 +545,7 @@ git push -u origin HEAD
 ## Task 3: Run — per-check runs, merge-by-item-key, distinct-examined population
 
 **Files:**
-- Modify: `controlflow_sdk/store/run_service.py`
+- Modify: `uticen_lite/store/run_service.py`
 - Test: `tests/store/test_run_service_procedures.py` (create)
 
 **Interfaces:**
@@ -563,9 +563,9 @@ Create `tests/store/test_run_service_procedures.py`. (Builds a real store with a
 import pandas as pd
 from pathlib import Path
 
-from controlflow_sdk.store.migrations import migrate
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.run_service import run_control_in_store
+from uticen_lite.store.migrations import migrate
+from uticen_lite.store import repo
+from uticen_lite.store.run_service import run_control_in_store
 import sqlite3
 
 
@@ -628,7 +628,7 @@ def test_procedure_rollup_distinct_examined_and_merged(tmp_path):
     assert sorted(a["details"]["checks"]) == ["no approval", "preparer=approver"]
 ```
 
-> NOTE TO IMPLEMENTER: confirm the exact repo accessors (`runs_for_control`, `violations_for_run`, `upsert_source`, `set_control_sources`, `upsert_control` kwargs) against `controlflow_sdk/store/repo.py` and adjust names/kwargs to match — the seeding shape above mirrors the columns but the helper names must match the real API. Keep the **assertions** unchanged (population 4, failed 3, A carries both checks).
+> NOTE TO IMPLEMENTER: confirm the exact repo accessors (`runs_for_control`, `violations_for_run`, `upsert_source`, `set_control_sources`, `upsert_control` kwargs) against `uticen_lite/store/repo.py` and adjust names/kwargs to match — the seeding shape above mirrors the columns but the helper names must match the real API. Keep the **assertions** unchanged (population 4, failed 3, A carries both checks).
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -637,7 +637,7 @@ Expected: FAIL — population is the trunk size (5) and `details["checks"]` is a
 
 - [ ] **Step 3: Add the rollup helpers**
 
-In `controlflow_sdk/store/run_service.py`, add near the other module-private helpers:
+In `uticen_lite/store/run_service.py`, add near the other module-private helpers:
 
 ```python
 def _distinct_examined(node_frames: dict[str, Any], tests: list[Node]) -> int | None:
@@ -711,19 +711,19 @@ def _severity_rank(sev: Any) -> int:
     )
 ```
 
-(Confirm imports at the top of `run_service.py`: `from typing import Any`, `from controlflow_sdk.pipeline.model import Node`, `from controlflow_sdk.model.violation import Violation`, and add `from controlflow_sdk.pipeline.materialize import materialize_steps`.)
+(Confirm imports at the top of `run_service.py`: `from typing import Any`, `from uticen_lite.pipeline.model import Node`, `from uticen_lite.model.violation import Violation`, and add `from uticen_lite.pipeline.materialize import materialize_steps`.)
 
 - [ ] **Step 4: Rewrite `_run_multi_procedure` to run per-check and synthesize per-procedure RunRecords**
 
 Replace the procedure loop in `_run_multi_procedure` with the version below. Key changes: iterate `effective_procedures`; materialize node frames once for distinct-examined population; run each check's single-terminal subpipeline; merge; synthesize the procedure `RunRecord`; build the display `ProcedureSpec` from the union compile.
 
 ```python
-    from controlflow_sdk.pipeline.compile import (
+    from uticen_lite.pipeline.compile import (
         compile_pipeline,
         compile_pipeline_procedures,
         _subpipeline_for,
     )
-    from controlflow_sdk.pipeline.procedures import effective_procedures, tests_for_procedure
+    from uticen_lite.pipeline.procedures import effective_procedures, tests_for_procedure
 
     pipeline = parse_pipeline(raw_pipeline)
 
@@ -831,7 +831,7 @@ Add the frame loader helper (loads each bound source's DataFrame via the same ad
 ```python
 def _load_run_frames(root, control, sources, pipeline) -> dict[str, Any]:
     """{source_id: DataFrame} for the pipeline's Import sources, via the source adapter."""
-    from controlflow_sdk.adapters import source_for  # adjust import to the real adapter entry
+    from uticen_lite.adapters import source_for  # adjust import to the real adapter entry
     frames: dict[str, Any] = {}
     for sid in pipeline.import_source_ids():
         binding = sources[sid]
@@ -849,8 +849,8 @@ Expected: the new test PASSES; existing store tests still pass for **unfiltered*
 - [ ] **Step 6: ruff + mypy + commit + push**
 
 ```bash
-python -m ruff check controlflow_sdk/store && python -m mypy controlflow_sdk/store
-git add controlflow_sdk/store/run_service.py tests/store/test_run_service_procedures.py
+python -m ruff check uticen_lite/store && python -m mypy uticen_lite/store
+git add uticen_lite/store/run_service.py tests/store/test_run_service_procedures.py
 git commit -m "feat(run): per-check procedure rollup with distinct-examined population" \
   -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>" \
   -m "Claude-Session: https://claude.ai/code/session_013JpkfZUEVoutkGJAYHqrKJ"
@@ -862,7 +862,7 @@ git push -u origin HEAD
 ## Task 4: Workpaper + bundle — additive `code`/`assertion`, per-check render
 
 **Files:**
-- Modify: `controlflow_sdk/model/workpaper.py`, `controlflow_sdk/render/html.py`, `controlflow_sdk/render/markdown.py`, `controlflow_sdk/bundle/assemble.py`, `controlflow_sdk/schema/bundle.schema.json`, `contract/bundle.schema.json` (if present)
+- Modify: `uticen_lite/model/workpaper.py`, `uticen_lite/render/html.py`, `uticen_lite/render/markdown.py`, `uticen_lite/bundle/assemble.py`, `uticen_lite/schema/bundle.schema.json`, `contract/bundle.schema.json` (if present)
 - Test: `tests/render/test_procedure_render.py` (create), extend `tests/test_contract_export.py`, `tests/schema/test_bundle_schema.py`
 
 **Interfaces:**
@@ -874,9 +874,9 @@ git push -u origin HEAD
 Create `tests/render/test_procedure_render.py`:
 
 ```python
-from controlflow_sdk.model.workpaper import Procedure, Workpaper, ProcedureSpec
-from controlflow_sdk.model.run import RunRecord
-from controlflow_sdk.model.violation import Violation
+from uticen_lite.model.workpaper import Procedure, Workpaper, ProcedureSpec
+from uticen_lite.model.run import RunRecord
+from uticen_lite.model.violation import Violation
 
 
 def _proc() -> Procedure:
@@ -896,7 +896,7 @@ def test_to_dict_emits_code_and_assertion():
 
 
 def test_html_renders_code_assertion_and_checks():
-    from controlflow_sdk.render.html import render_html  # match the real entry point
+    from uticen_lite.render.html import render_html  # match the real entry point
     wp = Workpaper(control_id="gl1", title="t", objective="o", narrative="n",
                    framework_refs={}, procedures=[_proc(), _proc()], generated_at="t")
     html = render_html(wp)
@@ -913,7 +913,7 @@ Expected: FAIL — `Procedure` has no `code`/`assertion`.
 
 - [ ] **Step 3: Add fields to `ProcedureSpec` + `Procedure`**
 
-In `controlflow_sdk/model/workpaper.py`, add `code: str = ""` and `assertion: str = ""` to **both** `ProcedureSpec` and `Procedure` (after `title`). Update `Procedure.to_dict()`:
+In `uticen_lite/model/workpaper.py`, add `code: str = ""` and `assertion: str = ""` to **both** `ProcedureSpec` and `Procedure` (after `title`). Update `Procedure.to_dict()`:
 
 ```python
     def to_dict(self) -> dict[str, Any]:
@@ -932,7 +932,7 @@ Thread `code`/`assertion` in `Workpaper.assemble_procedures` (copy from each `Pr
 
 - [ ] **Step 4: Add optional schema properties (both copies)**
 
-In `controlflow_sdk/schema/bundle.schema.json` (and `contract/bundle.schema.json` if it exists), under `$defs.procedure.properties` add:
+In `uticen_lite/schema/bundle.schema.json` (and `contract/bundle.schema.json` if it exists), under `$defs.procedure.properties` add:
 
 ```json
 "code": { "type": "string" },
@@ -960,8 +960,8 @@ Expected: PASS. Then full `python -m pytest -q` may still fail on demo populatio
 - [ ] **Step 8: ruff + mypy + commit + push**
 
 ```bash
-python -m ruff check controlflow_sdk && python -m mypy controlflow_sdk
-git add controlflow_sdk/model/workpaper.py controlflow_sdk/render controlflow_sdk/bundle/assemble.py controlflow_sdk/schema/bundle.schema.json contract/bundle.schema.json tests/render/test_procedure_render.py tests/schema/test_bundle_schema.py
+python -m ruff check uticen_lite && python -m mypy uticen_lite
+git add uticen_lite/model/workpaper.py uticen_lite/render uticen_lite/bundle/assemble.py uticen_lite/schema/bundle.schema.json contract/bundle.schema.json tests/render/test_procedure_render.py tests/schema/test_bundle_schema.py
 git commit -m "feat(workpaper): additive code/assertion + per-check exception rendering" \
   -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>" \
   -m "Claude-Session: https://claude.ai/code/session_013JpkfZUEVoutkGJAYHqrKJ"
@@ -973,9 +973,9 @@ git push -u origin HEAD
 ## Task 5: Builder UX — Procedures panel, per-Test selector, derived colors
 
 **Files:**
-- Modify: `controlflow_sdk/plane/routes/pipeline.py` (`_editor_context`, `save_pipeline`, `_diagram`)
-- Create: `controlflow_sdk/plane/templates/partials/_procedures_panel.html`
-- Modify: `controlflow_sdk/plane/templates/partials/_pipe_node.html`, `logic_builder.html`, `partials/_pipe_diagram.html`, `logic_flowchart.html`
+- Modify: `uticen_lite/plane/routes/pipeline.py` (`_editor_context`, `save_pipeline`, `_diagram`)
+- Create: `uticen_lite/plane/templates/partials/_procedures_panel.html`
+- Modify: `uticen_lite/plane/templates/partials/_pipe_node.html`, `logic_builder.html`, `partials/_pipe_diagram.html`, `logic_flowchart.html`
 - Test: extend `tests/e2e/test_smoke.py`; add `tests/plane/test_procedures_panel.py`
 
 **Interfaces:**
@@ -984,7 +984,7 @@ git push -u origin HEAD
 
 - [ ] **Step 1: Add the color palette + context (plane route)**
 
-In `controlflow_sdk/plane/routes/pipeline.py`, add near the top:
+In `uticen_lite/plane/routes/pipeline.py`, add near the top:
 
 ```python
 _PROC_PALETTE = ["#4f7cff", "#18a999", "#d9822b", "#9b5de5", "#e5556e", "#3aa0c2"]
@@ -996,7 +996,7 @@ def procedure_color(position: int) -> str:
 In `_editor_context` (when `for_builder`), add to the returned ctx:
 
 ```python
-    from controlflow_sdk.pipeline.procedures import effective_procedures, derived_membership
+    from uticen_lite.pipeline.procedures import effective_procedures, derived_membership
     try:
         _pipe = parse_pipeline(graph)            # the already-parsed builder graph
         eff = effective_procedures(_pipe)
@@ -1022,7 +1022,7 @@ In `_editor_context` (when `for_builder`), add to the returned ctx:
 
 - [ ] **Step 2: Create `_procedures_panel.html`**
 
-`controlflow_sdk/plane/templates/partials/_procedures_panel.html`:
+`uticen_lite/plane/templates/partials/_procedures_panel.html`:
 
 ```html
 <section class="proc-panel" data-proc-panel>
@@ -1125,8 +1125,8 @@ In `tests/e2e/test_smoke.py`, after the existing Test-node setup, add: click `#p
 ```bash
 python -m pytest tests/plane/test_procedures_panel.py -q
 python -m pytest tests/e2e -m browser -q   # requires: playwright install chromium
-python -m ruff check controlflow_sdk/plane && python -m mypy controlflow_sdk/plane
-git add controlflow_sdk/plane tests/plane/test_procedures_panel.py tests/e2e/test_smoke.py
+python -m ruff check uticen_lite/plane && python -m mypy uticen_lite/plane
+git add uticen_lite/plane tests/plane/test_procedures_panel.py tests/e2e/test_smoke.py
 git commit -m "feat(plane): Procedures panel, per-Test selector, derived colors" \
   -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>" \
   -m "Claude-Session: https://claude.ai/code/session_013JpkfZUEVoutkGJAYHqrKJ"
@@ -1156,7 +1156,7 @@ List every failing assertion + the file/line. Expect hits in `tests/test_northwi
 
 For each filtered pipeline control in the Northwind demo, the population becomes the post-filter distinct-examined count. Run the demo to get authoritative numbers:
 ```bash
-python -m controlflow_sdk.cli run examples/northwind-trading   # or: cflow run examples/northwind-trading
+python -m uticen_lite.cli run examples/northwind-trading   # or: uticen-lite run examples/northwind-trading
 ```
 Update each fixture/assertion to the printed values; add `# Decision A: distinct-examined population` next to changed literals. Keep the public-API-sourced demo source a **frozen CSV** so CI stays offline/deterministic (learning 0025).
 
@@ -1169,7 +1169,7 @@ Update `README.md` (any cited demo numbers) and `PRODUCT-MAP.md` — extend the 
 Run:
 ```bash
 python -m pytest -q
-python -m ruff check . && python -m mypy controlflow_sdk
+python -m ruff check . && python -m mypy uticen_lite
 ```
 Expected: all green, output pristine (no stray warnings).
 

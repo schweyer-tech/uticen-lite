@@ -100,7 +100,7 @@ same compiled artifacts. Verified by the existing contract gates
 ### Minor: launch banner
 
 The `controlplane` startup output prints both launch forms: `controlplane` and
-`python -m controlflow_sdk.plane`.
+`python -m uticen_lite.plane`.
 
 ## Affected surfaces (indicative)
 

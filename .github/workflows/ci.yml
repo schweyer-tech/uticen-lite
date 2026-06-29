@@ -37,7 +37,7 @@ jobs:
         run: ruff check .
 
       - name: Type-check with mypy
-        run: mypy controlflow_sdk
+        run: mypy uticen_lite
 
       - name: Run tests
         run: pytest -q
@@ -56,10 +56,10 @@ jobs:
         with:
           filters: |
             plane:
-              - 'controlflow_sdk/plane/**'
+              - 'uticen_lite/plane/**'
               - 'contract/**'
-              - 'controlflow_sdk/bundle/**'
-              - 'controlflow_sdk/schema/**'
+              - 'uticen_lite/bundle/**'
+              - 'uticen_lite/schema/**'
               - 'tests/e2e/**'
               - 'pyproject.toml'
               - '.github/workflows/ci.yml'

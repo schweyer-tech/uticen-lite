@@ -1,6 +1,6 @@
 # Northwind Trading Co.
 
-A complete, ready-to-run audit control example demonstrating the ControlFlow SDK on realistic financial, IT access, and procurement data.
+A complete, ready-to-run audit control example demonstrating the Uticen SDK on realistic financial, IT access, and procurement data.
 
 ## The Company
 
@@ -37,7 +37,7 @@ Nine production-ready audit controls span financial, IT access, and procurement 
 Execute the full population control test suite and generate HTML workpapers:
 
 ```bash
-cflow run . --at 2026-03-31T00:00:00Z
+uticen-lite run . --at 2026-03-31T00:00:00Z
 ```
 
 Results appear in `target/workpapers/`:
@@ -56,12 +56,12 @@ open target/workpapers/mfa-enforcement.html  # Clean control
 - Execution timestamp
 - Framework references (NIST 800-53, etc.)
 
-## Import Into ControlFlow
+## Import Into Uticen
 
-Build an importable bundle and upload it to the ControlFlow SaaS application:
+Build an importable bundle and upload it to the Uticen SaaS application:
 
 ```bash
-cflow build . --out import-bundle.zip --at 2026-03-31T00:00:00Z
+uticen-lite build . --out import-bundle.zip --at 2026-03-31T00:00:00Z
 ```
 
 Then in the app:
@@ -148,7 +148,7 @@ dicts (`item_key`, `description`, `severity`, `details`):
 > logic stays inspectable in the builder. The `test.py` files kept in each control directory
 > are documentation of the equivalent logic, not the executed artifact.
 
-**For authoring controls**, refer to the [ControlFlow SDK README](../../README.md) for:
+**For authoring controls**, refer to the [Uticen SDK README](../../README.md) for:
 - Control YAML structure (objective, narrative, framework_refs)
 - The no-code rule grammar and the `test()` signature / exception format
 - Execution environment (pandas, numpy, standard library)
@@ -156,4 +156,4 @@ dicts (`item_key`, `description`, `severity`, `details`):
 
 ---
 
-**Questions?** See `docs/` in the ControlFlow SDK or reach out to the audit team.
+**Questions?** See `docs/` in the Uticen SDK or reach out to the audit team.

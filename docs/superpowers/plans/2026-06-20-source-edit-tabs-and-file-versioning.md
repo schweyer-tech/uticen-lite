@@ -10,8 +10,8 @@
 
 ## Global Constraints
 
-- Python floor ≥3.11; ruff target `py311`, line-length 100; mypy must stay clean (`controlflow_sdk`).
-- Keep the suite green and output pristine (no stray warnings). Run `python -m pytest -q`, `python -m ruff check .`, `python -m mypy controlflow_sdk` before every commit.
+- Python floor ≥3.11; ruff target `py311`, line-length 100; mypy must stay clean (`uticen_lite`).
+- Keep the suite green and output pristine (no stray warnings). Run `python -m pytest -q`, `python -m ruff check .`, `python -m mypy uticen_lite` before every commit.
 - **Cardinal rule:** do NOT touch `contract/bundle.schema.json`, `bundle/`, or `SourceBinding.to_data_source()`. All new state is store/UI-only. `tests/test_contract_export.py` + `tests/schema/test_bundle_schema.py` must stay green unchanged.
 - Plane handlers: `async def` / writing handlers open their OWN `connect(root)` (try/finally, return inside try); sync `GET` may use `Depends(get_conn)`. `TemplateResponse(request, "name.html", {ctx without request})`. Redirects are 303. (Learning 0002.)
 - Brittle-by-design, localhost, single-user. CSV parsed with `utf-8-sig`.
@@ -31,15 +31,15 @@
 
 ## File Structure
 
-- `controlflow_sdk/store/migrations.py` — +step 3 (`source_files` table + backfill), `SCHEMA_VERSION=3`.
-- `controlflow_sdk/store/repo.py` — `source_files` CRUD.
-- `controlflow_sdk/store/import_service.py` — write a current `source_files` row per imported source.
-- `controlflow_sdk/plane/routes/sources.py` — as-of plumbed through create/refresh/confirm; new `/data`, `/history`, `/data/asof` routes + preview paging; History from DB; `save_source` preserves `extract_date`; remove `_list_versions`.
-- `controlflow_sdk/plane/templates/_source_tabs.html` (new) — tab nav.
-- `controlflow_sdk/plane/templates/source_edit.html` — Definition tab (trim data-file card + as-of).
-- `controlflow_sdk/plane/templates/source_data.html` (new), `source_history.html` (new).
-- `controlflow_sdk/plane/templates/source_new.html`, `source_refresh.html` — required as-of field / carry-through.
-- `controlflow_sdk/plane/static/app.css` — `.tabs`, preview pager.
+- `uticen_lite/store/migrations.py` — +step 3 (`source_files` table + backfill), `SCHEMA_VERSION=3`.
+- `uticen_lite/store/repo.py` — `source_files` CRUD.
+- `uticen_lite/store/import_service.py` — write a current `source_files` row per imported source.
+- `uticen_lite/plane/routes/sources.py` — as-of plumbed through create/refresh/confirm; new `/data`, `/history`, `/data/asof` routes + preview paging; History from DB; `save_source` preserves `extract_date`; remove `_list_versions`.
+- `uticen_lite/plane/templates/_source_tabs.html` (new) — tab nav.
+- `uticen_lite/plane/templates/source_edit.html` — Definition tab (trim data-file card + as-of).
+- `uticen_lite/plane/templates/source_data.html` (new), `source_history.html` (new).
+- `uticen_lite/plane/templates/source_new.html`, `source_refresh.html` — required as-of field / carry-through.
+- `uticen_lite/plane/static/app.css` — `.tabs`, preview pager.
 - Tests: `tests/store/test_migrations.py`, `tests/store/test_source_files.py` (new), `tests/store/test_import_service.py`, `tests/plane/test_sources.py`.
 
 ---
@@ -47,7 +47,7 @@
 ## Task 1: Migration step 3 — `source_files` table + backfill
 
 **Files:**
-- Modify: `controlflow_sdk/store/migrations.py`
+- Modify: `uticen_lite/store/migrations.py`
 - Test: `tests/store/test_migrations.py`
 
 **Interfaces:**
@@ -57,7 +57,7 @@
 
 ```python
 def test_source_files_table_and_backfill(tmp_path: Path):
-    from controlflow_sdk.store.migrations import _STEPS
+    from uticen_lite.store.migrations import _STEPS
 
     conn = connect(tmp_path)
     conn.executescript(_STEPS[0])      # v1 schema
@@ -121,8 +121,8 @@ Expected: PASS (existing tests still green; `<=` table-set assertion unaffected)
 - [ ] **Step 5: Gates + commit (local only, no push)**
 
 ```bash
-python -m pytest -q && python -m ruff check . && python -m mypy controlflow_sdk
-git add controlflow_sdk/store/migrations.py tests/store/test_migrations.py
+python -m pytest -q && python -m ruff check . && python -m mypy uticen_lite
+git add uticen_lite/store/migrations.py tests/store/test_migrations.py
 git commit -m "feat(store): source_files table + v2→v3 backfill for per-file as-of"
 ```
 
@@ -131,7 +131,7 @@ git commit -m "feat(store): source_files table + v2→v3 backfill for per-file a
 ## Task 2: `repo.py` source_files API
 
 **Files:**
-- Modify: `controlflow_sdk/store/repo.py`
+- Modify: `uticen_lite/store/repo.py`
 - Test: `tests/store/test_source_files.py` (new)
 
 **Interfaces:**
@@ -148,9 +148,9 @@ git commit -m "feat(store): source_files table + v2→v3 backfill for per-file a
 ```python
 from pathlib import Path
 
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.migrations import migrate
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.migrations import migrate
 
 
 def _store(tmp_path: Path):
@@ -295,8 +295,8 @@ Expected: PASS.
 - [ ] **Step 5: Gates + commit (local only, no push)**
 
 ```bash
-python -m pytest -q && python -m ruff check . && python -m mypy controlflow_sdk
-git add controlflow_sdk/store/repo.py tests/store/test_source_files.py
+python -m pytest -q && python -m ruff check . && python -m mypy uticen_lite
+git add uticen_lite/store/repo.py tests/store/test_source_files.py
 git commit -m "feat(store): source_files repo API (set/record/archive/list/asof)"
 ```
 
@@ -305,7 +305,7 @@ git commit -m "feat(store): source_files repo API (set/record/archive/list/asof)
 ## Task 3: Plumb source_files + as-of through import, create, refresh-confirm; Definition preserves extract_date
 
 **Files:**
-- Modify: `controlflow_sdk/store/import_service.py`, `controlflow_sdk/plane/routes/sources.py`
+- Modify: `uticen_lite/store/import_service.py`, `uticen_lite/plane/routes/sources.py`
 - Test: `tests/store/test_import_service.py`, `tests/plane/test_sources.py`
 
 **Interfaces:**
@@ -331,8 +331,8 @@ def test_create_records_current_file_with_asof(client):
                                    "as_of_date": "2026-05-01"},
                 files={"file": ("inv.csv", io.BytesIO(b"a\n1\n"), "text/csv")},
                 follow_redirects=False)
-    from controlflow_sdk.store import repo
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store import repo
+    from uticen_lite.store.db import connect
     conn = connect(client.app.state.project_root)
     cur = repo.get_current_file(conn, "inv")
     assert cur["as_of_date"] == "2026-05-01" and cur["original_name"] == "inv.csv"
@@ -351,8 +351,8 @@ def test_refresh_confirm_records_new_version_with_asof(client):
     client.post("/sources/tx/refresh/confirm",
                 data={"pending": "tx.csv", "as_of_date": "2026-06-30"},
                 follow_redirects=False)
-    from controlflow_sdk.store import repo
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store import repo
+    from uticen_lite.store.db import connect
     conn = connect(client.app.state.project_root)
     files = repo.list_source_files(conn, "tx")
     assert len(files) == 2  # initial + refreshed
@@ -441,8 +441,8 @@ Expected: PASS. (Pre-existing refresh tests that don't post `as_of_date` still p
 - [ ] **Step 5: Gates + commit (local only, no push)**
 
 ```bash
-python -m pytest -q && python -m ruff check . && python -m mypy controlflow_sdk
-git add controlflow_sdk/store/import_service.py controlflow_sdk/plane/routes/sources.py \
+python -m pytest -q && python -m ruff check . && python -m mypy uticen_lite
+git add uticen_lite/store/import_service.py uticen_lite/plane/routes/sources.py \
         tests/store/test_import_service.py tests/plane/test_sources.py
 git commit -m "feat(plane): record per-file as-of on import/create/refresh; preserve extract_date in Definition save"
 ```
@@ -452,8 +452,8 @@ git commit -m "feat(plane): record per-file as-of on import/create/refresh; pres
 ## Task 4: Tab nav partial + Definition tab template
 
 **Files:**
-- Create: `controlflow_sdk/plane/templates/_source_tabs.html`
-- Modify: `controlflow_sdk/plane/templates/source_edit.html`, `controlflow_sdk/plane/routes/sources.py` (pass `active`), `controlflow_sdk/plane/static/app.css`
+- Create: `uticen_lite/plane/templates/_source_tabs.html`
+- Modify: `uticen_lite/plane/templates/source_edit.html`, `uticen_lite/plane/routes/sources.py` (pass `active`), `uticen_lite/plane/static/app.css`
 - Test: `tests/plane/test_sources.py`
 
 **Interfaces:**
@@ -517,10 +517,10 @@ Expected: PASS (the earlier `test_save_source_metadata_persists` still passes �
 - [ ] **Step 5: Gates + commit (local only, no push)**
 
 ```bash
-python -m pytest -q && python -m ruff check . && python -m mypy controlflow_sdk
-git add controlflow_sdk/plane/templates/_source_tabs.html \
-        controlflow_sdk/plane/templates/source_edit.html \
-        controlflow_sdk/plane/routes/sources.py controlflow_sdk/plane/static/app.css \
+python -m pytest -q && python -m ruff check . && python -m mypy uticen_lite
+git add uticen_lite/plane/templates/_source_tabs.html \
+        uticen_lite/plane/templates/source_edit.html \
+        uticen_lite/plane/routes/sources.py uticen_lite/plane/static/app.css \
         tests/plane/test_sources.py
 git commit -m "feat(plane): Definition tab + shared source tab nav"
 ```
@@ -530,8 +530,8 @@ git commit -m "feat(plane): Definition tab + shared source tab nav"
 ## Task 5: Data tab — route, paged preview, as-of edit
 
 **Files:**
-- Create: `controlflow_sdk/plane/templates/source_data.html`
-- Modify: `controlflow_sdk/plane/routes/sources.py`, `controlflow_sdk/plane/static/app.css`
+- Create: `uticen_lite/plane/templates/source_data.html`
+- Modify: `uticen_lite/plane/routes/sources.py`, `uticen_lite/plane/static/app.css`
 - Test: `tests/plane/test_sources.py`
 
 **Interfaces:**
@@ -562,8 +562,8 @@ def test_data_tab_asof_edit_syncs(client):
                 follow_redirects=False)
     client.post("/sources/z/data/asof", data={"as_of_date": "2026-07-07"},
                 follow_redirects=False)
-    from controlflow_sdk.store import repo
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store import repo
+    from uticen_lite.store.db import connect
     conn = connect(client.app.state.project_root)
     assert repo.get_current_file(conn, "z")["as_of_date"] == "2026-07-07"
     assert repo.get_source(conn, "z")["extract_date"] == "2026-07-07"
@@ -713,9 +713,9 @@ Expected: PASS.
 - [ ] **Step 5: Gates + commit (local only, no push)**
 
 ```bash
-python -m pytest -q && python -m ruff check . && python -m mypy controlflow_sdk
-git add controlflow_sdk/plane/templates/source_data.html \
-        controlflow_sdk/plane/routes/sources.py controlflow_sdk/plane/static/app.css \
+python -m pytest -q && python -m ruff check . && python -m mypy uticen_lite
+git add uticen_lite/plane/templates/source_data.html \
+        uticen_lite/plane/routes/sources.py uticen_lite/plane/static/app.css \
         tests/plane/test_sources.py
 git commit -m "feat(plane): Data tab — paged read-only preview, record count, per-file as-of edit"
 ```
@@ -725,8 +725,8 @@ git commit -m "feat(plane): Data tab — paged read-only preview, record count, 
 ## Task 6: History tab + as-of fields on new/refresh templates
 
 **Files:**
-- Create: `controlflow_sdk/plane/templates/source_history.html`
-- Modify: `controlflow_sdk/plane/routes/sources.py`, `controlflow_sdk/plane/templates/source_new.html`, `controlflow_sdk/plane/templates/source_refresh.html`
+- Create: `uticen_lite/plane/templates/source_history.html`
+- Modify: `uticen_lite/plane/routes/sources.py`, `uticen_lite/plane/templates/source_new.html`, `uticen_lite/plane/templates/source_refresh.html`
 - Test: `tests/plane/test_sources.py`
 
 **Interfaces:**
@@ -837,11 +837,11 @@ Expected: PASS.
 - [ ] **Step 5: Gates + commit (local only, no push)**
 
 ```bash
-python -m pytest -q && python -m ruff check . && python -m mypy controlflow_sdk
-git add controlflow_sdk/plane/templates/source_history.html \
-        controlflow_sdk/plane/templates/source_new.html \
-        controlflow_sdk/plane/templates/source_refresh.html \
-        controlflow_sdk/plane/routes/sources.py tests/plane/test_sources.py
+python -m pytest -q && python -m ruff check . && python -m mypy uticen_lite
+git add uticen_lite/plane/templates/source_history.html \
+        uticen_lite/plane/templates/source_new.html \
+        uticen_lite/plane/templates/source_refresh.html \
+        uticen_lite/plane/routes/sources.py tests/plane/test_sources.py
 git commit -m "feat(plane): History tab + required as-of on add/refresh"
 ```
 
@@ -853,18 +853,18 @@ git commit -m "feat(plane): History tab + required as-of on add/refresh"
 
 - [ ] **Step 1: Full gates**
 
-Run: `python -m pytest -q && python -m ruff check . && python -m mypy controlflow_sdk`
+Run: `python -m pytest -q && python -m ruff check . && python -m mypy uticen_lite`
 Expected: all green; bundle/contract tests untouched and passing.
 
 - [ ] **Step 2: Browser smoke (fresh demo)**
 
 ```bash
 DEMO="$CLAUDE_JOB_DIR/tmp/tabs-demo"; rm -rf "$DEMO"; mkdir -p "$DEMO/data"
-python -c "from pathlib import Path; from controlflow_sdk.store.db import connect; \
-from controlflow_sdk.store.migrations import migrate; \
-from controlflow_sdk.store.import_service import load_demo; \
+python -c "from pathlib import Path; from uticen_lite.store.db import connect; \
+from uticen_lite.store.migrations import migrate; \
+from uticen_lite.store.import_service import load_demo; \
 r=Path('$DEMO'); c=connect(r); migrate(c); print(load_demo(c,r)); c.close()"
-python -m controlflow_sdk.plane --project "$DEMO" --port 8803 --no-browser
+python -m uticen_lite.plane --project "$DEMO" --port 8803 --no-browser
 ```
 
 Verify with Playwright: `/sources/invoices` (Definition tab + nav, no data-file card),

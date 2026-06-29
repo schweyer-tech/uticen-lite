@@ -10,9 +10,9 @@ import io
 
 import pandas as pd
 
-from controlflow_sdk.adapters.files import source_for
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
+from uticen_lite.adapters.files import source_for
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
 
 
 def test_xlsx_second_sheet_runs_full_population(client):
@@ -29,7 +29,7 @@ def test_xlsx_second_sheet_runs_full_population(client):
                 follow_redirects=False)
 
     conn = connect(client.app.state.project_root)
-    from controlflow_sdk.store.loader import _binding
+    from uticen_lite.store.loader import _binding
     src = repo.get_source(conn, "gl")
     conn.close()
     pop = source_for(_binding(src), client.app.state.project_root).load()

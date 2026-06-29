@@ -24,12 +24,12 @@ bundle/contract change** — this is `plane/` UI + the one helper.
   ```bash
   git push -u origin HEAD
   ```
-- Keep the suite green (`python -m pytest -q`), `ruff check .`, and `mypy controlflow_sdk` clean after every task.
+- Keep the suite green (`python -m pytest -q`), `ruff check .`, and `mypy uticen_lite` clean after every task.
 
 ## Global Constraints
 
 - **Cardinal rule (learning 0001):** nothing bundle-facing changes. `contract/bundle.schema.json`,
-  `controlflow_sdk/schema/bundle.schema.json`, `bundle/`, and `model/workpaper.py` MUST NOT appear in this
+  `uticen_lite/schema/bundle.schema.json`, `bundle/`, and `model/workpaper.py` MUST NOT appear in this
   branch's diff. No `schema_version` bump. No store-schema migration (`store/migrations.py` unchanged).
 - **Pyodide-safe core (STRATEGY.md):** `pipeline/procedures.py` stays pure — no `import pandas`, no store,
   no render. The grouping helper operates only on the `Pipeline` graph.
@@ -48,17 +48,17 @@ bundle/contract change** — this is `plane/` UI + the one helper.
 
 | File | Responsibility | Task |
 | --- | --- | --- |
-| `controlflow_sdk/pipeline/procedures.py` | **New** `group_nodes_by_band(pipeline)` pure helper. | 1 |
+| `uticen_lite/pipeline/procedures.py` | **New** `group_nodes_by_band(pipeline)` pure helper. | 1 |
 | `tests/pipeline/test_procedures_bands.py` | **New** unit tests for the helper. | 1 |
-| `controlflow_sdk/plane/routes/pipeline.py` | `_card_bands()` builder; thread `bands` through every `_pipe_cards.html` render site; `_diagram(..., collapsed)`; flowchart `?collapsed=`. | 2, 4 |
+| `uticen_lite/plane/routes/pipeline.py` | `_card_bands()` builder; thread `bands` through every `_pipe_cards.html` render site; `_diagram(..., collapsed)`; flowchart `?collapsed=`. | 2, 4 |
 | `tests/plane/test_logic_bands.py` | **New** route-context tests for `bands`. | 2 |
-| `controlflow_sdk/plane/templates/partials/_pipe_cards.html` | Render Inputs band + `<details>` procedure sections + section-scoped insert zones + "＋ Add procedure". | 3 |
-| `controlflow_sdk/plane/templates/partials/_procedures_panel.html` | **Deleted** (absorbed into section headers). | 3 |
-| `controlflow_sdk/plane/templates/partials/_pipe_node.html` | Relabel "Procedure"→"Belongs to"; drop redundant Test-card chips; chips only on shared cards. | 3 |
-| `controlflow_sdk/plane/templates/logic_builder.html` | Remove panel include; JS: serialize from section headers, insert-in-section, belongs-to-move autosave, `<details>` localStorage, add/delete section. | 3 |
-| `controlflow_sdk/plane/templates/partials/_pipe_diagram.html` | Swimlane band backgrounds/labels + collapse toggles + summary boxes. | 4 |
-| `controlflow_sdk/plane/templates/logic_flowchart.html` | HTMX-swappable flowchart container reading `?collapsed=`. | 4 |
-| `controlflow_sdk/plane/static/app.css` | Section/band/summary styling; retire `.proc-panel`/`.proc-row`/`#proc-add`. | 3, 4 |
+| `uticen_lite/plane/templates/partials/_pipe_cards.html` | Render Inputs band + `<details>` procedure sections + section-scoped insert zones + "＋ Add procedure". | 3 |
+| `uticen_lite/plane/templates/partials/_procedures_panel.html` | **Deleted** (absorbed into section headers). | 3 |
+| `uticen_lite/plane/templates/partials/_pipe_node.html` | Relabel "Procedure"→"Belongs to"; drop redundant Test-card chips; chips only on shared cards. | 3 |
+| `uticen_lite/plane/templates/logic_builder.html` | Remove panel include; JS: serialize from section headers, insert-in-section, belongs-to-move autosave, `<details>` localStorage, add/delete section. | 3 |
+| `uticen_lite/plane/templates/partials/_pipe_diagram.html` | Swimlane band backgrounds/labels + collapse toggles + summary boxes. | 4 |
+| `uticen_lite/plane/templates/logic_flowchart.html` | HTMX-swappable flowchart container reading `?collapsed=`. | 4 |
+| `uticen_lite/plane/static/app.css` | Section/band/summary styling; retire `.proc-panel`/`.proc-row`/`#proc-add`. | 3, 4 |
 | `tests/e2e/test_smoke.py` / `test_multi_procedure.py` | Extend for sectioned Builder, collapse, insert-in-section, flowchart collapse. | 5 |
 
 ---
@@ -66,12 +66,12 @@ bundle/contract change** — this is `plane/` UI + the one helper.
 ### Task 1: `group_nodes_by_band` helper
 
 **Files:**
-- Modify: `controlflow_sdk/pipeline/procedures.py` (append a function; imports already present)
+- Modify: `uticen_lite/pipeline/procedures.py` (append a function; imports already present)
 - Test: `tests/pipeline/test_procedures_bands.py` (create)
 
 **Interfaces:**
 - Consumes: `Pipeline`, `effective_procedures(pipeline)`, `derived_membership(pipeline)` (all already in
-  `controlflow_sdk/pipeline/procedures.py`). `Pipeline.topological()` returns `list[Node]`; `Node` has
+  `uticen_lite/pipeline/procedures.py`). `Pipeline.topological()` returns `list[Node]`; `Node` has
   `.id: str` and `.type: str`.
 - Produces: `group_nodes_by_band(pipeline: Pipeline) -> dict[str, Any]` returning
   `{"shared": list[str], "procedures": [{"id": str, "node_ids": list[str]}, ...]}`. `procedures` is
@@ -89,8 +89,8 @@ both the Builder and the Flowchart consume."""
 
 from __future__ import annotations
 
-from controlflow_sdk.pipeline.model import parse_pipeline
-from controlflow_sdk.pipeline.procedures import effective_procedures, group_nodes_by_band
+from uticen_lite.pipeline.model import parse_pipeline
+from uticen_lite.pipeline.procedures import effective_procedures, group_nodes_by_band
 
 
 def _topo_index(pipeline):
@@ -217,7 +217,7 @@ Expected: FAIL with `ImportError: cannot import name 'group_nodes_by_band'`.
 
 - [ ] **Step 3: Implement the helper**
 
-Append to `controlflow_sdk/pipeline/procedures.py` (the module already imports `Node, Pipeline,
+Append to `uticen_lite/pipeline/procedures.py` (the module already imports `Node, Pipeline,
 ProcedureDef` and `from __future__ import annotations`; add `from typing import Any` to the imports at
 the top of the file):
 
@@ -261,8 +261,8 @@ Expected: PASS (5 passed).
 - [ ] **Step 5: Lint, type-check, commit, push**
 
 ```bash
-python -m ruff check controlflow_sdk tests && python -m mypy controlflow_sdk
-git add controlflow_sdk/pipeline/procedures.py tests/pipeline/test_procedures_bands.py
+python -m ruff check uticen_lite tests && python -m mypy uticen_lite
+git add uticen_lite/pipeline/procedures.py tests/pipeline/test_procedures_bands.py
 git commit -m "feat: group_nodes_by_band — Inputs/per-procedure node partition"
 git push -u origin HEAD
 ```
@@ -272,7 +272,7 @@ git push -u origin HEAD
 ### Task 2: Builder route context — `bands` everywhere `_pipe_cards.html` renders
 
 **Files:**
-- Modify: `controlflow_sdk/plane/routes/pipeline.py`
+- Modify: `uticen_lite/plane/routes/pipeline.py`
 - Test: `tests/plane/test_logic_bands.py` (create)
 
 **Interfaces:**
@@ -287,7 +287,7 @@ git push -u origin HEAD
   "__inputs__", "nodes": node_vms}, "procedures": []}`.
 
 **Background:** `partials/_pipe_cards.html` is rendered from FOUR places — find them all first:
-`grep -n "_pipe_cards.html" controlflow_sdk/plane/routes/pipeline.py` → the GET full page goes through
+`grep -n "_pipe_cards.html" uticen_lite/plane/routes/pipeline.py` → the GET full page goes through
 `_editor_context` (`logic_builder.html` includes the partial), and three POST sites return the partial
 directly: `save_pipeline` autosave-success (~line 1070), `save_pipeline` autosave-error 422 (~line 1020),
 and the AI-apply handler (`grep -n "_pipe_cards.html"` will also surface it). **All four must provide
@@ -304,8 +304,8 @@ bands, each carrying the node view-models that belong in it."""
 
 from __future__ import annotations
 
-from controlflow_sdk.pipeline.model import parse_pipeline
-from controlflow_sdk.plane.routes.pipeline import _card_bands, _card_vm, _procedure_context
+from uticen_lite.pipeline.model import parse_pipeline
+from uticen_lite.plane.routes.pipeline import _card_bands, _card_vm, _procedure_context
 
 
 def _vms(pipeline):
@@ -365,7 +365,7 @@ def _card_bands(
     if cards_pipeline is None:
         return fallback
     try:
-        from controlflow_sdk.pipeline.procedures import group_nodes_by_band
+        from uticen_lite.pipeline.procedures import group_nodes_by_band
 
         grouped = group_nodes_by_band(cards_pipeline)
         proc_by_id = {p["id"]: p for p in proc_ctx.get("procedures", [])}
@@ -442,8 +442,8 @@ Expected: PASS (the new tests pass; the existing `tests/plane` suite stays green
 - [ ] **Step 7: Lint, type-check, commit, push**
 
 ```bash
-python -m ruff check controlflow_sdk tests && python -m mypy controlflow_sdk
-git add controlflow_sdk/plane/routes/pipeline.py tests/plane/test_logic_bands.py
+python -m ruff check uticen_lite tests && python -m mypy uticen_lite
+git add uticen_lite/plane/routes/pipeline.py tests/plane/test_logic_bands.py
 git commit -m "feat: _card_bands — group node cards into Inputs + per-procedure bands"
 git push -u origin HEAD
 ```
@@ -453,11 +453,11 @@ git push -u origin HEAD
 ### Task 3: Builder — sectioned `<details>` UI (templates + JS + CSS)
 
 **Files:**
-- Rewrite: `controlflow_sdk/plane/templates/partials/_pipe_cards.html`
-- Delete: `controlflow_sdk/plane/templates/partials/_procedures_panel.html`
-- Modify: `controlflow_sdk/plane/templates/partials/_pipe_node.html`
-- Modify: `controlflow_sdk/plane/templates/logic_builder.html`
-- Modify: `controlflow_sdk/plane/static/app.css`
+- Rewrite: `uticen_lite/plane/templates/partials/_pipe_cards.html`
+- Delete: `uticen_lite/plane/templates/partials/_procedures_panel.html`
+- Modify: `uticen_lite/plane/templates/partials/_pipe_node.html`
+- Modify: `uticen_lite/plane/templates/logic_builder.html`
+- Modify: `uticen_lite/plane/static/app.css`
 - Test: render assertion in `tests/plane/test_logic_bands.py` (extend) — see Step 7.
 
 **Interfaces:**
@@ -576,7 +576,7 @@ upstream to the last shared node so the new terminal is always wired (no unwired
 - [ ] **Step 2: Delete the old panel partial and its include**
 
 ```bash
-git rm controlflow_sdk/plane/templates/partials/_procedures_panel.html
+git rm uticen_lite/plane/templates/partials/_procedures_panel.html
 ```
 
 In `logic_builder.html`, delete the block that includes it (lines ~166-169):
@@ -596,7 +596,7 @@ becomes
 
 - [ ] **Step 3: `_pipe_node.html` — relabel selector, scope chips to shared cards**
 
-In `controlflow_sdk/plane/templates/partials/_pipe_node.html`:
+In `uticen_lite/plane/templates/partials/_pipe_node.html`:
 
 Change the Test-card "Procedure" row (lines ~131-142) to relabel and drop its redundant inline chips (the
 enclosing section already names the procedure):
@@ -804,7 +804,7 @@ the old `newProcedureRow` function (the panel is gone). Keep `addProcedureOption
 
 - [ ] **Step 5: CSS — section/band styling; retire panel rules**
 
-In `controlflow_sdk/plane/static/app.css`, replace the "Procedures panel" block (lines ~673-695, from the
+In `uticen_lite/plane/static/app.css`, replace the "Procedures panel" block (lines ~673-695, from the
 comment through `#proc-add { ... }`) with section/band styles. Keep `.proc-dot`, `.proc-in` (re-key it to
 `.proc-head`), `.proc-chip`, `.pipe-chips`:
 
@@ -867,8 +867,8 @@ Run a quick render check to confirm the partial compiles and sections appear (no
 
 ```bash
 python -c "
-from controlflow_sdk.pipeline.model import parse_pipeline
-from controlflow_sdk.plane.routes.pipeline import _card_bands, _card_vm, _procedure_context
+from uticen_lite.pipeline.model import parse_pipeline
+from uticen_lite.plane.routes.pipeline import _card_bands, _card_vm, _procedure_context
 p = parse_pipeline({'nodes':[
   {'id':'src','type':'import','source_id':'s'},
   {'id':'t1','type':'test','inputs':['src'],'config':{'procedure_id':'p1','conditions':[{'column':'a','op':'not_empty'}]}},
@@ -895,8 +895,8 @@ and does NOT contain `data-proc-panel` (the retired panel). If no seeding helper
 
 ```bash
 python -m pytest tests/plane -q
-python -m ruff check controlflow_sdk tests && python -m mypy controlflow_sdk
-git add controlflow_sdk/plane tests/plane/test_logic_bands.py
+python -m ruff check uticen_lite tests && python -m mypy uticen_lite
+git add uticen_lite/plane tests/plane/test_logic_bands.py
 git commit -m "feat: sectioned Builder — collapsible per-procedure <details> sections"
 git push -u origin HEAD
 ```
@@ -906,10 +906,10 @@ git push -u origin HEAD
 ### Task 4: Flowchart — procedure swimlanes + server-rendered collapse
 
 **Files:**
-- Modify: `controlflow_sdk/plane/routes/pipeline.py` (`_diagram`, the flowchart GET route)
-- Modify: `controlflow_sdk/plane/templates/partials/_pipe_diagram.html`
-- Modify: `controlflow_sdk/plane/templates/logic_flowchart.html`
-- Modify: `controlflow_sdk/plane/static/app.css` (or the `<style>` in `logic_flowchart.html`)
+- Modify: `uticen_lite/plane/routes/pipeline.py` (`_diagram`, the flowchart GET route)
+- Modify: `uticen_lite/plane/templates/partials/_pipe_diagram.html`
+- Modify: `uticen_lite/plane/templates/logic_flowchart.html`
+- Modify: `uticen_lite/plane/static/app.css` (or the `<style>` in `logic_flowchart.html`)
 - Test: `tests/plane/test_logic_bands.py` (extend) — diagram view-model assertions.
 
 **Interfaces:**
@@ -927,7 +927,7 @@ git push -u origin HEAD
 Add to `tests/plane/test_logic_bands.py`:
 
 ```python
-from controlflow_sdk.plane.routes.pipeline import _diagram
+from uticen_lite.plane.routes.pipeline import _diagram
 
 
 def _forked():
@@ -1037,11 +1037,11 @@ set when present:
 ```
 
 (Use the existing `_pipeline_for_view` and `_row_counts` helpers — confirm their names via `grep -n "def
-_pipeline_for_view\|def _row_counts" controlflow_sdk/plane/routes/pipeline.py`.)
+_pipeline_for_view\|def _row_counts" uticen_lite/plane/routes/pipeline.py`.)
 
 - [ ] **Step 5: Templates — swimlane bands + summary boxes + collapse toggles**
 
-Create `controlflow_sdk/plane/templates/partials/_pipe_diagram_card.html` (the HTMX-swappable wrapper so a
+Create `uticen_lite/plane/templates/partials/_pipe_diagram_card.html` (the HTMX-swappable wrapper so a
 collapse toggle replaces just the chart):
 
 ```jinja
@@ -1103,14 +1103,14 @@ Add to the `<style>` in `logic_flowchart.html` (next to the `.fc-*` rules):
   .fc-summary text { fill: var(--text-secondary); font-family: var(--font-sans); font-size: 12px; }
 ```
 
-Ensure `logic_flowchart.html` loads htmx (check `base.html` already includes it — `grep -rn "htmx" controlflow_sdk/plane/templates/base.html`; the Builder already uses HTMX so it is global).
+Ensure `logic_flowchart.html` loads htmx (check `base.html` already includes it — `grep -rn "htmx" uticen_lite/plane/templates/base.html`; the Builder already uses HTMX so it is global).
 
 - [ ] **Step 7: Run tests, lint, type-check, commit, push**
 
 ```bash
 python -m pytest tests/plane/test_logic_bands.py -q
-python -m ruff check controlflow_sdk tests && python -m mypy controlflow_sdk
-git add controlflow_sdk/plane
+python -m ruff check uticen_lite tests && python -m mypy uticen_lite
+git add uticen_lite/plane
 git commit -m "feat: Flowchart procedure swimlanes + server-rendered collapse"
 git push -u origin HEAD
 ```
@@ -1181,9 +1181,9 @@ GET `/controls/<id>/logic/builder`, assert HTTP 200 and the response contains `d
 
 ```bash
 git fetch origin main -q
-git diff --name-only origin/main...HEAD | grep -E '^(contract/|controlflow_sdk/schema/|controlflow_sdk/bundle/|controlflow_sdk/model/workpaper.py)' && echo "BUNDLE DRIFT — STOP" || echo "no bundle drift"
+git diff --name-only origin/main...HEAD | grep -E '^(contract/|uticen_lite/schema/|uticen_lite/bundle/|uticen_lite/model/workpaper.py)' && echo "BUNDLE DRIFT — STOP" || echo "no bundle drift"
 python -m pytest -q
-python -m ruff check . && python -m mypy controlflow_sdk
+python -m ruff check . && python -m mypy uticen_lite
 python -m pytest tests/e2e -m browser -q
 ```
 Expected: `no bundle drift`; full suite green; ruff/mypy clean; e2e green.

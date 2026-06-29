@@ -42,8 +42,8 @@ normalizes order, not content. Renderers here also read these dicts by key (`.ge
 
 ## Reference
 
-- `controlflow_sdk/bundle/archive.py` (`json.dumps(..., sort_keys=True)` — the normalization point).
-- `controlflow_sdk/model/control.py` (`FrameworkRefs.to_dict`), `controlflow_sdk/bundle/assemble.py`
+- `uticen_lite/bundle/archive.py` (`json.dumps(..., sort_keys=True)` — the normalization point).
+- `uticen_lite/model/control.py` (`FrameworkRefs.to_dict`), `uticen_lite/bundle/assemble.py`
   (`_serialise_framework_refs` now delegates to it).
 - Gates that proved byte-identity: `tests/test_contract_export.py`, `tests/schema/test_bundle_schema.py`.
 - Cardinal contract: [[0001]]. Triage context that produced this change: [[0027]].

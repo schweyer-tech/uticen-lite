@@ -1,14 +1,14 @@
 import pandas as pd
 
-from controlflow_sdk.model.population import ColumnMeta, Population
-from controlflow_sdk.pipeline.compile import (
+from uticen_lite.model.population import ColumnMeta, Population
+from uticen_lite.pipeline.compile import (
     _subpipeline_for,
     compile_pipeline,
     compile_pipeline_procedures,
 )
-from controlflow_sdk.pipeline.model import parse_pipeline
-from controlflow_sdk.rules.evaluate import evaluate_rule  # canonical interpreter
-from controlflow_sdk.rules.spec import parse_rule_spec
+from uticen_lite.pipeline.model import parse_pipeline
+from uticen_lite.rules.evaluate import evaluate_rule  # canonical interpreter
+from uticen_lite.rules.spec import parse_rule_spec
 
 
 def _multi_check_one_procedure() -> dict:

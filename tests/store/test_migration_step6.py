@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.migrations import migrate
+from uticen_lite.store.db import connect
+from uticen_lite.store.migrations import migrate
 
 
 def _cols(conn, table):

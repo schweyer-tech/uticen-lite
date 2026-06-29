@@ -1,4 +1,4 @@
-# Copilot instructions for `controlflow-sdk`
+# Copilot instructions for `uticen-lite`
 
 ## Build, test, and lint
 
@@ -7,7 +7,7 @@
 - Run a single test function: `python -m pytest -q tests/path/to/test_file.py::test_name`
 - Run only browser e2e smoke tests (opt-in lane): `python -m pytest tests/e2e -m browser`
 - Lint: `python -m ruff check .`
-- Type-check: `python -m mypy controlflow_sdk`
+- Type-check: `python -m mypy uticen_lite`
 - Build wheel: `python -m build --wheel`
 
 Notes:
@@ -16,18 +16,18 @@ Notes:
 
 ## High-level architecture
 
-`controlflow-sdk` is one engine with two authoring surfaces:
+`uticen-lite` is one engine with two authoring surfaces:
 
-1. `cflow` CLI (`controlflow_sdk/cli/`) for import/run/build.
-2. `controlplane` local web app (`controlflow_sdk/plane/`) for browser-based authoring/runs/export.
+1. `uticen-lite` CLI (`uticen_lite/cli/`) for import/run/build.
+2. `controlplane` local web app (`uticen_lite/plane/`) for browser-based authoring/runs/export.
 
 Both surfaces share the same core pipeline:
 
-- **Store as source of truth**: engagement state lives in `controlplane.db` (`controlflow_sdk/store/db.py`, `store/migrations.py`, `store/repo.py`).
+- **Store as source of truth**: engagement state lives in `controlplane.db` (`uticen_lite/store/db.py`, `store/migrations.py`, `store/repo.py`).
 - **Import path is shared**: CLI import and setup/demo import both use `store/import_service.py`.
 - **Execution path is shared**: run routes/commands call `store/run_service.py`, which uses `runner/execute.py` and writes render artifacts to `target/workpapers/` and `target/evidence/`.
 - **Export path is shared**: CLI build and web export both call `store/export_service.py`, which builds via `bundle/assemble.py` and zips via `bundle/archive.py`.
-- **Contract gate**: bundle output must validate against `contract/bundle.schema.json` (`schema_version` is the ControlFlow app integration contract).
+- **Contract gate**: bundle output must validate against `contract/bundle.schema.json` (`schema_version` is the Uticen app integration contract).
 
 Authoring/test logic representations:
 
@@ -50,14 +50,14 @@ Authoring/test logic representations:
 
 ## Subsystem coverage: upgrade/update path
 
-- Upgrade capability is install-method aware (`controlflow_sdk/upgrade/detect.py` + `upgrade/command.py`): git-editable, pipx, and pip installs map to different upgrade commands.
-- The CLI path (`cflow upgrade`) runs commands inline (`controlflow_sdk/cli/upgrade_cmd.py`).
+- Upgrade capability is install-method aware (`uticen_lite/upgrade/detect.py` + `upgrade/command.py`): git-editable, pipx, and pip installs map to different upgrade commands.
+- The CLI path (`uticen-lite upgrade`) runs commands inline (`uticen_lite/cli/upgrade_cmd.py`).
 - The web path (`plane/routes/updates.py`) must spawn a **detached helper** (`upgrade/spawn.py`) and then shut down the current process; it must not upgrade in-process.
 - Preserve egress behavior in updates routes: automatic launch-time checks are opt-in, while explicit “Check now” is user-triggered.
 
 ## Subsystem coverage: bundle/schema contract
 
-- Treat `contract/bundle.schema.json` as the external compatibility boundary with the ControlFlow app.
+- Treat `contract/bundle.schema.json` as the external compatibility boundary with the Uticen app.
 - Keep all bundle producers funneled through shared code: `store/export_service.py` → `bundle/assemble.py` → `bundle/archive.py`.
 - `assemble_bundle()` must validate output via schema validation before writing artifacts.
 - Preserve trust-boundary rules from bundle assembly: include definitions/run provenance/workpapers/evidence references, but never raw population rows or local `test_path` values in the manifest.

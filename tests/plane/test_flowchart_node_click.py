@@ -11,7 +11,7 @@ hardened to honor the documented contract.
 import io
 import json
 
-from controlflow_sdk.plane.routes import pipeline as P
+from uticen_lite.plane.routes import pipeline as P
 
 
 def _seed_pipeline_control(client):
@@ -73,17 +73,17 @@ def test_node_click_degrades_when_pipeline_parse_raises(client, monkeypatch):
 def test_materialize_full_never_raises(client, monkeypatch):
     """The contract in the docstring: _materialize_full returns {} on any failure."""
     _seed_pipeline_control(client)
-    import controlflow_sdk.pipeline.materialize as M
+    import uticen_lite.pipeline.materialize as M
 
     def boom(*_a, **_k):
         raise RuntimeError("kaboom")
 
     monkeypatch.setattr(M, "materialize_steps", boom)
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store.db import connect
     root = client.app.state.project_root
     conn = connect(root)
     try:
-        from controlflow_sdk.store import repo
+        from uticen_lite.store import repo
         pipeline = P._pipeline_for_view(repo.get_control(conn, "sod"))
         assert pipeline is not None
         assert P._materialize_full(conn, root, pipeline) == {}

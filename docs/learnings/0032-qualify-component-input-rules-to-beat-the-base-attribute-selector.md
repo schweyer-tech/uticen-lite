@@ -12,7 +12,7 @@ superseded_by: null
 
 ## Context
 
-`controlflow_sdk/plane/static/app.css` has a global form block that styles fields by
+`uticen_lite/plane/static/app.css` has a global form block that styles fields by
 element + attribute:
 
 ```css
@@ -57,7 +57,7 @@ cascade tie-break (source order) reveals which one applies. A glance at the file
 
 ## Reference
 
-- `controlflow_sdk/plane/static/app.css` — the global `input[type="text"], …, textarea,
+- `uticen_lite/plane/static/app.css` — the global `input[type="text"], …, textarea,
   select` block; the `.control-title-edit-form input[type="text"]` and
   `.proc-head input.proc-name-title` rules that must out-specify it.
 - `tests/e2e/test_smoke.py` — the `to_have_css("font-size", …)` teeth-check on the procedure

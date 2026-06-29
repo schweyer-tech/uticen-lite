@@ -45,7 +45,7 @@ full-population test *inspectable* so an analyst can trust it.
 
 ### The materialization engine (new)
 
-New module **`controlflow_sdk/pipeline/materialize.py`** — pandas/CPython layer, alongside
+New module **`uticen_lite/pipeline/materialize.py`** — pandas/CPython layer, alongside
 `rowcounts.py` (so it respects the Pyodide boundary: the Pyodide-safe core — `model/`, `compile.py`,
 `runner/execute.py` — stays pandas-free).
 
@@ -191,10 +191,10 @@ Both `.xlsx` writers live in the pandas layer and are `[adapters]`-gated (see be
 
 ## Files (anticipated)
 
-- **New:** `controlflow_sdk/pipeline/materialize.py` (engine + cache); an xlsx-writer helper (in the
-  pandas layer — e.g. `controlflow_sdk/adapters/xlsx_export.py` or a `pipeline/` sibling); inspector
+- **New:** `uticen_lite/pipeline/materialize.py` (engine + cache); an xlsx-writer helper (in the
+  pandas layer — e.g. `uticen_lite/adapters/xlsx_export.py` or a `pipeline/` sibling); inspector
   partial template; per-step + workbook export wiring.
-- **Modified:** `controlflow_sdk/pipeline/rowcounts.py` (consume the engine); `routes/pipeline.py`
+- **Modified:** `uticen_lite/pipeline/rowcounts.py` (consume the engine); `routes/pipeline.py`
   (3 new routes); `templates/partials/_pipe_node.html` + `_pipe_diagram.html` (clickable counts);
   builder template (drawer + export buttons); `pyproject.toml` only if a new optional dep is needed
   (none anticipated — openpyxl already in `[adapters]`).

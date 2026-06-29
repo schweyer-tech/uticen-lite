@@ -5,9 +5,9 @@ import copy
 
 import pandas as pd
 
-from controlflow_sdk.pipeline.materialize import _step_keys, materialize_steps, new_step_cache
-from controlflow_sdk.pipeline.model import parse_pipeline
-from controlflow_sdk.pipeline.rowcounts import compute_row_counts
+from uticen_lite.pipeline.materialize import _step_keys, materialize_steps, new_step_cache
+from uticen_lite.pipeline.model import parse_pipeline
+from uticen_lite.pipeline.rowcounts import compute_row_counts
 
 
 def _pipeline():
@@ -120,7 +120,7 @@ def test_cache_recomputes_only_edited_step_onward():
 
 
 def test_cache_is_bounded():
-    from controlflow_sdk.pipeline.materialize import _CACHE_MAX
+    from uticen_lite.pipeline.materialize import _CACHE_MAX
     cache = new_step_cache()
     for i in range(_CACHE_MAX + 20):
         materialize_steps(parse_pipeline(_graph()), _frames(),

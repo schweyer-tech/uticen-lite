@@ -39,6 +39,6 @@ key is exactly what the post-swap browser smoke catches.
 
 ## Reference
 
-- `controlflow_sdk/plane/routes/pipeline.py` — `_card_bands` + its four call sites that render
+- `uticen_lite/plane/routes/pipeline.py` — `_card_bands` + its four call sites that render
   `partials/_pipe_cards.html` (`_editor_context`, autosave-success, autosave-error 422, AI-apply).
 - Same audit-every-site family: [[0014]] (plural accessor call sites), [[0023]] (upsert writers).

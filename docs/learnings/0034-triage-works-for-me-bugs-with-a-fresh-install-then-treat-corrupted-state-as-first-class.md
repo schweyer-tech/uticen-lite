@@ -45,5 +45,5 @@ For a stateful local tool, when a "broken for me" report does not reproduce in t
 ## Reference
 
 - Fresh-install repro (clean venv → built wheel → real `controlplane` server → load demo → run all).
-- `controlflow_sdk/store/import_service.py` — `reset_to_demo` (the recovery path).
+- `uticen_lite/store/import_service.py` — `reset_to_demo` (the recovery path).
 - Commit d56bf99 (#98). Relates to [[0003]], [[0019]], [[0033]].

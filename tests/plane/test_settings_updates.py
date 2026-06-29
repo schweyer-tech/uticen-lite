@@ -1,7 +1,7 @@
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.upgrade.check import UpdateInfo
-from controlflow_sdk.upgrade.detect import InstallMethod
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.upgrade.check import UpdateInfo
+from uticen_lite.upgrade.detect import InstallMethod
 
 
 def test_settings_hub_links_to_updates(client):
@@ -44,11 +44,11 @@ def test_toggle_unchecked_persists_false(client):
 
 def test_check_now_returns_result_partial(client, monkeypatch):
     monkeypatch.setattr(
-        "controlflow_sdk.plane.routes.updates.detect_install",
+        "uticen_lite.plane.routes.updates.detect_install",
         lambda: InstallMethod.PIP,
     )
     monkeypatch.setattr(
-        "controlflow_sdk.plane.routes.updates.check_for_update",
+        "uticen_lite.plane.routes.updates.check_for_update",
         lambda method: UpdateInfo(method, "0.1.0", "0.2.0", True, "Version 0.2.0 is available."),
     )
     resp = client.post("/settings/updates/check")
@@ -61,11 +61,11 @@ def test_header_indicator_up_to_date_shows_tooltip_and_modal_trigger(client, mon
     repo.set_check_updates_on_launch(conn, True)
     conn.close()
     monkeypatch.setattr(
-        "controlflow_sdk.plane.routes.updates.detect_install",
+        "uticen_lite.plane.routes.updates.detect_install",
         lambda: InstallMethod.PIP,
     )
     monkeypatch.setattr(
-        "controlflow_sdk.plane.routes.updates.check_for_update",
+        "uticen_lite.plane.routes.updates.check_for_update",
         lambda method: UpdateInfo(method, "0.1.0", "0.1.0", False, "You are up to date."),
     )
     resp = client.get("/updates/indicator")
@@ -85,11 +85,11 @@ def test_header_indicator_update_available_shows_update_now_in_modal(client, mon
     repo.set_check_updates_on_launch(conn, True)
     conn.close()
     monkeypatch.setattr(
-        "controlflow_sdk.plane.routes.updates.detect_install",
+        "uticen_lite.plane.routes.updates.detect_install",
         lambda: InstallMethod.PIP,
     )
     monkeypatch.setattr(
-        "controlflow_sdk.plane.routes.updates.check_for_update",
+        "uticen_lite.plane.routes.updates.check_for_update",
         lambda method: UpdateInfo(method, "0.1.0", "0.2.0", True, "Version 0.2.0 is available."),
     )
     resp = client.get("/updates/indicator")
@@ -116,7 +116,7 @@ def test_base_template_polls_header_indicator_every_two_minutes(client):
 
 def test_refresh_indicator_skips_check_when_toggle_off(client, monkeypatch):
     monkeypatch.setattr(
-        "controlflow_sdk.plane.routes.updates.check_for_update",
+        "uticen_lite.plane.routes.updates.check_for_update",
         lambda method: (_ for _ in ()).throw(AssertionError("unexpected network check")),
     )
     resp = client.post("/updates/indicator/check")

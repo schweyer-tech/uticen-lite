@@ -10,10 +10,10 @@ from pathlib import Path
 
 import pandas as pd
 
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.migrations import migrate
-from controlflow_sdk.store.run_service import run_control_in_store
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.migrations import migrate
+from uticen_lite.store.run_service import run_control_in_store
 
 
 def _seed(tmp_path: Path):

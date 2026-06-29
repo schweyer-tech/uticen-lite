@@ -6,9 +6,9 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from controlflow_sdk.model.run import RunRecord, SourceProvenance
-from controlflow_sdk.model.violation import Severity, Violation
-from controlflow_sdk.runner.runlog import append_run, read_runs
+from uticen_lite.model.run import RunRecord, SourceProvenance
+from uticen_lite.model.violation import Severity, Violation
+from uticen_lite.runner.runlog import append_run, read_runs
 
 
 @pytest.fixture

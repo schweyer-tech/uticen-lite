@@ -2,8 +2,8 @@
 editor can pin it on the offending card (2026-06-27 review)."""
 import pytest
 
-from controlflow_sdk.pipeline.model import PipelineError, parse_pipeline
-from controlflow_sdk.plane.routes.pipeline import _node_errors_from
+from uticen_lite.pipeline.model import PipelineError, parse_pipeline
+from uticen_lite.plane.routes.pipeline import _node_errors_from
 
 
 def test_terminal_error_is_node_prefixed():

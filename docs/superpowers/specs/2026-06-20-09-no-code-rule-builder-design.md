@@ -16,7 +16,7 @@ The no-code rule builder is not usable by a GRC analyst: condition columns are f
 
 The first bound source is the rule's primary population (matches `runner/execute.py` which uses `populations[0]`). We pass that source's columns into both the initial render and the HTMX "add condition" partial so the column field is a `<select>` plus a free-text fallback.
 
-**`controlflow_sdk/plane/routes/controls.py`**
+**`uticen_lite/plane/routes/controls.py`**
 - Add a helper `def _primary_columns(conn, source_ids: list[str]) -> list[dict]:` returning `repo.get_source(conn, source_ids[0])["columns"]` (the list of `{original_name, display_name, ...}`) or `[]` when no source is bound / source missing. Used to populate dropdowns.
 - `new_control` / `edit_control`: add `"columns": _primary_columns(conn, <source_ids>)` to the template context. For `new_control` there is no bound source yet, so pass `[]` (free-text fallback shows). For `edit_control` use `control["source_ids"]`.
 - `condition_row` route — change signature to accept an optional source id and resolve columns:
@@ -31,7 +31,7 @@ The first bound source is the rule's primary population (matches `runner/execute
   (Per learning 0002 this is a sync GET — keep `Depends(get_conn)`.)
 - `_rule_spec_from_form` — extend to read the new cross-source fields and emit the new condition kind (see Part C). The `cond_column` field is still read the same way (the dropdown and the fallback text input both post `cond_column`), so existing parsing is preserved; a dropdown set to the empty sentinel `""` plus a non-empty `cond_column_freetext` lets power users override (see template below).
 
-**`controlflow_sdk/plane/templates/partials/rule_condition.html`** — replace the free-text column input with a select + fallback, driven by a `columns` context var. The select posts `cond_column`; an "Other…" option reveals a sibling text input named `cond_column_freetext`. When `columns` is empty (e.g. brand-new control with no source yet), render only the free-text input named `cond_column` (current behavior) so nothing breaks:
+**`uticen_lite/plane/templates/partials/rule_condition.html`** — replace the free-text column input with a select + fallback, driven by a `columns` context var. The select posts `cond_column`; an "Other…" option reveals a sibling text input named `cond_column_freetext`. When `columns` is empty (e.g. brand-new control with no source yet), render only the free-text input named `cond_column` (current behavior) so nothing breaks:
 ```html
 <div class="condition-row" data-condition>
   {% if columns %}
@@ -53,7 +53,7 @@ The first bound source is the rule's primary population (matches `runner/execute
 ```
 - `_rule_spec_from_form` resolves the column: `col = freetext if (sel == "__other__" and freetext) else sel`. Concretely: read `form.getlist("cond_column")` and `form.getlist("cond_column_freetext")` zipped; when the select value is `"__other__"` use the freetext sibling. Keep stripping/whitespace-skip behavior (preserves `test_rule_spec_whitespace_column_skipped`).
 
-**`controlflow_sdk/plane/templates/partials/rule_builder.html`** — the pre-existing condition rows (edit path) also need the select. Two changes:
+**`uticen_lite/plane/templates/partials/rule_builder.html`** — the pre-existing condition rows (edit path) also need the select. Two changes:
 1. Replace the inline free-text column input in the `{% for cond in ... %}` loop with the same select markup, marking the matching option `selected` (`{% if c.original_name == cond.column %}selected{% endif %}`); if `cond.column` is not among `columns`, select `__other__` and prefill `cond_column_freetext` with `cond.column`.
 2. The "+ Add condition" button must pass the bound source to the partial route so new rows get the right dropdown. Since the source checkboxes can change after page load, pass the primary source via an `hx-vals` that reads the first checked `source_ids` box. Simplest robust approach: server-render the button's `hx-get` with the current primary id and additionally include `hx-include="[name='source_ids']"` is not enough (route needs a single id) — instead use a tiny JS shim already permitted (the page already ships inline JS for panes/CodeMirror). Add to the existing `<script>` in `control_edit.html`: on add-condition click, set the button's `hx-get` query `?source_id=<first checked source_ids>` before HTMX issues the request (via `htmx:configRequest` listener adding `evt.detail.parameters` or rewriting `hx-get`). Document this in the plan as the one allowed JS touch; it does not introduce client-side tabs (0007 unaffected — that rule is about tabs).
 
@@ -71,11 +71,11 @@ The first bound source is the rule's primary population (matches `runner/execute
 
 The Data tab route already parses the current file's rows. Add a per-column coercion-health summary using the SAME coercion the runner uses (`adapters/files.coerce_series`), so the preview matches run-time reality.
 
-**New module `controlflow_sdk/plane/coercion_check.py`** (keeps `sources.py` lean; pandas import is fine here — the plane is CPython-only):
+**New module `uticen_lite/plane/coercion_check.py`** (keeps `sources.py` lean; pandas import is fine here — the plane is CPython-only):
 ```python
 from __future__ import annotations
 import pandas as pd
-from controlflow_sdk.adapters.files import coerce_series
+from uticen_lite.adapters.files import coerce_series
 
 def coercion_report(header: list[str], data_rows: list[list[str]],
                     columns: list[dict]) -> list[dict]:
@@ -98,11 +98,11 @@ Implementation notes:
 - `all_bad = non_empty_count > 0 and bad == non_empty_count`.
 - Use only the displayed page's rows? No — compute over the FULL current file for an accurate verdict (the route already reads the whole file into `all_rows`; pass `data_rows` = all rows, not the paginated slice). This keeps the verdict honest even when page 1 happens to be clean.
 
-**`controlflow_sdk/plane/routes/sources.py` — `source_data` handler:**
+**`uticen_lite/plane/routes/sources.py` — `source_data` handler:**
 - After building `all_rows`, compute `report = coercion_report(header, data_rows, repo.get_source(conn, source_id)["columns"])` (using the full `data_rows`, not the paginated `rows`).
 - Add `"coercion": report` to the template context. Keep paginated `rows` for display unchanged (0004: the displayed slice ordering is untouched; the report is computed over the full unsliced list, so no positional consumer is reordered).
 
-**`controlflow_sdk/plane/templates/source_data.html`** — add a "Mapping check" card ABOVE the preview table, only when `coercion` has any flagged column:
+**`uticen_lite/plane/templates/source_data.html`** — add a "Mapping check" card ABOVE the preview table, only when `coercion` has any flagged column:
 ```html
 {% set flagged = coercion | selectattr('all_bad') | list %}
 {% if flagged %}
@@ -119,11 +119,11 @@ Implementation notes:
 </div>
 {% endif %}
 ```
-Style: route all colors through existing tokens (0005). Add a `.callout-warn` rule to `controlflow_sdk/plane/static/app.css` using `var(--accent-muted)`/`var(--border-default)` and a warning foreground token already present (e.g. reuse the severity/high token if defined; otherwise add `--callout-warn-*` tokens for BOTH default and `[data-theme=light]`). No new stylesheet; one design language (0005).
+Style: route all colors through existing tokens (0005). Add a `.callout-warn` rule to `uticen_lite/plane/static/app.css` using `var(--accent-muted)`/`var(--border-default)` and a warning foreground token already present (e.g. reuse the severity/high token if defined; otherwise add `--callout-warn-*` tokens for BOTH default and `[data-theme=light]`). No new stylesheet; one design language (0005).
 
 ### Part C — Cross-source "exists_in / not_exists_in" primitive
 
-#### Grammar (`controlflow_sdk/rules/spec.py`)
+#### Grammar (`uticen_lite/rules/spec.py`)
 - Add the two ops: `OPERATORS = frozenset({... , "exists_in", "not_exists_in"})`.
 - Extend `Condition` with cross-source fields (default `None` so existing single-source conditions are unchanged and remain frozen-dataclass-compatible):
   ```python
@@ -139,7 +139,7 @@ Style: route all colors through existing tokens (0005). Add a `.callout-warn` ru
 - `parse_rule_spec`: when `op in {"exists_in","not_exists_in"}`, require `other_source` and `this_key` and `other_key` (raise `RuleSpecError` with a clear message if any missing); the `column` field for these ops is set to `this_key` (so `referenced_columns` still surfaces the key and `_condition_mask` is never reached for these ops). Single-key only — if a future caller passes a list, raise `RuleSpecError("exists_in supports a single key column")` (composite is a non-goal).
 - `referenced_columns` unchanged (still returns distinct `c.column`; for cross-source conditions that is the primary key column — correct for `details`).
 
-#### Evaluator (`controlflow_sdk/rules/evaluate.py`)
+#### Evaluator (`uticen_lite/rules/evaluate.py`)
 The runner currently calls `evaluate_rule(spec, primary)` with a single Population. Cross-source needs source B. Extend the signature with an optional sources map (backward compatible — all existing callers/tests pass one positional arg):
 ```python
 def evaluate_rule(spec: RuleSpec, pop: Population,
@@ -158,14 +158,14 @@ def evaluate_rule(spec: RuleSpec, pop: Population,
   `_condition_mask` must therefore accept `sources` (thread it through from `evaluate_rule`). Stringify both sides (matches how item keys are stringified elsewhere) so a numeric/text mismatch across files still joins. Single-key only.
 - Everything downstream (mask combine, item_key, details, description_template) is unchanged.
 
-#### Runner wiring (`controlflow_sdk/runner/execute.py`)
+#### Runner wiring (`uticen_lite/runner/execute.py`)
 `run_control` already builds `sources_by_id: dict[str, Population]`. Change the rule branch to pass it:
 ```python
 raw_result = evaluate_rule(parse_rule_spec(control.rule_spec), primary, sources_by_id)
 ```
 No other runner change. The primary is still `populations[0]` (first bound source); source B must be among `control.sources`, so the builder must bind BOTH sources to the control (enforced in the form — see UI below).
 
-#### Renderer → plain Python `test_code` (`controlflow_sdk/rules/render_rule.py`)
+#### Renderer → plain Python `test_code` (`uticen_lite/rules/render_rule.py`)
 This is the contract-critical piece. The bundle's `test_code` is a plain string (schema unchanged). For a spec that contains NO cross-source condition, `rule_to_text` keeps emitting the existing human-readable text (unchanged — preserves `test_render_rule` tests and existing bundle output). For a spec that contains at least one cross-source condition, `rule_to_text` MUST emit runnable multi-source Python using the existing `test(pop, sources)` API, because the human-readable form cannot express the join and the app/SDK both execute `test_code` as Python:
 
 ```python
@@ -219,20 +219,20 @@ Generation rules:
 
 ### Exact files to create / modify
 Create:
-- `controlflow_sdk/plane/coercion_check.py`
+- `uticen_lite/plane/coercion_check.py`
 
 Modify:
-- `controlflow_sdk/rules/spec.py` (ops + Condition fields + parse validation)
-- `controlflow_sdk/rules/evaluate.py` (sources param + exists_in/not_exists_in masks)
-- `controlflow_sdk/rules/render_rule.py` (`_render_python` for cross-source specs)
-- `controlflow_sdk/runner/execute.py` (pass `sources_by_id` into `evaluate_rule`)
-- `controlflow_sdk/plane/routes/controls.py` (`_primary_columns`, `condition_row` source_id, context vars, `_rule_spec_from_form` + `_save_from_form` cross-source + freetext)
-- `controlflow_sdk/plane/routes/sources.py` (`source_data` coercion report)
-- `controlflow_sdk/plane/templates/partials/rule_condition.html`
-- `controlflow_sdk/plane/templates/partials/rule_builder.html`
-- `controlflow_sdk/plane/templates/control_edit.html` (inline JS: add `source_id` to condition_row request + xsrc field toggle)
-- `controlflow_sdk/plane/templates/source_data.html` (Mapping-check card)
-- `controlflow_sdk/plane/static/app.css` (`.callout-warn` tokens, light + dark)
+- `uticen_lite/rules/spec.py` (ops + Condition fields + parse validation)
+- `uticen_lite/rules/evaluate.py` (sources param + exists_in/not_exists_in masks)
+- `uticen_lite/rules/render_rule.py` (`_render_python` for cross-source specs)
+- `uticen_lite/runner/execute.py` (pass `sources_by_id` into `evaluate_rule`)
+- `uticen_lite/plane/routes/controls.py` (`_primary_columns`, `condition_row` source_id, context vars, `_rule_spec_from_form` + `_save_from_form` cross-source + freetext)
+- `uticen_lite/plane/routes/sources.py` (`source_data` coercion report)
+- `uticen_lite/plane/templates/partials/rule_condition.html`
+- `uticen_lite/plane/templates/partials/rule_builder.html`
+- `uticen_lite/plane/templates/control_edit.html` (inline JS: add `source_id` to condition_row request + xsrc field toggle)
+- `uticen_lite/plane/templates/source_data.html` (Mapping-check card)
+- `uticen_lite/plane/static/app.css` (`.callout-warn` tokens, light + dark)
 
 ## Bundle / contract impact
 **Unchanged.** No edit to `contract/bundle.schema.json`, `bundle/assemble.py`, or `bundle/archive.py`. The cross-source rule is persisted only as a richer `rule_spec` (store-internal JSON, never in the bundle). At export, `_resolve_test_code` → `rule_to_text(parse_rule_spec(rule_spec))` now returns runnable plain Python for cross-source specs, which lands in the existing `control.test_code` string field (and the workpaper procedure's `test_code`) — both already string-typed in the schema. No new manifest keys, no raw population data, no filesystem paths. `schema_version` stays `"1.0"`. The gates `tests/test_contract_export.py` + `tests/schema/test_bundle_schema.py` must stay green unchanged (a new test asserts a cross-source control still produces a schema-valid bundle).

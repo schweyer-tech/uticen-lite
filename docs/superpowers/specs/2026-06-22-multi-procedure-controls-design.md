@@ -63,7 +63,7 @@ export assertion is the cardinal-rule-0001 guard.
 
 ## Architecture (by component)
 
-### 1. Pipeline model — allow N terminals (`controlflow_sdk/pipeline/model.py`)
+### 1. Pipeline model — allow N terminals (`uticen_lite/pipeline/model.py`)
 - `_validate_terminal`: change from *exactly one sink* to *≥1 sinks, **every** sink terminal-capable*
   (a `test`, or a `custom_python` with `flavor == "test"`). A non-terminal sink (e.g. a dangling
   Filter) is still an error with a clear message ("every endpoint must be a Test").
@@ -77,7 +77,7 @@ export assertion is the cardinal-rule-0001 guard.
   `failure_threshold_pct`, `failure_threshold_count`. Parsed leniently (absent → fall back to control
   defaults / `Test {id}`); validated as non-negative numbers when present.
 
-### 2. Compile — per-terminal artifacts + a union (`controlflow_sdk/pipeline/compile.py`)
+### 2. Compile — per-terminal artifacts + a union (`uticen_lite/pipeline/compile.py`)
 - Add `compile_pipeline_procedures(pipeline) -> list[CompiledProcedure]`: for each terminal, compile the
   **sub-pipeline** = (that terminal's transitive inputs + the terminal). Reuse the existing single-sink
   compile by treating each terminal as the sole sink of its reachable subgraph. Each `CompiledProcedure`
@@ -91,7 +91,7 @@ export assertion is the cardinal-rule-0001 guard.
   AND the union (exec the generated `test()` and compare against `evaluate_rule` on a **forked** fixture,
   incl. `any`/`all` + cross-source).
 
-### 3. Store — per-procedure runs (`controlflow_sdk/store/`)
+### 3. Store — per-procedure runs (`uticen_lite/store/`)
 - Migration (store-only, bump `user_version`): `ALTER TABLE runs ADD COLUMN procedure_id TEXT` (default
   `''` = the sole/legacy procedure). `repo.insert_run` / row mapping carry `procedure_id`.
 - `_save_pipeline_graph` (`plane/routes/controls.py`): compile **all** procedures; store the graph
@@ -99,7 +99,7 @@ export assertion is the cardinal-rule-0001 guard.
   unchanged shape). The per-terminal artifacts are re-derived from the graph at run/assemble time (no
   new control columns) — keeps learning **0010** (graph compiles to the existing artifact).
 
-### 4. Run — one result per procedure (`controlflow_sdk/store/run_service.py`)
+### 4. Run — one result per procedure (`uticen_lite/store/run_service.py`)
 - `run_control_in_store`: if the control has a pipeline with **≥2 terminals**, parse the graph, and for
   each terminal compile + run its sub-pipeline → **N `RunRecord`s**, each persisted with its
   `procedure_id`. Otherwise behave exactly as today (one run, `procedure_id=''`).
@@ -109,7 +109,7 @@ export assertion is the cardinal-rule-0001 guard.
 - `runner/execute.run_control` stays single-result; the multi-terminal fan-out lives in `run_service`
   (store-backed) so the Pyodide-safe runner core is untouched.
 
-### 5. Workpaper + determination (`controlflow_sdk/model/workpaper.py`, `render/html.py`)
+### 5. Workpaper + determination (`uticen_lite/model/workpaper.py`, `render/html.py`)
 - `Procedure` gains a `threshold: Threshold` and a `determination` property (its own verdict against its
   own result).
 - `Workpaper.assemble` gains a multi-procedure path: accept the list of `(procedure_meta, run)` and build

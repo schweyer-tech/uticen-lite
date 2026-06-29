@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import builtins
 
-from controlflow_sdk.ai import providers
+from uticen_lite.ai import providers
 
 
 def test_provider_key_present_reads_env(monkeypatch):

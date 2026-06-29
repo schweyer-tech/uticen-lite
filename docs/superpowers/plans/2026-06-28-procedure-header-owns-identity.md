@@ -24,19 +24,19 @@
 - **Cardinal rule:** no change to `contract/bundle.schema.json` or the bundle `schema_version`. Procedure code/name/assertion/threshold/verdict stay **render+store-only** (learnings 0001, 0015). The contract gate (`tests/test_contract_export.py` + `tests/schema/test_bundle_schema.py`) must stay green.
 - **Sole-procedure heading byte-identity (learning 0036):** a control with exactly ONE effective procedure must keep `code=""` so the workpaper heading stays the legacy `P1: title` form (a non-empty code emits `P1 &middot; title`). Author-typed codes are always preserved verbatim.
 - **Thread new context keys through every render site (learning 0038):** `narrative` is added to the `band.proc` view-model in the single context builder `_procedure_context` and its `_card_bands` fallback default — not per-render-site.
-- **Pyodide-safe core:** no pandas in `controlflow_sdk/pipeline/`.
+- **Pyodide-safe core:** no pandas in `uticen_lite/pipeline/`.
 - **e2e on form/HTMX restructure (learning 0012):** re-run + update `pytest tests/e2e -m browser` when the Test form or procedure header changes shape. Assert app-persisted state via the app's own write path; never inject state to dodge a race (learning 0037).
-- Gates: `python -m pytest -q` pristine (no new warnings), `python -m ruff check .`, `python -m mypy controlflow_sdk`. ruff target `py311`, line length 100.
+- Gates: `python -m pytest -q` pristine (no new warnings), `python -m ruff check .`, `python -m mypy uticen_lite`. ruff target `py311`, line length 100.
 
 ---
 
 ### Task 1: Thread procedure narrative into the view-model + header editor
 
 **Files:**
-- Modify: `controlflow_sdk/plane/routes/pipeline.py` (`_procedure_context` ~698-709; `_card_bands` `_proc_defaults` ~753-756)
-- Modify: `controlflow_sdk/plane/templates/partials/_pipe_cards.html` (the `proc-head` span ~61-68)
-- Modify: `controlflow_sdk/plane/templates/logic_builder.html` (`serializeProcedures()` ~303-318; `newProcedureSection()` innerHTML ~353-370)
-- Modify: `controlflow_sdk/plane/static/app.css` (after `.proc-head .proc-in:focus` ~705)
+- Modify: `uticen_lite/plane/routes/pipeline.py` (`_procedure_context` ~698-709; `_card_bands` `_proc_defaults` ~753-756)
+- Modify: `uticen_lite/plane/templates/partials/_pipe_cards.html` (the `proc-head` span ~61-68)
+- Modify: `uticen_lite/plane/templates/logic_builder.html` (`serializeProcedures()` ~303-318; `newProcedureSection()` innerHTML ~353-370)
+- Modify: `uticen_lite/plane/static/app.css` (after `.proc-head .proc-in:focus` ~705)
 - Test: `tests/plane/test_logic_bands.py`
 
 **Interfaces:**
@@ -206,8 +206,8 @@ Expected: PASS (all three new tests + the existing band tests).
 - [ ] **Step 9: Gates + commit + push**
 
 ```bash
-python -m ruff check . && python -m mypy controlflow_sdk
-git add controlflow_sdk/plane/routes/pipeline.py controlflow_sdk/plane/templates/partials/_pipe_cards.html controlflow_sdk/plane/templates/logic_builder.html controlflow_sdk/plane/static/app.css tests/plane/test_logic_bands.py
+python -m ruff check . && python -m mypy uticen_lite
+git add uticen_lite/plane/routes/pipeline.py uticen_lite/plane/templates/partials/_pipe_cards.html uticen_lite/plane/templates/logic_builder.html uticen_lite/plane/static/app.css tests/plane/test_logic_bands.py
 git commit -m "feat(plane): add procedure narrative to the section-header editor"
 git push -u origin HEAD
 ```
@@ -217,8 +217,8 @@ git push -u origin HEAD
 ### Task 2: Reduce the Test node card to pure step mechanics
 
 **Files:**
-- Modify: `controlflow_sdk/plane/templates/partials/_pipe_node.html` (the `{% if node.type == 'test' %}` block, rows at ~121-126 and ~141-150)
-- Modify: `controlflow_sdk/plane/templates/logic_builder.html` (`serialize()` Test branch, ~244-255)
+- Modify: `uticen_lite/plane/templates/partials/_pipe_node.html` (the `{% if node.type == 'test' %}` block, rows at ~121-126 and ~141-150)
+- Modify: `uticen_lite/plane/templates/logic_builder.html` (`serialize()` Test branch, ~244-255)
 - Test: `tests/plane/test_logic_bands.py`
 
 **Interfaces:**
@@ -323,8 +323,8 @@ Expected: no per-node `failure_threshold_*` and no terminal `config.title` in th
 - [ ] **Step 7: Gates + commit + push**
 
 ```bash
-python -m pytest tests/plane -q && python -m ruff check . && python -m mypy controlflow_sdk
-git add controlflow_sdk/plane/templates/partials/_pipe_node.html controlflow_sdk/plane/templates/logic_builder.html tests/plane/test_logic_bands.py
+python -m pytest tests/plane -q && python -m ruff check . && python -m mypy uticen_lite
+git add uticen_lite/plane/templates/partials/_pipe_node.html uticen_lite/plane/templates/logic_builder.html tests/plane/test_logic_bands.py
 git commit -m "feat(plane): Test node carries step mechanics only — drop vestigial procedure fields"
 git push -u origin HEAD
 ```
@@ -334,8 +334,8 @@ git push -u origin HEAD
 ### Task 3: Keep a sole procedure's code empty (preserve 0036 heading byte-identity)
 
 **Files:**
-- Modify: `controlflow_sdk/plane/routes/pipeline.py` (`_procedure_context` code default ~701)
-- Modify: `controlflow_sdk/plane/templates/logic_builder.html` (`serializeProcedures()` code default ~310)
+- Modify: `uticen_lite/plane/routes/pipeline.py` (`_procedure_context` code default ~701)
+- Modify: `uticen_lite/plane/templates/logic_builder.html` (`serializeProcedures()` code default ~310)
 - Test: `tests/plane/test_logic_bands.py`
 
 **Interfaces:**
@@ -417,8 +417,8 @@ Expected: PASS — `test_lone_auto_code_empty_heading_is_legacy_form` already pi
 - [ ] **Step 8: Gates + commit + push**
 
 ```bash
-python -m pytest tests/plane tests/render -q && python -m ruff check . && python -m mypy controlflow_sdk
-git add controlflow_sdk/plane/routes/pipeline.py controlflow_sdk/plane/templates/logic_builder.html tests/plane/test_logic_bands.py
+python -m pytest tests/plane tests/render -q && python -m ruff check . && python -m mypy uticen_lite
+git add uticen_lite/plane/routes/pipeline.py uticen_lite/plane/templates/logic_builder.html tests/plane/test_logic_bands.py
 git commit -m "fix(plane): keep a sole procedure's code empty to preserve 0036 heading byte-identity"
 git push -u origin HEAD
 ```
@@ -567,12 +567,12 @@ Expected: PASS with no new warnings. Pay attention to `tests/render`, `tests/pla
 
 - [ ] **Step 2: Lint + type gates**
 
-Run: `python -m ruff check . && python -m mypy controlflow_sdk`
+Run: `python -m ruff check . && python -m mypy uticen_lite`
 Expected: clean.
 
 - [ ] **Step 3: Confirm no bundle drift**
 
-Run: `git diff --stat main..HEAD -- contract/ controlflow_sdk/schema/`
+Run: `git diff --stat main..HEAD -- contract/ uticen_lite/schema/`
 Expected: EMPTY — no change to `contract/bundle.schema.json` or the bundle schema (cardinal rule; the change is render+store-only).
 
 - [ ] **Step 4: If anything failed, fix and re-run; otherwise the branch is ready for the whole-branch review.**

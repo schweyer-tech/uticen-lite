@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import pathlib
 
-from controlflow_sdk.model.control import ControlDef, FrameworkRefs
-from controlflow_sdk.rules.render_rule import rule_to_text
-from controlflow_sdk.rules.resolve import resolve_test_code
-from controlflow_sdk.rules.spec import parse_rule_spec
+from uticen_lite.model.control import ControlDef, FrameworkRefs
+from uticen_lite.rules.render_rule import rule_to_text
+from uticen_lite.rules.resolve import resolve_test_code
+from uticen_lite.rules.spec import parse_rule_spec
 
 _RULE_SPEC = {
     "logic": "all",

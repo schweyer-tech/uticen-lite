@@ -14,7 +14,7 @@ from __future__ import annotations
 import io
 import json
 
-from controlflow_sdk.pipeline.lint import OFFRAMP_MESSAGE
+from uticen_lite.pipeline.lint import OFFRAMP_MESSAGE
 
 # The offramp message is HTML-escaped in the rendered page (the apostrophe in
 # "can't" becomes &#39;), so assert on an escaping-stable substring of it.
@@ -29,7 +29,7 @@ def _make_source(client, sid, csv):
 
 
 def _conn(client):
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store.db import connect
     return connect(client.app.state.project_root)
 
 
@@ -53,7 +53,7 @@ def test_save_pure_pipeline_derives_sources_and_compiles_to_rule_spec(client):
                        follow_redirects=False)
     assert resp.status_code in (302, 303)
 
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "pipe1")
     conn.close()
@@ -96,7 +96,7 @@ def test_save_cross_source_pipeline_compiles_to_test_code(client):
                        follow_redirects=False)
     assert resp.status_code in (302, 303)
 
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "pipe2")
     conn.close()
@@ -139,7 +139,7 @@ def test_save_cross_source_pipeline_ignores_placeholder_filter_condition(client)
                        follow_redirects=False)
     assert resp.status_code in (302, 303)
 
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "pipe2b")
     conn.close()
@@ -185,7 +185,7 @@ def test_save_rejects_custom_node_that_reads_a_file(client):
     assert resp.status_code == 422
     assert _OFFRAMP_STABLE in resp.text
     # The control shell exists but the unsafe pipeline was NOT persisted.
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "bad1")
     conn.close()
@@ -200,7 +200,7 @@ def test_save_rejects_custom_node_using_read_csv(client):
     assert resp.status_code == 422
     assert "read_csv" in resp.text
     assert _OFFRAMP_STABLE in resp.text
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "bad2")
     conn.close()
@@ -213,7 +213,7 @@ def test_save_rejects_custom_node_using_dunder_import(client):
                           _custom_pipeline("m = __import__('os')\nrows = rows"))
     assert resp.status_code == 422
     assert "__import__" in resp.text
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "bad3")
     conn.close()
@@ -226,7 +226,7 @@ def test_save_rejects_custom_node_using_eval(client):
                           _custom_pipeline("rows = eval('rows')"))
     assert resp.status_code == 422
     assert "eval" in resp.text
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "bad4")
     conn.close()
@@ -240,7 +240,7 @@ def test_save_accepts_clean_custom_transform_node(client):
     resp = _post_pipeline(client, "ok1", graph)
     # A clean rows→rows node saves normally (303 redirect to the control).
     assert resp.status_code in (302, 303)
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "ok1")
     conn.close()
@@ -299,7 +299,7 @@ def test_save_single_import_test_with_not_exists_in_binds_both_sources(client):
                        follow_redirects=False)
     assert resp.status_code in (302, 303), f"save failed: {resp.status_code} {resp.text[:200]}"
 
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "cross1")
     conn.close()
@@ -420,7 +420,7 @@ def test_save_pipeline_with_blank_condition_placeholder_does_not_500(client):
         f"blank condition 500 regression: {resp.text[:300]}"
     )
 
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "blank1")
     conn.close()
@@ -473,7 +473,7 @@ def test_autosave_returns_fragment_not_redirect(client):
     assert "pipe-insert" in resp.text, "expected pipe-cards fragment in autosave response"
 
     # The control MUST still be persisted after autosave.
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "as1")
     conn.close()
@@ -505,7 +505,7 @@ def test_autosave_validation_error_returns_422_not_redirect(client):
     assert _OFFRAMP_STABLE in resp.text
 
     # The pipeline must NOT be persisted after a failed autosave.
-    from controlflow_sdk.store import repo
+    from uticen_lite.store import repo
     conn = _conn(client)
     c = repo.get_control(conn, "as2")
     conn.close()

@@ -30,8 +30,8 @@ def test_save_column_mapping(client):
     }, follow_redirects=False)
     assert resp.status_code in (302, 303)
     # persisted
-    from controlflow_sdk.store import repo
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store import repo
+    from uticen_lite.store.db import connect
     conn = connect(client.app.state.project_root)
     src = repo.get_source(conn, "tx")
     conn.close()
@@ -58,8 +58,8 @@ def test_save_source_metadata_persists(client):
     }, follow_redirects=False)
     assert resp.status_code in (302, 303)
 
-    from controlflow_sdk.store import repo
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store import repo
+    from uticen_lite.store.db import connect
     conn = connect(client.app.state.project_root)
     src = repo.get_source(conn, "invoices")
     conn.close()
@@ -115,8 +115,8 @@ def test_refresh_same_columns_archives_and_preserves_mapping(client):
                        data={"pending": "tx.csv"}, follow_redirects=False)
     assert resp.status_code in (302, 303)
 
-    from controlflow_sdk.store import repo
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store import repo
+    from uticen_lite.store.db import connect
     root = client.app.state.project_root
     conn = connect(root)
     src = repo.get_source(conn, "tx")
@@ -148,8 +148,8 @@ def test_refresh_diff_columns_reconciles_after_confirm(client):
     client.post("/sources/acc/refresh/confirm",
                 data={"pending": "acc.csv"}, follow_redirects=False)
 
-    from controlflow_sdk.store import repo
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store import repo
+    from uticen_lite.store.db import connect
     conn = connect(client.app.state.project_root)
     src = repo.get_source(conn, "acc")
     conn.close()
@@ -179,8 +179,8 @@ def test_create_records_current_file_with_asof(client):
                                    "as_of_date": "2026-05-01"},
                 files={"file": ("inv.csv", io.BytesIO(b"a\n1\n"), "text/csv")},
                 follow_redirects=False)
-    from controlflow_sdk.store import repo
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store import repo
+    from uticen_lite.store.db import connect
     conn = connect(client.app.state.project_root)
     cur = repo.get_current_file(conn, "inv")
     assert cur["as_of_date"] == "2026-05-01" and cur["original_name"] == "inv.csv"
@@ -199,8 +199,8 @@ def test_refresh_confirm_records_new_version_with_asof(client):
     client.post("/sources/tx/refresh/confirm",
                 data={"pending": "tx.csv", "as_of_date": "2026-06-30"},
                 follow_redirects=False)
-    from controlflow_sdk.store import repo
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store import repo
+    from uticen_lite.store.db import connect
     conn = connect(client.app.state.project_root)
     files = repo.list_source_files(conn, "tx")
     assert len(files) == 2  # initial + refreshed
@@ -239,8 +239,8 @@ def test_data_tab_asof_edit_syncs(client):
                 follow_redirects=False)
     client.post("/sources/z/data/asof", data={"as_of_date": "2026-07-07"},
                 follow_redirects=False)
-    from controlflow_sdk.store import repo
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store import repo
+    from uticen_lite.store.db import connect
     conn = connect(client.app.state.project_root)
     assert repo.get_current_file(conn, "z")["as_of_date"] == "2026-07-07"
     assert repo.get_source(conn, "z")["extract_date"] == "2026-07-07"
@@ -320,8 +320,8 @@ def test_blank_title_clears_to_none(client):
     client.post("/sources/s", data={"title": "   ", "display_name__a": "A",
                                      "data_type__a": "text", "include__a": "on"},
                 follow_redirects=False)
-    from controlflow_sdk.store import repo
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store import repo
+    from uticen_lite.store.db import connect
     conn = connect(client.app.state.project_root)
     assert repo.get_source(conn, "s")["title"] is None
     conn.close()

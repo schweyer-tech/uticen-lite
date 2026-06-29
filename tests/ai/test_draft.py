@@ -11,9 +11,9 @@ import json
 
 import pytest
 
-from controlflow_sdk import ai
-from controlflow_sdk.ai.draft import RULE_SPEC_JSON_SCHEMA, DraftError, draft_and_validate
-from controlflow_sdk.rules.spec import OPERATORS, RuleSpecError, parse_rule_spec
+from uticen_lite import ai
+from uticen_lite.ai.draft import RULE_SPEC_JSON_SCHEMA, DraftError, draft_and_validate
+from uticen_lite.rules.spec import OPERATORS, RuleSpecError, parse_rule_spec
 
 # A 2-row sample (≥2 rows per learning 0004): one row trips the rule, one doesn't.
 _SCHEMA = [
@@ -42,7 +42,7 @@ def _fake_provider(spec: dict):
 
 def _patch_provider(monkeypatch, spec: dict) -> None:
     monkeypatch.setattr(
-        "controlflow_sdk.ai.draft.get_provider", lambda provider: _fake_provider(spec)
+        "uticen_lite.ai.draft.get_provider", lambda provider: _fake_provider(spec)
     )
 
 

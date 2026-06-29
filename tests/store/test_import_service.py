@@ -2,16 +2,16 @@ from pathlib import Path
 
 import pytest
 
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.import_service import (
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.import_service import (
     demo_source_dir,
     import_project,
     load_demo,
     reset_to_demo,
 )
-from controlflow_sdk.store.migrations import migrate
-from controlflow_sdk.store.run_service import run_control_in_store
+from uticen_lite.store.migrations import migrate
+from uticen_lite.store.run_service import run_control_in_store
 
 
 def _fresh_store(tmp_path: Path):
@@ -129,7 +129,7 @@ def test_reset_to_demo_clears_stale_data_files(tmp_path: Path):
 
 
 def test_demo_source_dir_missing_raises(monkeypatch, tmp_path: Path):
-    import controlflow_sdk.store.import_service as mod
+    import uticen_lite.store.import_service as mod
 
     # Point both candidate locations at a directory that does not exist.
     monkeypatch.setattr(mod, "__file__", str(tmp_path / "store" / "import_service.py"))

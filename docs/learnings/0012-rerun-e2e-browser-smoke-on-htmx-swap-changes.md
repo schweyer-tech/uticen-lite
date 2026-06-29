@@ -66,7 +66,7 @@ attribute's new home, don't just delete it.) DOM-hook member of the fan-out-audi
 - `tests/e2e/test_smoke.py` — the browser gate (issue #13).
 - `tests/e2e/test_multi_procedure.py` — the 2026-06-28 recurrence: aggregation/render-semantic
   changes (item-key dedupe; `{code} · {title}` headings) made its count/heading assertions stale.
-- `controlflow_sdk/plane/templates/partials/rule_builder.html` — the `hx-get` / `hx-target` /
+- `uticen_lite/plane/templates/partials/rule_builder.html` — the `hx-get` / `hx-target` /
   `hx-swap` wiring whose behaviour change triggered this.
 - Builds on [0007](0007-control-plane-editors-are-server-rendered-sub-route-tabs.md)
   (server-rendered HTMX sub-routes) and shares the spirit of

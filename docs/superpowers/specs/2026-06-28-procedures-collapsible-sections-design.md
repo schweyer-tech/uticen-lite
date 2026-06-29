@@ -57,7 +57,7 @@ Unchanged: `ProcedureDef` / `Pipeline.procedures`, `procedure_id` on Test nodes,
 `schema/bundle.schema.json` + `contract/bundle.schema.json`, and the store schema. The only **new
 logic** is one pure, pandas-free grouping helper; everything else is `plane/` templates, routes, CSS,
 and JS. This keeps the cardinal rule trivially satisfied (learning
-[0001](../../learnings/0001-stay-compatible-with-the-controlflow-app.md)): the contract gate
+[0001](../../learnings/0001-stay-compatible-with-the-uticen-app.md)): the contract gate
 (`tests/test_contract_export.py` + `tests/schema/test_bundle_schema.py`) is untouched because no
 bundle producer changes.
 

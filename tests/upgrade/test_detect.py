@@ -1,4 +1,4 @@
-from controlflow_sdk.upgrade.detect import InstallMethod, classify_install
+from uticen_lite.upgrade.detect import InstallMethod, classify_install
 
 
 def test_editable_with_git_is_git_editable():
@@ -12,12 +12,12 @@ def test_editable_without_git_is_unknown():
 
 
 def test_pipx_prefix_is_pipx():
-    prefix = "/home/u/.local/pipx/venvs/controlflow-sdk"
+    prefix = "/home/u/.local/pipx/venvs/uticen-lite"
     assert classify_install(None, prefix, False) is InstallMethod.PIPX
 
 
 def test_windows_pipx_prefix_is_pipx():
-    prefix = r"C:\Users\u\pipx\venvs\controlflow-sdk"
+    prefix = r"C:\Users\u\pipx\venvs\uticen-lite"
     assert classify_install(None, prefix, False) is InstallMethod.PIPX
 
 

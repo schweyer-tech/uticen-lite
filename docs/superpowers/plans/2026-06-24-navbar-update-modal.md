@@ -13,9 +13,9 @@
 ### Task 1: Replacing the hover popover with a tooltip-driven modal trigger
 
 **Files:**
-- Modify: `controlflow_sdk/plane/templates/partials/header_update_indicator.html`
-- Modify: `controlflow_sdk/plane/templates/base.html:51-78`
-- Modify: `controlflow_sdk/plane/static/app.css:555-620`
+- Modify: `uticen_lite/plane/templates/partials/header_update_indicator.html`
+- Modify: `uticen_lite/plane/templates/base.html:51-78`
+- Modify: `uticen_lite/plane/static/app.css:555-620`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -25,11 +25,11 @@ def test_header_indicator_renders_tooltip_and_modal_trigger(client, monkeypatch)
     repo.set_check_updates_on_launch(conn, True)
     conn.close()
     monkeypatch.setattr(
-        "controlflow_sdk.plane.routes.updates.detect_install",
+        "uticen_lite.plane.routes.updates.detect_install",
         lambda: InstallMethod.PIP,
     )
     monkeypatch.setattr(
-        "controlflow_sdk.plane.routes.updates.check_for_update",
+        "uticen_lite.plane.routes.updates.check_for_update",
         lambda method: UpdateInfo(method, "0.1.0", "0.2.0", True, "Version 0.2.0 is available."),
     )
     resp = client.get("/updates/indicator")
@@ -120,7 +120,7 @@ Expected: PASS with the modal trigger and tooltip attributes present, and no hov
 - [ ] **Step 5: Commit**
 
 ```bash
-git add controlflow_sdk/plane/templates/partials/header_update_indicator.html controlflow_sdk/plane/templates/base.html controlflow_sdk/plane/static/app.css
+git add uticen_lite/plane/templates/partials/header_update_indicator.html uticen_lite/plane/templates/base.html uticen_lite/plane/static/app.css
 git commit -m "Make header update indicator open a modal" -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 ```
 

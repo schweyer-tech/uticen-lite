@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import pandas as pd
 
-from controlflow_sdk.pipeline.model import parse_pipeline
-from controlflow_sdk.pipeline.rowcounts import RowCountError, compute_row_counts
+from uticen_lite.pipeline.model import parse_pipeline
+from uticen_lite.pipeline.rowcounts import RowCountError, compute_row_counts
 
 
 def _terminated_access_graph() -> dict:

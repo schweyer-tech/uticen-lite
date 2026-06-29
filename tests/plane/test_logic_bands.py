@@ -10,15 +10,15 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from controlflow_sdk.pipeline.model import parse_pipeline
-from controlflow_sdk.plane.routes.pipeline import (
+from uticen_lite.pipeline.model import parse_pipeline
+from uticen_lite.plane.routes.pipeline import (
     _card_bands,
     _card_vm,
     _diagram,
     _procedure_context,
 )
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
 
 
 def _vms(pipeline):

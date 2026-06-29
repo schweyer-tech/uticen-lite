@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from controlflow_sdk.model.run import RunRecord
-from controlflow_sdk.model.violation import Violation
-from controlflow_sdk.model.workpaper import Procedure, ProcedureSpec, Workpaper
+from uticen_lite.model.run import RunRecord
+from uticen_lite.model.violation import Violation
+from uticen_lite.model.workpaper import Procedure, ProcedureSpec, Workpaper
 
 
 def _proc() -> Procedure:
@@ -39,7 +39,7 @@ def test_to_dict_emits_code_and_assertion():
 
 
 def test_html_renders_code_assertion_and_checks():
-    from controlflow_sdk.render.html import render_html
+    from uticen_lite.render.html import render_html
 
     wp = Workpaper(
         control_id="gl1",
@@ -56,7 +56,7 @@ def test_html_renders_code_assertion_and_checks():
 
 
 def test_markdown_renders_code_assertion_and_checks():
-    from controlflow_sdk.render.markdown import render_markdown
+    from uticen_lite.render.markdown import render_markdown
 
     wp = Workpaper(
         control_id="gl1",
@@ -116,7 +116,7 @@ def test_assemble_procedures_threads_code_assertion():
 
 def test_code_assertion_empty_no_extra_html_lines():
     """When code/assertion are empty, N==1 HTML must be byte-identical (no new lines)."""
-    from controlflow_sdk.render.html import render_html
+    from uticen_lite.render.html import render_html
 
     run = RunRecord(
         control_id="c1", executed_at="t", population_size=10, violations=[]
@@ -144,8 +144,8 @@ def test_lone_auto_code_empty_heading_is_legacy_form():
     produce 'P1: title' in both HTML and Markdown — NOT the 'P1 · title' middot form
     that a non-empty code would generate.
     """
-    from controlflow_sdk.render.html import render_html
-    from controlflow_sdk.render.markdown import render_markdown
+    from uticen_lite.render.html import render_html
+    from uticen_lite.render.markdown import render_markdown
 
     run = RunRecord(
         control_id="c1", executed_at="t", population_size=10, violations=[]

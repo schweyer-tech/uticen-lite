@@ -1,6 +1,6 @@
 import pandas as pd
 
-from controlflow_sdk.model.population import ColumnMeta, Population
+from uticen_lite.model.population import ColumnMeta, Population
 
 
 def _pop():

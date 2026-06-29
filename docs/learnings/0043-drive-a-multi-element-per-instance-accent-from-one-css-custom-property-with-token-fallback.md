@@ -55,8 +55,8 @@ For a **dynamic, per-instance accent colour that more than one sub-element must 
 
 ## Reference
 
-- `controlflow_sdk/plane/templates/partials/_pipe_cards.html` — `<details class="proc-section" style="--proc:…">`.
-- `controlflow_sdk/plane/static/app.css` — `.proc-section` stripe + `.proc-head .proc-code-chip` tint/wash off `var(--proc, …)`.
-- `controlflow_sdk/plane/templates/logic_builder.html` — `newProcedureSection()` sets no `--proc` (documented neutral fallback).
-- `controlflow_sdk/plane/routes/pipeline.py` — `_PROC_PALETTE` / position-ordered colour assignment.
+- `uticen_lite/plane/templates/partials/_pipe_cards.html` — `<details class="proc-section" style="--proc:…">`.
+- `uticen_lite/plane/static/app.css` — `.proc-section` stripe + `.proc-head .proc-code-chip` tint/wash off `var(--proc, …)`.
+- `uticen_lite/plane/templates/logic_builder.html` — `newProcedureSection()` sets no `--proc` (documented neutral fallback).
+- `uticen_lite/plane/routes/pipeline.py` — `_PROC_PALETTE` / position-ordered colour assignment.
 - Kin: [[0005]] (route colours through tokens + theming) and [[0032]] (keep the component selector out-specifying the global input block).

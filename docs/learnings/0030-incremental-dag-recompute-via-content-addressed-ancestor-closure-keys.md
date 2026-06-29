@@ -44,9 +44,9 @@ an upstream node recomputes its descendants; a changed source version busts the 
 
 ## Reference
 
-- `controlflow_sdk/pipeline/materialize.py` (`_step_keys` / `_ancestor_closure` / `_canonical_node`; the
+- `uticen_lite/pipeline/materialize.py` (`_step_keys` / `_ancestor_closure` / `_canonical_node`; the
   `recompute = {keys not in cache}` + seed split; LRU bound `_CACHE_MAX`).
-- `controlflow_sdk/plane/routes/pipeline.py` (`_source_versions` = path+mtime+size token; process-wide
+- `uticen_lite/plane/routes/pipeline.py` (`_source_versions` = path+mtime+size token; process-wide
   `_STEP_CACHE`; `_materialize_full`).
 - `tests/pipeline/test_materialize.py` (`test_cache_recomputes_only_edited_step_onward`,
   `test_step_keys_change_for_edited_node_and_descendants_only`, `test_source_version_change_busts_every_key`).

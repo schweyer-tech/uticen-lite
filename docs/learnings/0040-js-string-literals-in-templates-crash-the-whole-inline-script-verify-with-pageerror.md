@@ -75,9 +75,9 @@ Consequences:
 
 ## Reference
 
-- `controlflow_sdk/plane/templates/logic_builder.html` — `newProcedureSection()` inline
+- `uticen_lite/plane/templates/logic_builder.html` — `newProcedureSection()` inline
   `<script>` DOM-by-concatenation; the tooltip `title` whose `\\'`→`\'` fix unbroke it.
-- `controlflow_sdk/plane/templates/partials/_pipe_cards.html` — the server-rendered twin
+- `uticen_lite/plane/templates/partials/_pipe_cards.html` — the server-rendered twin
   (plain single quotes; no JS escaping needed).
 - `tests/e2e/test_smoke.py` — the browser gate that caught the crash; add a
   `page.on('pageerror')` assertion for inline-script changes.

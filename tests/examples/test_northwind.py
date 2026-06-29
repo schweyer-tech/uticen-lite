@@ -12,11 +12,11 @@ import shutil
 import zipfile
 from pathlib import Path
 
-from controlflow_sdk.cli import main
-from controlflow_sdk.cli.import_cmd import import_cmd
-from controlflow_sdk.schema.validate import validate_bundle
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
+from uticen_lite.cli import main
+from uticen_lite.cli.import_cmd import import_cmd
+from uticen_lite.schema.validate import validate_bundle
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -53,7 +53,7 @@ def test_northwind_runs_and_builds(tmp_path: Path) -> None:
     shutil.copytree(str(EXAMPLE_DIR / "data"), str(into / "data"))
 
     # 1. Run at deterministic snapshot ------------------------------------------
-    assert main(["run", str(into), "--at", AT]) == 0, "cflow run failed"
+    assert main(["run", str(into), "--at", AT]) == 0, "uticen-lite run failed"
 
     # 2. Assert per-control failed counts from the store -------------------------
     conn = connect(into)
@@ -94,7 +94,8 @@ def test_northwind_runs_and_builds(tmp_path: Path) -> None:
 
     # 3. Build bundle -----------------------------------------------------------
     out = into / "bundle.zip"
-    assert main(["build", str(into), "--out", str(out), "--at", AT]) == 0, "cflow build failed"
+    rc = main(["build", str(into), "--out", str(out), "--at", AT])
+    assert rc == 0, "uticen-lite build failed"
     assert out.exists(), "bundle.zip was not created"
 
     # 4. Validate bundle manifest -----------------------------------------------

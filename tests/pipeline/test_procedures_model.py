@@ -1,5 +1,5 @@
-from controlflow_sdk.pipeline.model import parse_pipeline
-from controlflow_sdk.pipeline.procedures import (
+from uticen_lite.pipeline.model import parse_pipeline
+from uticen_lite.pipeline.procedures import (
     derived_membership,
     effective_procedures,
     tests_for_procedure,

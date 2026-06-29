@@ -26,7 +26,7 @@ route returns empty **before any network path** — no call. The egress claim wa
 settings hint): "zero network egress **by default** … except an **opt-in** update check you can leave
 off." The OFF invariant is proved by a **call-counter test**: a spy on the network function asserts it
 ran **0 times** when the toggle is OFF (`test_badge_empty_when_toggle_off`), not merely that the badge
-was empty. Explicit user actions ("Check now", `cflow upgrade --check`) may reach the network; only the
+was empty. Explicit user actions ("Check now", `uticen-lite upgrade --check`) may reach the network; only the
 proactive/background path is toggle-gated.
 
 ## The rule
@@ -42,8 +42,8 @@ silent ones may not.
 
 ## Reference
 
-- `controlflow_sdk/plane/routes/updates.py` (`GET /updates/badge` returns empty before any check when
+- `uticen_lite/plane/routes/updates.py` (`GET /updates/badge` returns empty before any check when
   the toggle is OFF; `POST /settings/updates/check` is the explicit-action path that may egress).
-- `controlflow_sdk/store/repo.py` (`get/set_check_updates_on_launch`, default False, in `project.system`).
+- `uticen_lite/store/repo.py` (`get/set_check_updates_on_launch`, default False, in `project.system`).
 - `tests/plane/test_dashboard_upgrade.py::test_badge_empty_when_toggle_off` (asserts the check ran 0×).
 - Reworded claim: `README.md`, `docs/INSTALL.md`.

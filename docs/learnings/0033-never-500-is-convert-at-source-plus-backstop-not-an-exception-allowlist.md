@@ -41,7 +41,7 @@ listing exception types:
    loop **and** the `rule_spec` evaluation path in `try/except` that raises `RunnerError`
    (mirror the existing author-callable wrap; reuse `_clean_traceback_summary`). Then
    author/data failures carry one documented type across **both** the web app and
-   `cflow run`.
+   `uticen-lite run`.
 2. **Backstop at the boundary (route).** In the run `POST`, after the typed `except`, add a
    final `except Exception` that `logging.getLogger(__name__).exception(...)`s (so real
    server bugs stay visible) and renders the friendly page — never a 500. Wrap `run_view`
@@ -60,8 +60,8 @@ state ships a one-click factory reset (Settings ▸ "Reset to demo data" →
 
 ## Reference
 
-- `controlflow_sdk/runner/execute.py` — `run_control` source-load + `rule_spec` wraps → `RunnerError`.
-- `controlflow_sdk/plane/routes/runs.py` — run `POST` logged backstop + `run_view` guard.
-- `controlflow_sdk/store/import_service.py` — `reset_to_demo`.
+- `uticen_lite/runner/execute.py` — `run_control` source-load + `rule_spec` wraps → `RunnerError`.
+- `uticen_lite/plane/routes/runs.py` — run `POST` logged backstop + `run_view` guard.
+- `uticen_lite/store/import_service.py` — `reset_to_demo`.
 - Tests: `tests/runner/test_execute.py`, `tests/plane/test_run_button.py`, `tests/plane/test_settings_reset.py`.
 - Commit 72cd875. Extends [[0013]]; relates to [[0011]].

@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib.resources
 import json
 
-from controlflow_sdk.schema.validate import validate_bundle
+from uticen_lite.schema.validate import validate_bundle
 
 # ---------------------------------------------------------------------------
 # Minimal valid bundle fixture
@@ -186,7 +186,7 @@ def test_procedure_with_code_and_assertion_validates():
 def test_procedure_required_fields_unchanged():
     """procedure.required stays [title, narrative, test_code, result]; code/assertion optional."""
     schema_bytes = (
-        importlib.resources.files("controlflow_sdk.schema")
+        importlib.resources.files("uticen_lite.schema")
         .joinpath("bundle.schema.json")
         .read_bytes()
     )

@@ -1,8 +1,8 @@
-# ControlFlow SDK Contract Policy
+# Uticen SDK Contract Policy
 
 ## Overview
 
-This document defines the versioning and compatibility contract for the ControlFlow SDK package and its exported bundle schema. The contract ensures forward compatibility, reproducible audits, and safe evolution across the SDK and the ControlFlow application.
+This document defines the versioning and compatibility contract for the Uticen SDK package and its exported bundle schema. The contract ensures forward compatibility, reproducible audits, and safe evolution across the SDK and the Uticen application.
 
 ## Package Versioning (Semantic Versioning)
 
@@ -13,7 +13,7 @@ The SDK package itself follows **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 - **PATCH** — Incremented on bug fixes and internal improvements with no API changes
 
 Examples:
-- `0.1.0` → `0.2.0` — Add `cflow export` command (new feature)
+- `0.1.0` → `0.2.0` — Add `uticen-lite export` command (new feature)
 - `0.1.0` → `0.1.1` — Fix validation error message (bug fix)
 - `0.1.0` → `1.0.0` — Remove deprecated `runner` module (breaking change)
 
@@ -61,12 +61,12 @@ Violations:
 Any breaking change to the bundle schema **must**:
 
 1. **Increment `schema_version` MAJOR** (e.g., `1.x` → `2.0`)
-2. **Require a coordinated release** of both the SDK **and** the ControlFlow application
+2. **Require a coordinated release** of both the SDK **and** the Uticen application
 3. **Be documented** in `CHANGELOG.md` with migration guidance
 
 Example: Removing the `framework_refs` field from controls would require:
 - SDK version `2.0.0` with `schema_version: "2.0"`
-- ControlFlow application updated to validate `schema_version >= "2.0"` and interpret bundles without `framework_refs`
+- Uticen application updated to validate `schema_version >= "2.0"` and interpret bundles without `framework_refs`
 
 ## CI Parity Test: Bundle Schema Export
 
@@ -77,29 +77,29 @@ def test_contract_is_byte_identical_to_packaged_schema() -> None:
     """contract/bundle.schema.json must match the packaged schema."""
 ```
 
-This test **gates every commit**: if the canonical schema in `controlflow_sdk/schema/bundle.schema.json` drifts from `contract/bundle.schema.json`, the build fails and the developer must run `python scripts/export_contract.py` to regenerate the contract file.
+This test **gates every commit**: if the canonical schema in `uticen_lite/schema/bundle.schema.json` drifts from `contract/bundle.schema.json`, the build fails and the developer must run `python scripts/export_contract.py` to regenerate the contract file.
 
-**Purpose**: Prevents silent schema drift. The `contract/` folder is the single source of truth for external consumers (the ControlFlow app) to vendor.
+**Purpose**: Prevents silent schema drift. The `contract/` folder is the single source of truth for external consumers (the Uticen app) to vendor.
 
-## ControlFlow App Integration
+## Uticen App Integration
 
-The ControlFlow application pins a specific SDK version and bundles the matching schema at that version. The pinning workflow:
+The Uticen application pins a specific SDK version and bundles the matching schema at that version. The pinning workflow:
 
-### 1. Initial Pinning (ControlFlow Setup)
+### 1. Initial Pinning (Uticen Setup)
 
-When ControlFlow adopts SDK version `0.1.0`:
+When Uticen adopts SDK version `0.1.0`:
 
 ```bash
 # Download the SDK
-pip install controlflow-sdk==0.1.0
+pip install uticen-lite==0.1.0
 
 # Vendor the schema into the app (one-time or per-version)
-cp node_modules/controlflow-sdk/contract/bundle.schema.json \
+cp node_modules/uticen-lite/contract/bundle.schema.json \
    src/lib/bundle-schema-0.1.0.json
 
 # Record the SDK version and commit SHA for reference
 echo "SDK version: 0.1.0" >> docs/SDK_PINNING.md
-echo "Commit: abc123def456 (controlflow-sdk)" >> docs/SDK_PINNING.md
+echo "Commit: abc123def456 (uticen-lite)" >> docs/SDK_PINNING.md
 ```
 
 ### 2. On SDK Patch/Minor Version Updates
@@ -114,31 +114,31 @@ If the SDK releases `0.1.1` (patch) or `0.2.0` (minor) **without breaking change
 
 If the SDK releases `1.0.0` or increments `schema_version` to `2.0`:
 
-- **New PR required**: Update ControlFlow to support both old and new schemas
+- **New PR required**: Update Uticen to support both old and new schemas
 - **Validation change**: Migrate bundle parsing to handle new schema
-- **Coordinated release**: Merge both SDK and ControlFlow changes to `main`, release together
-- **Vendor the new schema**: Copy the new `bundle.schema.json` into ControlFlow
+- **Coordinated release**: Merge both SDK and Uticen changes to `main`, release together
+- **Vendor the new schema**: Copy the new `bundle.schema.json` into Uticen
 - **Document migration**: Update `CHANGELOG.md` with the app-side changes required
 
-### 4. CI Parity Check (ControlFlow Side)
+### 4. CI Parity Check (Uticen Side)
 
-The ControlFlow app CI includes a check that verifies its vendored schema matches the pinned SDK version:
+The Uticen app CI includes a check that verifies its vendored schema matches the pinned SDK version:
 
 ```typescript
-// In ControlFlow CI (e.g., .github/workflows/pr-checks.yml)
+// In Uticen CI (e.g., .github/workflows/pr-checks.yml)
 it("vendored bundle schema matches SDK version", () => {
-  const pinned_version = packageJson.dependencies["controlflow-sdk"];
-  const sdk = require(`controlflow-sdk@${pinned_version}`);
+  const pinned_version = packageJson.dependencies["uticen-lite"];
+  const sdk = require(`uticen-lite@${pinned_version}`);
   const pinned_schema = require(`./src/lib/bundle-schema-${pinned_version}.json`);
-  const sdk_schema = require(`controlflow-sdk@${pinned_version}/contract/bundle.schema.json`);
+  const sdk_schema = require(`uticen-lite@${pinned_version}/contract/bundle.schema.json`);
   
   assert.deepStrictEqual(pinned_schema, sdk_schema, 
-    `Vendored schema for SDK ${pinned_version} has drifted. Regenerate with: npm install && cp node_modules/controlflow-sdk/contract/bundle.schema.json src/lib/bundle-schema-${pinned_version}.json`
+    `Vendored schema for SDK ${pinned_version} has drifted. Regenerate with: npm install && cp node_modules/uticen-lite/contract/bundle.schema.json src/lib/bundle-schema-${pinned_version}.json`
   );
 });
 ```
 
-If the check fails, the ControlFlow build blocks and the developer regenerates the vendored schema.
+If the check fails, the Uticen build blocks and the developer regenerates the vendored schema.
 
 ## Schema Evolution Example
 
@@ -148,7 +148,7 @@ If the check fails, the ControlFlow build blocks and the developer regenerates t
 
 1. SDK `0.1.x` adds `compliance_mapping: { [framework: string]: string[] }?` to the control $defs
 2. `schema_version` remains `"1.0"` (additive change)
-3. ControlFlow app continues parsing bundles without breaking; new bundles have the field and can use it
+3. Uticen app continues parsing bundles without breaking; new bundles have the field and can use it
 4. No app code changes required
 
 ### Scenario: Removing the `severity` field from violations
@@ -158,7 +158,7 @@ If the check fails, the ControlFlow build blocks and the developer regenerates t
 1. SDK `2.0.0` removes `severity` from the violation $defs
 2. `schema_version` increments to `"2.0"`
 3. `CHANGELOG.md` documents: "Breaking: removed `violation.severity` field. Apps must migrate to severity-free schemas or implement local post-processing."
-4. ControlFlow app must update:
+4. Uticen app must update:
    - Bundle parser to reject `schema_version < "2.0"` (or accept both with conditional logic)
    - Exception creation to not expect severity from bundles
    - Migration docs for existing bundles
@@ -171,7 +171,7 @@ If the check fails, the ControlFlow build blocks and the developer regenerates t
 - **`test_contract_export.py`** — Ensures `contract/bundle.schema.json` is byte-identical to the packaged schema (gates all commits)
 - **Schema validation tests** — Verify generated bundles match `schema_version` and all required fields
 
-### ControlFlow Tests
+### Uticen Tests
 
 - **Parity CI check** — Confirms vendored schema matches the pinned SDK version
 - **Bundle import tests** — Validate that real bundles round-trip correctly through the import pipeline

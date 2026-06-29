@@ -1,7 +1,7 @@
 # tests/store/test_repo_sources.py
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.migrations import migrate
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.migrations import migrate
 
 
 def _db(tmp_path):

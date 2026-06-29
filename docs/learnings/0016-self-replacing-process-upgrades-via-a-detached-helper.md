@@ -27,7 +27,7 @@ CREATE_NEW_PROCESS_GROUP` on Windows), flushes its "Upgrading…" response, then
 **self-contained, stdlib-only script that imports nothing from the package being replaced** — so the
 package can be swapped under it — and it **waits for the parent PID to fully exit** (`os.kill(pid, 0)`
 poll with a deadline backstop) before running the upgrade, logging to a file and writing a **one-shot
-status file** the next launch reads then deletes. The CLI (`cflow upgrade`) runs the same command
+status file** the next launch reads then deletes. The CLI (`uticen-lite upgrade`) runs the same command
 *inline* (no server to outlive, so no detach needed). `spawn`/`timer`/`popen` are injectable so tests
 never spawn a real process or kill the runner.
 
@@ -44,10 +44,10 @@ run inline — the detach dance is only for the process that must outlive its ow
 
 ## Reference
 
-- `controlflow_sdk/upgrade/spawn.py` (`_HELPER_SOURCE` stdlib-only helper; `spawn_detached_upgrade`,
+- `uticen_lite/upgrade/spawn.py` (`_HELPER_SOURCE` stdlib-only helper; `spawn_detached_upgrade`,
   `schedule_shutdown`, one-shot `read_status`).
-- `controlflow_sdk/upgrade/detect.py` + `command.py` (install-method-aware command builder).
-- `controlflow_sdk/plane/routes/updates.py` (`POST /upgrade` flushes the page, spawns, schedules
-  shutdown) and `controlflow_sdk/cli/upgrade_cmd.py` (inline path).
-- `tests/upgrade/test_spawn.py` (helper compiles + imports no `controlflow_sdk`; popen/timer injected).
+- `uticen_lite/upgrade/detect.py` + `command.py` (install-method-aware command builder).
+- `uticen_lite/plane/routes/updates.py` (`POST /upgrade` flushes the page, spawns, schedules
+  shutdown) and `uticen_lite/cli/upgrade_cmd.py` (inline path).
+- `tests/upgrade/test_spawn.py` (helper compiles + imports no `uticen_lite`; popen/timer injected).
 - Manual-verification checklist: `docs/superpowers/specs/2026-06-22-control-plane-upgrade-design.md`.

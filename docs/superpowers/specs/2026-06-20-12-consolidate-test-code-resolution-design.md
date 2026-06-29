@@ -14,14 +14,14 @@
 ## Design
 
 ### Import-graph confirmation (why `rules/`)
-- `controlflow_sdk/rules/render_rule.py` imports only from `rules/spec.py`. `rules/spec.py` imports only stdlib. So `rules/` has **no** dependency on `model/`, `bundle/`, or `store/`.
-- `model/control.py` imports **nothing** from `controlflow_sdk` (verified: `grep controlflow_sdk model/control.py` → none). Putting the resolver there would force `model → rules`, breaking the "model is a leaf data holder" invariant — rejected, as the locked decision anticipated.
-- `bundle/assemble.py` already does a lazy `from controlflow_sdk.rules.render_rule import rule_to_text` inside `_resolve_test_code`. `store/run_service.py` already imports `rule_to_text` + `parse_rule_spec` at module top. So both producers already depend on `rules/`; a resolver in `rules/` introduces **no new edges and no cycle**.
+- `uticen_lite/rules/render_rule.py` imports only from `rules/spec.py`. `rules/spec.py` imports only stdlib. So `rules/` has **no** dependency on `model/`, `bundle/`, or `store/`.
+- `model/control.py` imports **nothing** from `uticen_lite` (verified: `grep uticen_lite model/control.py` → none). Putting the resolver there would force `model → rules`, breaking the "model is a leaf data holder" invariant — rejected, as the locked decision anticipated.
+- `bundle/assemble.py` already does a lazy `from uticen_lite.rules.render_rule import rule_to_text` inside `_resolve_test_code`. `store/run_service.py` already imports `rule_to_text` + `parse_rule_spec` at module top. So both producers already depend on `rules/`; a resolver in `rules/` introduces **no new edges and no cycle**.
 
 The resolver takes a `ControlDef` but must not import `model/control.py` at module scope (would create `rules → model → (nothing)`, harmless, but we keep `rules/` a leaf to be safe and to avoid any future `model → rules` temptation). Use a `TYPE_CHECKING`-only import of `ControlDef` plus duck-typed attribute access (`control.test_code`, `getattr(control, "rule_spec", None)`, `control.test_path`) — exactly mirroring the current `_resolve_test_code`, which already uses `getattr` for `rule_spec`.
 
 ### Component: new shared resolver
-**Create `controlflow_sdk/rules/resolve.py`:**
+**Create `uticen_lite/rules/resolve.py`:**
 
 ```python
 """Single source of truth for resolving a control's test_code for output.
@@ -35,11 +35,11 @@ from __future__ import annotations
 import pathlib
 from typing import TYPE_CHECKING
 
-from controlflow_sdk.rules.render_rule import rule_to_text
-from controlflow_sdk.rules.spec import parse_rule_spec
+from uticen_lite.rules.render_rule import rule_to_text
+from uticen_lite.rules.spec import parse_rule_spec
 
 if TYPE_CHECKING:
-    from controlflow_sdk.model.control import ControlDef
+    from uticen_lite.model.control import ControlDef
 
 
 def resolve_test_code(control: ControlDef) -> str:
@@ -63,16 +63,16 @@ def resolve_test_code(control: ControlDef) -> str:
 This is the **byte-identical body** of the current `bundle/assemble.py::_resolve_test_code`, with the two lazy imports promoted to module top (safe — no cycle, confirmed above) and `rule_to_text`/`parse_rule_spec` imported once.
 
 ### Component: `bundle/assemble.py` — delegate
-- **Modify** `controlflow_sdk/bundle/assemble.py`:
+- **Modify** `uticen_lite/bundle/assemble.py`:
   - Delete the `_resolve_test_code` function (lines 115–134).
-  - Add module-top import: `from controlflow_sdk.rules.resolve import resolve_test_code`.
+  - Add module-top import: `from uticen_lite.rules.resolve import resolve_test_code`.
   - In `_build_control_block` (currently line 147) change `test_code = _resolve_test_code(control)` → `test_code = resolve_test_code(control)`.
-  - Update the `_build_control_block` docstring reference from `:func:`_resolve_test_code`` to `:func:`~controlflow_sdk.rules.resolve.resolve_test_code``.
+  - Update the `_build_control_block` docstring reference from `:func:`_resolve_test_code`` to `:func:`~uticen_lite.rules.resolve.resolve_test_code``.
   - Remove the now-unused `import pathlib` only if nothing else in the file uses it. **Verify before removing** (grep `pathlib` in the file) — keep it if still referenced, drop it if not (ruff will flag an unused import otherwise).
 
 ### Component: `store/run_service.py` — thin wrapper preserving "None → read-from-disk"
-- **Modify** `controlflow_sdk/store/run_service.py`:
-  - Replace the top imports `from controlflow_sdk.rules.render_rule import rule_to_text` and `from controlflow_sdk.rules.spec import parse_rule_spec` with `from controlflow_sdk.rules.resolve import resolve_test_code` (drop the two now-unused imports).
+- **Modify** `uticen_lite/store/run_service.py`:
+  - Replace the top imports `from uticen_lite.rules.render_rule import rule_to_text` and `from uticen_lite.rules.spec import parse_rule_spec` with `from uticen_lite.rules.resolve import resolve_test_code` (drop the two now-unused imports).
   - Replace the resolution block (current lines 53–61):
 
     ```python
@@ -119,11 +119,11 @@ _build_control_block                   (thin wrapper: short-circuits to None
 ```
 
 ### Files
-- **Create:** `controlflow_sdk/rules/resolve.py`
-- **Modify:** `controlflow_sdk/bundle/assemble.py`, `controlflow_sdk/store/run_service.py`
+- **Create:** `uticen_lite/rules/resolve.py`
+- **Modify:** `uticen_lite/bundle/assemble.py`, `uticen_lite/store/run_service.py`
 
 ### Gates
-After changes: `python -m pytest -q` (green + pristine), `python -m ruff check .` (watch for unused-import on `pathlib`/`rule_to_text`/`parse_rule_spec`), `python -m mypy controlflow_sdk` (the `TYPE_CHECKING` import of `ControlDef` keeps the annotation typed without a runtime edge).
+After changes: `python -m pytest -q` (green + pristine), `python -m ruff check .` (watch for unused-import on `pathlib`/`rule_to_text`/`parse_rule_spec`), `python -m mypy uticen_lite` (the `TYPE_CHECKING` import of `ControlDef` keeps the annotation typed without a runtime edge).
 
 ## Bundle / contract impact
 **UNCHANGED.** This is a pure code-movement refactor: the resolved `test_code` string is computed by byte-identical logic, the manifest shape is untouched, no `schema_version` bump, no `contract/bundle.schema.json` edit, no change to `assemble_bundle` / `bundle/archive.py` output. The bundle remains schema-valid because the only producer of the `test_code` field (`_build_control_block`) now calls a relocated function with the same body and same priority order. `tests/test_contract_export.py` and `tests/schema/test_bundle_schema.py` pass unchanged (they assert byte-identity of the schema file and validity of assembled manifests, neither of which this touches).
@@ -131,7 +131,7 @@ After changes: `python -m pytest -q` (green + pristine), `python -m ruff check .
 ## Testing
 TDD order: write/adjust the resolver unit tests first (they fail until `rules/resolve.py` exists), then refactor the two call sites, then confirm the existing producer tests stay green unchanged.
 
-**New unit tests — create `tests/rules/test_resolve.py`** (`from controlflow_sdk.rules.resolve import resolve_test_code`, build `ControlDef` via `controlflow_sdk.model.control`):
+**New unit tests — create `tests/rules/test_resolve.py`** (`from uticen_lite.rules.resolve import resolve_test_code`, build `ControlDef` via `uticen_lite.model.control`):
 - `test_inline_wins_over_rule_and_file` — control with `test_code="X"` AND `rule_spec={...}` AND `test_path=<file>` → returns `"X"` (locks the canonical inline-first priority; this is the case the two old sites disagreed on).
 - `test_rule_renders_to_text_when_no_inline` — `test_code=None`, `rule_spec` set → returns `rule_to_text(parse_rule_spec(rule_spec))`; assert `"Flag a record when ALL" in result`.
 - `test_file_read_when_no_inline_no_rule` — `test_code=None`, `rule_spec=None`, `test_path=<tmp .py file>` → returns the file's exact bytes-as-text (use `tmp_path`).
@@ -158,4 +158,4 @@ No new fixtures beyond `tmp_path`; reuse `ControlDef` construction patterns alre
 - **Risk: the contract test catches an accidental schema/file edit.** Mitigation: this refactor touches no schema file; if `tests/test_contract_export.py` ever fails, it means an unintended edit crept in — treat as a stop signal, not a regenerate-and-move-on.
 
 ## Resolved open questions (2026-06-20)
-- **`rules/__init__.py` re-export:** not added — callers use the full import path `from controlflow_sdk.rules.resolve import resolve_test_code`. Deferred as a non-goal.
+- **`rules/__init__.py` re-export:** not added — callers use the full import path `from uticen_lite.rules.resolve import resolve_test_code`. Deferred as a non-goal.

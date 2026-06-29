@@ -15,7 +15,7 @@ superseded_by: null
 A design spec for the multi-procedure demo cycle mandated a concrete test: "assert the new
 population `5` explicitly so the [17→5] shift is intentional." During planning, two spec
 assumptions were found wrong against the code (the demo `controlplane.db` is empty → no
-regeneration; `cflow build` already delegates to `export_service` → no code change), and the
+regeneration; `uticen-lite build` already delegates to `export_service` → no code change), and the
 plan added a "Corrections" section that called out those two **removed build steps** — but it
 silently omitted the spec's "assert population=5" **requirement** from every task. The
 implementer followed the plan faithfully, so the assertion never got written; the suite was
