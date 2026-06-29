@@ -1,6 +1,6 @@
 import json
 
-from controlflow_sdk.upgrade import spawn
+from uticen_lite.upgrade import spawn
 
 
 def test_status_roundtrip_then_clears(tmp_path):
@@ -15,9 +15,9 @@ def test_read_status_missing_is_none(tmp_path):
 
 
 def test_helper_source_is_self_contained():
-    # The detached helper must not import controlflow_sdk (the package may be
+    # The detached helper must not import uticen_lite (the package may be
     # replaced under it) and must be valid Python.
-    assert "import controlflow_sdk" not in spawn._HELPER_SOURCE
+    assert "import uticen_lite" not in spawn._HELPER_SOURCE
     compile(spawn._HELPER_SOURCE, "<helper>", "exec")
 
 
@@ -29,12 +29,12 @@ def test_spawn_writes_helper_and_invokes_popen(tmp_path):
         calls["kwargs"] = kwargs
         return object()
 
-    commands = [["pipx", "upgrade", "controlflow-sdk"]]
+    commands = [["pipx", "upgrade", "uticen-lite"]]
     helper = spawn.spawn_detached_upgrade(
         tmp_path,
         commands,
         current="0.1.0",
-        restart_command=["python", "-m", "controlflow_sdk.plane", "--project", str(tmp_path)],
+        restart_command=["python", "-m", "uticen_lite.plane", "--project", str(tmp_path)],
         popen=fake_popen,
     )
     assert helper.exists()
@@ -43,7 +43,7 @@ def test_spawn_writes_helper_and_invokes_popen(tmp_path):
     cfg = json.loads(calls["argv"][2])
     assert cfg["commands"] == commands
     assert cfg["restart_command"] == [
-        "python", "-m", "controlflow_sdk.plane", "--project", str(tmp_path)
+        "python", "-m", "uticen_lite.plane", "--project", str(tmp_path)
     ]
     assert cfg["from"] == "0.1.0"
     assert cfg["status"].endswith(spawn.STATUS_FILE)

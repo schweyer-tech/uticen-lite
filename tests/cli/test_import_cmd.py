@@ -1,9 +1,9 @@
 import argparse
 from pathlib import Path
 
-from controlflow_sdk.cli.import_cmd import import_cmd
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
+from uticen_lite.cli.import_cmd import import_cmd
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
 
 
 def test_import_northwind(tmp_path: Path):

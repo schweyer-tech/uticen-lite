@@ -6,10 +6,10 @@ import pathlib
 
 import pytest
 
-from controlflow_sdk.model.control import ControlDef, FrameworkRefs, Threshold
-from controlflow_sdk.model.run import RunRecord
-from controlflow_sdk.model.violation import Severity, Violation
-from controlflow_sdk.model.workpaper import Procedure, ProcedureSpec, Workpaper
+from uticen_lite.model.control import ControlDef, FrameworkRefs, Threshold
+from uticen_lite.model.run import RunRecord
+from uticen_lite.model.violation import Severity, Violation
+from uticen_lite.model.workpaper import Procedure, ProcedureSpec, Workpaper
 
 GENERATED_AT = "2026-06-16T00:00:00Z"
 TEST_PY_CONTENT = """\

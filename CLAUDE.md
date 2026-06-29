@@ -1,15 +1,15 @@
 # CLAUDE.md
 
-Guidance for Claude Code / agents working in **controlflow-sdk**. This repo is meant to be worked on
-**on its own** — do not assume the ControlFlow app repo is checked out alongside it.
+Guidance for Claude Code / agents working in **uticen-lite**. This repo is meant to be worked on
+**on its own** — do not assume the Uticen app repo is checked out alongside it.
 
 ## What this is
 
-`controlflow-sdk` is a standalone, Apache-2.0, pure-Python "dbt for controls". Consultants author
-full-population control tests locally and export an **import bundle** the ControlFlow SaaS app
+`uticen-lite` is a standalone, Apache-2.0, pure-Python "dbt for controls". Consultants author
+full-population control tests locally and export an **import bundle** the Uticen SaaS app
 imports 1:1. Two authoring surfaces, one engine:
 
-- **`cflow`** — the CLI: `cflow import` (YAML project → store), `cflow run`, `cflow build`, `cflow validate`.
+- **`uticen-lite`** — the CLI: `uticen-lite import` (YAML project → store), `uticen-lite run`, `uticen-lite build`, `uticen-lite validate`.
 - **`controlplane`** — a local SQLite-backed web app (`pip install '.[plane]'` → `controlplane`):
   FastAPI + HTMX, author in forms + a no-code rule builder (or a Python escape hatch), run
   full-population, view workpapers, export the bundle. SQLite (`controlplane.db`) is the source of
@@ -25,7 +25,7 @@ violations + render) · `plane/` (web app) · `runner/`,`render/`,`bundle/`,`mod
 - **Why it exists + scope/non-goals → [`STRATEGY.md`](STRATEGY.md).** Read it before brainstorming or
   planning a feature: proposals must fit the authoring-ladder north-star and respect the non-goals
   (the CCM loop, multi-tenancy, live connectors, and a general data tool are all out of scope — they
-  live in or belong to the ControlFlow SaaS).
+  live in or belong to the Uticen SaaS).
 - **What's shipped now → [`PRODUCT-MAP.md`](PRODUCT-MAP.md).** Present-state inventory; update it when
   a surface ships, changes, or is retired.
 - **What's next → GitHub issues** (the canonical roadmap). Priorities: **#9** no-code authoring
@@ -33,15 +33,15 @@ violations + render) · `plane/` (web app) · `runner/`,`render/`,`bundle/`,`mod
   **#12** test_code-resolution DRY, **#13** control-plane CI browser smoke test, **#14** run history.
 - **Bundle contract details → [`docs/CONTRACT.md`](docs/CONTRACT.md) + `contract/bundle.schema.json`.**
 
-## Cardinal rule — stay compatible with the ControlFlow app
+## Cardinal rule — stay compatible with the Uticen app
 
 **The bundle is the contract.** `contract/bundle.schema.json` is the single integration surface with
-the ControlFlow app (the app vendors/pins it). Any change that touches the bundle manifest must keep
+the Uticen app (the app vendors/pins it). Any change that touches the bundle manifest must keep
 it schema-valid — the gate is `tests/test_contract_export.py` + `tests/schema/test_bundle_schema.py`.
-All producers (`cflow build`, the web export) reuse `bundle/assemble.py` + `bundle/archive.py` — never
+All producers (`uticen-lite build`, the web export) reuse `bundle/assemble.py` + `bundle/archive.py` — never
 fork the shape. Never put raw population data in the bundle (trust boundary). To evolve the contract,
 bump `schema_version` and change the SDK schema AND the app's vendored copy together.
-**See [docs/learnings/0001](docs/learnings/0001-stay-compatible-with-the-controlflow-app.md).**
+**See [docs/learnings/0001](docs/learnings/0001-stay-compatible-with-the-uticen-app.md).**
 
 ## Learnings — read before you work
 
@@ -54,7 +54,7 @@ to `INDEX.md` (newest on top). Capture reusable RULES, not stories or one-off tr
 ## Dev workflow
 
 - Tests: `python -m pytest -q` (keep the suite green and output pristine — no stray warnings).
-- Lint/type gates: `python -m ruff check .` and `python -m mypy controlflow_sdk` must stay green.
+- Lint/type gates: `python -m ruff check .` and `python -m mypy uticen_lite` must stay green.
   ruff target `py311`, line-length 100. Python floor ≥3.11.
 - Install for development: `pip install -e ".[dev]"` (includes the `[plane]` web deps + test client).
   The web app needs the `[plane]` extra; `adapters` adds Parquet/Excel support.

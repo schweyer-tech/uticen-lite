@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from controlflow_sdk.pipeline.model import (
+from uticen_lite.pipeline.model import (
     Pipeline,
     PipelineError,
     parse_pipeline,

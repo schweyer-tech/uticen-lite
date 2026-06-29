@@ -4,7 +4,7 @@ import io
 
 import pandas as pd
 
-from controlflow_sdk.adapters import inspect
+from uticen_lite.adapters import inspect
 
 
 def _xlsx_bytes(sheets: dict[str, pd.DataFrame]) -> bytes:

@@ -2,8 +2,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
 
 
 def test_settings_page_has_reset_form(client: TestClient):

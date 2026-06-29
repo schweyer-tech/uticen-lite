@@ -39,8 +39,8 @@ artifact available** (a flat single-source pipeline → `rule_spec`, not generat
 
 ## Reference
 
-- `controlflow_sdk/pipeline/compile.py` (`compile_pipeline` → `rule_spec` | `test_code`).
-- `controlflow_sdk/store/migrations.py` (store schema 3→4: store-only `pipeline` column).
-- `controlflow_sdk/store/repo.py` (`upsert_control` `pipeline` kwarg; loader leaves it out of the bundle path).
+- `uticen_lite/pipeline/compile.py` (`compile_pipeline` → `rule_spec` | `test_code`).
+- `uticen_lite/store/migrations.py` (store schema 3→4: store-only `pipeline` column).
+- `uticen_lite/store/repo.py` (`upsert_control` `pipeline` kwarg; loader leaves it out of the bundle path).
 - Gates that stay green unchanged: `tests/test_contract_export.py`, `tests/schema/`.
 - Foundations: [[0001]] (cardinal), [[0006]] (store-only authoring state).

@@ -1,12 +1,12 @@
 from types import SimpleNamespace
 
-from controlflow_sdk.upgrade.check import (
+from uticen_lite.upgrade.check import (
     UpdateInfo,
     check_for_update,
     current_version,
     latest_version,
 )
-from controlflow_sdk.upgrade.detect import InstallMethod
+from uticen_lite.upgrade.detect import InstallMethod
 
 
 def test_current_version_is_a_string():
@@ -21,7 +21,7 @@ def test_latest_version_uses_injected_fetcher():
 
 def test_pip_update_available(monkeypatch):
     monkeypatch.setattr(
-        "controlflow_sdk.upgrade.check.current_version", lambda: "0.1.0"
+        "uticen_lite.upgrade.check.current_version", lambda: "0.1.0"
     )
     info = check_for_update(InstallMethod.PIP, fetch=lambda: "0.2.0")
     assert isinstance(info, UpdateInfo)
@@ -32,7 +32,7 @@ def test_pip_update_available(monkeypatch):
 
 def test_pip_up_to_date(monkeypatch):
     monkeypatch.setattr(
-        "controlflow_sdk.upgrade.check.current_version", lambda: "0.2.0"
+        "uticen_lite.upgrade.check.current_version", lambda: "0.2.0"
     )
     info = check_for_update(InstallMethod.PIP, fetch=lambda: "0.2.0")
     assert info.available is False
@@ -40,7 +40,7 @@ def test_pip_up_to_date(monkeypatch):
 
 def test_pip_unreachable_index_degrades(monkeypatch):
     monkeypatch.setattr(
-        "controlflow_sdk.upgrade.check.current_version", lambda: "0.1.0"
+        "uticen_lite.upgrade.check.current_version", lambda: "0.1.0"
     )
     info = check_for_update(InstallMethod.PIP, fetch=lambda: None)
     assert info.available is False
@@ -49,7 +49,7 @@ def test_pip_unreachable_index_degrades(monkeypatch):
 
 def test_unknown_method_is_not_available(monkeypatch):
     monkeypatch.setattr(
-        "controlflow_sdk.upgrade.check.current_version", lambda: "0.1.0"
+        "uticen_lite.upgrade.check.current_version", lambda: "0.1.0"
     )
     info = check_for_update(InstallMethod.UNKNOWN)
     assert info.available is False
@@ -57,10 +57,10 @@ def test_unknown_method_is_not_available(monkeypatch):
 
 def test_git_behind_uses_injected_runner(monkeypatch):
     monkeypatch.setattr(
-        "controlflow_sdk.upgrade.check.current_version", lambda: "0.1.0"
+        "uticen_lite.upgrade.check.current_version", lambda: "0.1.0"
     )
     monkeypatch.setattr(
-        "controlflow_sdk.upgrade.check.source_dir", lambda: __import__("pathlib").Path(".")
+        "uticen_lite.upgrade.check.source_dir", lambda: __import__("pathlib").Path(".")
     )
 
     def fake_git(args):

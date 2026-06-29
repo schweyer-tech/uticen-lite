@@ -12,8 +12,8 @@ from __future__ import annotations
 import threading
 from pathlib import Path
 
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.migrations import migrate
+from uticen_lite.store.db import connect
+from uticen_lite.store.migrations import migrate
 
 
 def test_connection_is_usable_from_a_different_thread(tmp_path: Path) -> None:

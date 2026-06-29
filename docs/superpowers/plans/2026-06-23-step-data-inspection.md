@@ -10,11 +10,11 @@
 
 ## Global Constraints
 
-- **Python floor ≥3.11**; ruff target `py311`, line-length 100; `python -m ruff check .` and `python -m mypy controlflow_sdk` must stay green.
+- **Python floor ≥3.11**; ruff target `py311`, line-length 100; `python -m ruff check .` and `python -m mypy uticen_lite` must stay green.
 - **Test suite pristine:** `python -m pytest -q` green with **no stray warnings** (e.g. do NOT use `DataFrame.applymap` — deprecated; use per-column `Series.map`).
 - **Pyodide boundary:** `model/`, `pipeline/compile.py`, `runner/execute.py` must stay pandas-free. New pandas-using code lives in `pipeline/materialize.py`, `adapters/`, or `plane/`. `materialize.py` must NOT `import pandas` at module top (import it inside functions, like `rowcounts.py`).
 - **Cardinal rule (learning 0001):** raw population rows never enter `contract/bundle.schema.json`, `bundle/`, the store, or any persisted run. Do NOT bump the bundle `schema_version`. No store migration.
-- **`[adapters]` gate is xlsx-only:** the xlsx writer must convert a missing `openpyxl` `ImportError` into `controlflow_sdk.plane.ingest.AdaptersUnavailable` (catch `ImportError` *before* any broad catch — learning 0024). The inspector (HTML) needs only core pandas.
+- **`[adapters]` gate is xlsx-only:** the xlsx writer must convert a missing `openpyxl` `ImportError` into `uticen_lite.plane.ingest.AdaptersUnavailable` (catch `ImportError` *before* any broad catch — learning 0024). The inspector (HTML) needs only core pandas.
 - **Never 500 the editor (learning 0013):** missing/unbound source, incomplete graph, or a raising custom node degrade to a friendly partial, not an exception.
 - **Excel limits:** a worksheet holds at most `1_048_576` rows incl. header → `1_048_575` data rows; truncate beyond that with a visible note.
 
@@ -25,19 +25,19 @@
 - **Never ask the user for permission to continue between tasks.** Execute the full plan start to finish without interruption.
 - **On an unresolvable error after 2–3 attempts:** note it in your progress report and skip to the next task; do not stall the run.
 - **After every `git commit`, push:** `git push -u origin HEAD` (already included as the final step of each task).
-- Keep the gates green per task: `python -m pytest -q`, `python -m ruff check .`, `python -m mypy controlflow_sdk` — pristine output, no stray warnings.
+- Keep the gates green per task: `python -m pytest -q`, `python -m ruff check .`, `python -m mypy uticen_lite` — pristine output, no stray warnings.
 
 ---
 
 ## File Structure
 
-- **`controlflow_sdk/pipeline/materialize.py`** (new) — the engine: `materialize_steps()`, the incremental cache primitives (`_step_keys`, `new_step_cache`), and the generated-body emitters. One responsibility: turn a pipeline + frames into `{node_id: DataFrame}`.
-- **`controlflow_sdk/pipeline/rowcounts.py`** (modify) — `compute_row_counts()` becomes a thin `len()` over `materialize_steps()`; delete the now-dead `_emit_counts_body` / `_emit_terminal_count`.
-- **`controlflow_sdk/adapters/xlsx_export.py`** (new) — `.xlsx` byte writers (`write_single_step`, `write_step_workbook`) + sheet-name sanitization, Excel cell coercion, row-limit truncation. CPython/pandas layer; `openpyxl`-gated.
-- **`controlflow_sdk/plane/routes/pipeline.py`** (modify) — full-population frame loader, source-version tokens, the module-level step cache, and 3 new routes (inspector partial, per-step xlsx, workbook xlsx); `_row_counts` switches to full population via the cache.
-- **`controlflow_sdk/plane/templates/partials/_step_data.html`** (new) — the inspector drawer partial (paginated table + per-step download).
-- **`controlflow_sdk/plane/templates/partials/_pipe_node.html`**, **`_pipe_diagram.html`** (modify) — make the row-count clickable (HTMX → `#step-drawer`).
-- **`controlflow_sdk/plane/templates/logic_builder.html`**, **`logic_flowchart.html`** (modify) — add the `#step-drawer` container + the workbook-export button.
+- **`uticen_lite/pipeline/materialize.py`** (new) — the engine: `materialize_steps()`, the incremental cache primitives (`_step_keys`, `new_step_cache`), and the generated-body emitters. One responsibility: turn a pipeline + frames into `{node_id: DataFrame}`.
+- **`uticen_lite/pipeline/rowcounts.py`** (modify) — `compute_row_counts()` becomes a thin `len()` over `materialize_steps()`; delete the now-dead `_emit_counts_body` / `_emit_terminal_count`.
+- **`uticen_lite/adapters/xlsx_export.py`** (new) — `.xlsx` byte writers (`write_single_step`, `write_step_workbook`) + sheet-name sanitization, Excel cell coercion, row-limit truncation. CPython/pandas layer; `openpyxl`-gated.
+- **`uticen_lite/plane/routes/pipeline.py`** (modify) — full-population frame loader, source-version tokens, the module-level step cache, and 3 new routes (inspector partial, per-step xlsx, workbook xlsx); `_row_counts` switches to full population via the cache.
+- **`uticen_lite/plane/templates/partials/_step_data.html`** (new) — the inspector drawer partial (paginated table + per-step download).
+- **`uticen_lite/plane/templates/partials/_pipe_node.html`**, **`_pipe_diagram.html`** (modify) — make the row-count clickable (HTMX → `#step-drawer`).
+- **`uticen_lite/plane/templates/logic_builder.html`**, **`logic_flowchart.html`** (modify) — add the `#step-drawer` container + the workbook-export button.
 - **Tests:** `tests/pipeline/test_materialize.py` (new), `tests/adapters/test_xlsx_export.py` (new), `tests/plane/test_pipeline_steps.py` (new), `tests/test_steps_trust_boundary.py` (new), `tests/e2e/test_step_inspector_smoke.py` (new, `browser` marker).
 
 ---
@@ -45,12 +45,12 @@
 ## Task 1: Materialization engine + rowcounts refactor
 
 **Files:**
-- Create: `controlflow_sdk/pipeline/materialize.py`
-- Modify: `controlflow_sdk/pipeline/rowcounts.py`
+- Create: `uticen_lite/pipeline/materialize.py`
+- Modify: `uticen_lite/pipeline/rowcounts.py`
 - Test: `tests/pipeline/test_materialize.py`
 
 **Interfaces:**
-- Consumes: `controlflow_sdk.pipeline.compile._frame, _conditions, _emit_node_lines, _emit_custom_helper`; `controlflow_sdk.pipeline.model.Pipeline`; `controlflow_sdk.rules.render_rule._mask_expr`.
+- Consumes: `uticen_lite.pipeline.compile._frame, _conditions, _emit_node_lines, _emit_custom_helper`; `uticen_lite.pipeline.model.Pipeline`; `uticen_lite.rules.render_rule._mask_expr`.
 - Produces:
   - `MaterializeError(RuntimeError)`
   - `materialize_steps(pipeline: Pipeline, frames: dict[str, Any], *, source_versions: dict[str, str] | None = None, cache: "OrderedDict | None" = None, recomputed_out: set[str] | None = None) -> dict[str, Any]` — returns `{node_id: DataFrame}`; `{}` when an Import source is absent from `frames`. (Task 1 ships the no-cache path; `source_versions`/`cache`/`recomputed_out` are added in Task 2 — define the full signature now but ignore the cache args until Task 2.)
@@ -66,9 +66,9 @@ from __future__ import annotations
 
 import pandas as pd
 
-from controlflow_sdk.pipeline.materialize import materialize_steps
-from controlflow_sdk.pipeline.model import parse_pipeline
-from controlflow_sdk.pipeline.rowcounts import compute_row_counts
+from uticen_lite.pipeline.materialize import materialize_steps
+from uticen_lite.pipeline.model import parse_pipeline
+from uticen_lite.pipeline.rowcounts import compute_row_counts
 
 
 def _pipeline():
@@ -132,21 +132,21 @@ def test_custom_python_test_terminal_frame_is_the_violations():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/pipeline/test_materialize.py -q`
-Expected: FAIL — `ModuleNotFoundError: controlflow_sdk.pipeline.materialize`.
+Expected: FAIL — `ModuleNotFoundError: uticen_lite.pipeline.materialize`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `controlflow_sdk/pipeline/materialize.py`:
+Create `uticen_lite/pipeline/materialize.py`:
 
 ```python
 """Materialise the DataFrame at every node of a control pipeline.
 
 This is the engine behind the per-step data inspector, the per-step / whole-pipeline
-Excel exports, AND the live row-counts. It generalises :mod:`controlflow_sdk.pipeline.rowcounts`:
+Excel exports, AND the live row-counts. It generalises :mod:`uticen_lite.pipeline.rowcounts`:
 that probe kept only ``len(frame)`` after each node; this keeps the frames themselves.
 
 Like rowcounts it reuses the compiler's *exact* node semantics
-(:func:`controlflow_sdk.pipeline.compile._emit_node_lines` + the module-level custom-python
+(:func:`uticen_lite.pipeline.compile._emit_node_lines` + the module-level custom-python
 helpers), so what you inspect is byte-for-byte what the compiled ``test()`` computes. It
 ``exec``s generated code over real pandas frames, so it lives behind the runner-side boundary
 (callers pass already-loaded frames) and never imports pandas at module import time.
@@ -162,13 +162,13 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import Any
 
-from controlflow_sdk.pipeline.compile import (
+from uticen_lite.pipeline.compile import (
     _conditions,
     _emit_node_lines,
     _frame,
 )
-from controlflow_sdk.pipeline.model import Node, Pipeline
-from controlflow_sdk.rules.render_rule import _mask_expr
+from uticen_lite.pipeline.model import Node, Pipeline
+from uticen_lite.rules.render_rule import _mask_expr
 
 _CACHE_MAX = 64  # bound the in-memory frame cache (single-user, localhost)
 
@@ -270,7 +270,7 @@ def materialize_steps(
         recomputed_out.clear()
         recomputed_out.update(recompute)
 
-    from controlflow_sdk.pipeline.compile import _emit_custom_helper
+    from uticen_lite.pipeline.compile import _emit_custom_helper
 
     namespace: dict[str, Any] = {}
     helper_parts = [
@@ -350,14 +350,14 @@ def _step_keys(pipeline: Pipeline, source_versions: dict[str, str]) -> dict[str,
     return keys
 ```
 
-Now refactor `controlflow_sdk/pipeline/rowcounts.py`. Replace the whole file body below the module docstring with:
+Now refactor `uticen_lite/pipeline/rowcounts.py`. Replace the whole file body below the module docstring with:
 
 ```python
 from __future__ import annotations
 
 from typing import Any
 
-from controlflow_sdk.pipeline.model import Pipeline
+from uticen_lite.pipeline.model import Pipeline
 
 
 class RowCountError(RuntimeError):
@@ -367,12 +367,12 @@ class RowCountError(RuntimeError):
 def compute_row_counts(pipeline: Pipeline, frames: dict[str, Any]) -> dict[str, int]:
     """Return ``{node_id: rows surviving}`` for *pipeline* over *frames*.
 
-    Now a thin ``len()`` over :func:`controlflow_sdk.pipeline.materialize.materialize_steps`
+    Now a thin ``len()`` over :func:`uticen_lite.pipeline.materialize.materialize_steps`
     so the count and the inspectable data are the *same* computation. Returns ``{}`` when a
     source is missing; raises :class:`RowCountError` on an evaluation failure.
     """
-    from controlflow_sdk.pipeline.materialize import MaterializeError, materialize_steps
-    from controlflow_sdk.rules.spec import RuleSpecError
+    from uticen_lite.pipeline.materialize import MaterializeError, materialize_steps
+    from uticen_lite.rules.spec import RuleSpecError
 
     try:
         steps = materialize_steps(pipeline, frames)
@@ -381,17 +381,17 @@ def compute_row_counts(pipeline: Pipeline, frames: dict[str, Any]) -> dict[str, 
     return {nid: len(df) for nid, df in steps.items()}
 ```
 
-Keep the module docstring at the top of `rowcounts.py` (update its first line to note it now delegates to `materialize.py`). Then run `grep -rn "_emit_counts_body\|_emit_terminal_count\|RowCountError" controlflow_sdk tests` and fix any other reference (the `routes/pipeline.py` import of `RowCountError`/`compute_row_counts` stays valid).
+Keep the module docstring at the top of `rowcounts.py` (update its first line to note it now delegates to `materialize.py`). Then run `grep -rn "_emit_counts_body\|_emit_terminal_count\|RowCountError" uticen_lite tests` and fix any other reference (the `routes/pipeline.py` import of `RowCountError`/`compute_row_counts` stays valid).
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `python -m pytest tests/pipeline/ -q && python -m ruff check controlflow_sdk/pipeline && python -m mypy controlflow_sdk/pipeline/materialize.py controlflow_sdk/pipeline/rowcounts.py`
+Run: `python -m pytest tests/pipeline/ -q && python -m ruff check uticen_lite/pipeline && python -m mypy uticen_lite/pipeline/materialize.py uticen_lite/pipeline/rowcounts.py`
 Expected: PASS; ruff/mypy clean. Also run the full suite to confirm the rowcounts refactor didn't break callers: `python -m pytest -q`.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add controlflow_sdk/pipeline/materialize.py controlflow_sdk/pipeline/rowcounts.py tests/pipeline/test_materialize.py
+git add uticen_lite/pipeline/materialize.py uticen_lite/pipeline/rowcounts.py tests/pipeline/test_materialize.py
 git commit -m "feat(pipeline): materialize per-step frames; rowcounts delegates"
 git push -u origin HEAD
 ```
@@ -401,7 +401,7 @@ git push -u origin HEAD
 ## Task 2: Incremental recompute cache
 
 **Files:**
-- Modify: `controlflow_sdk/pipeline/materialize.py` (already has the primitives from Task 1 — this task only adds tests; if any primitive is missing, add it here)
+- Modify: `uticen_lite/pipeline/materialize.py` (already has the primitives from Task 1 — this task only adds tests; if any primitive is missing, add it here)
 - Test: `tests/pipeline/test_materialize.py` (append)
 
 **Interfaces:**
@@ -415,7 +415,7 @@ Append to `tests/pipeline/test_materialize.py`:
 ```python
 import copy
 
-from controlflow_sdk.pipeline.materialize import _step_keys, new_step_cache
+from uticen_lite.pipeline.materialize import _step_keys, new_step_cache
 
 
 def _graph():
@@ -470,7 +470,7 @@ def test_cache_recomputes_only_edited_step_onward():
 
 
 def test_cache_is_bounded():
-    from controlflow_sdk.pipeline.materialize import _CACHE_MAX
+    from uticen_lite.pipeline.materialize import _CACHE_MAX
     cache = new_step_cache()
     for i in range(_CACHE_MAX + 20):
         materialize_steps(parse_pipeline(_graph()), _frames(),
@@ -489,13 +489,13 @@ If Task 1 was implemented exactly as written, no code changes are needed. Otherw
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `python -m pytest tests/pipeline/test_materialize.py -q && python -m ruff check controlflow_sdk/pipeline && python -m mypy controlflow_sdk/pipeline/materialize.py`
+Run: `python -m pytest tests/pipeline/test_materialize.py -q && python -m ruff check uticen_lite/pipeline && python -m mypy uticen_lite/pipeline/materialize.py`
 Expected: PASS; ruff/mypy clean.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add controlflow_sdk/pipeline/materialize.py tests/pipeline/test_materialize.py
+git add uticen_lite/pipeline/materialize.py tests/pipeline/test_materialize.py
 git commit -m "test(pipeline): incremental step cache recomputes from edited step onward"
 git push -u origin HEAD
 ```
@@ -505,7 +505,7 @@ git push -u origin HEAD
 ## Task 3: Full-population frames, source versions, and full-pop badges
 
 **Files:**
-- Modify: `controlflow_sdk/plane/routes/pipeline.py`
+- Modify: `uticen_lite/plane/routes/pipeline.py`
 - Test: `tests/plane/test_pipeline_steps.py` (new)
 
 **Interfaces:**
@@ -525,7 +525,7 @@ Create `tests/plane/test_pipeline_steps.py`. (Reuse the existing plane test fixt
 """Full-population step frames feed the badges and the inspector route."""
 from __future__ import annotations
 
-from controlflow_sdk.plane.routes import pipeline as P
+from uticen_lite.plane.routes import pipeline as P
 
 
 def test_load_full_frames_is_uncapped(seeded_conn, project_root):
@@ -549,7 +549,7 @@ Expected: FAIL — `AttributeError: module ... has no attribute '_load_full_fram
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `controlflow_sdk/plane/routes/pipeline.py`:
+In `uticen_lite/plane/routes/pipeline.py`:
 
 1. Add imports near the top: `from collections import OrderedDict`.
 2. Below `_EMPTY_GRAPH`, add the module-level cache:
@@ -557,7 +557,7 @@ In `controlflow_sdk/plane/routes/pipeline.py`:
 ```python
 # Process-wide, LRU-bounded cache of materialised step frames (single-user, localhost).
 # Keyed inside materialize_steps by each node's ancestor-closure + source versions.
-from controlflow_sdk.pipeline.materialize import new_step_cache as _new_step_cache
+from uticen_lite.pipeline.materialize import new_step_cache as _new_step_cache
 _STEP_CACHE = _new_step_cache()
 ```
 
@@ -573,8 +573,8 @@ def _load_full_frames(
     the incremental step cache keeps edits fast. Returns only the sources whose file
     exists; a missing frame makes materialize_steps return ``{}``.
     """
-    from controlflow_sdk.adapters.files import source_for
-    from controlflow_sdk.store.loader import _binding
+    from uticen_lite.adapters.files import source_for
+    from uticen_lite.store.loader import _binding
 
     frames: dict[str, Any] = {}
     for sid in source_ids:
@@ -618,8 +618,8 @@ def _materialize_full(
     Returns ``{}`` when a source is unbound/missing or the probe fails — never raises
     into the request (learning 0013).
     """
-    from controlflow_sdk.pipeline.materialize import MaterializeError, materialize_steps
-    from controlflow_sdk.rules.spec import RuleSpecError
+    from uticen_lite.pipeline.materialize import MaterializeError, materialize_steps
+    from uticen_lite.rules.spec import RuleSpecError
 
     sids = pipeline.import_source_ids()
     frames = _load_full_frames(conn, root, sids)
@@ -639,17 +639,17 @@ def _row_counts(
     return {nid: len(df) for nid, df in _materialize_full(conn, root, pipeline).items()}
 ```
 
-4. Remove the now-unused `_ROWCOUNT_SAMPLE` constant and the old `_load_sample_frames`/`_row_counts` definitions and the now-unused `RowCountError` import line (`from controlflow_sdk.pipeline.rowcounts import RowCountError, compute_row_counts` inside the old `_row_counts`). Run `grep -n "_load_sample_frames\|_ROWCOUNT_SAMPLE\|compute_row_counts" controlflow_sdk/plane` and clean up any leftover reference.
+4. Remove the now-unused `_ROWCOUNT_SAMPLE` constant and the old `_load_sample_frames`/`_row_counts` definitions and the now-unused `RowCountError` import line (`from uticen_lite.pipeline.rowcounts import RowCountError, compute_row_counts` inside the old `_row_counts`). Run `grep -n "_load_sample_frames\|_ROWCOUNT_SAMPLE\|compute_row_counts" uticen_lite/plane` and clean up any leftover reference.
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `python -m pytest tests/plane/test_pipeline_steps.py tests/plane/test_pipeline_editor.py -q && python -m ruff check controlflow_sdk/plane && python -m mypy controlflow_sdk`
+Run: `python -m pytest tests/plane/test_pipeline_steps.py tests/plane/test_pipeline_editor.py -q && python -m ruff check uticen_lite/plane && python -m mypy uticen_lite`
 Expected: PASS; ruff/mypy clean. Run `python -m pytest -q` to confirm no plane regressions from the full-pop switch.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add controlflow_sdk/plane/routes/pipeline.py tests/plane/test_pipeline_steps.py
+git add uticen_lite/plane/routes/pipeline.py tests/plane/test_pipeline_steps.py
 git commit -m "feat(plane): full-population step frames + source-versioned step cache"
 git push -u origin HEAD
 ```
@@ -659,11 +659,11 @@ git push -u origin HEAD
 ## Task 4: xlsx writer (per-step + workbook)
 
 **Files:**
-- Create: `controlflow_sdk/adapters/xlsx_export.py`
+- Create: `uticen_lite/adapters/xlsx_export.py`
 - Test: `tests/adapters/test_xlsx_export.py`
 
 **Interfaces:**
-- Consumes: `pandas`, `openpyxl` (lazy); `controlflow_sdk.plane.ingest.AdaptersUnavailable`.
+- Consumes: `pandas`, `openpyxl` (lazy); `uticen_lite.plane.ingest.AdaptersUnavailable`.
 - Produces:
   - `EXCEL_MAX_DATA_ROWS = 1_048_575`
   - `write_single_step(frame, label: str) -> bytes`
@@ -684,7 +684,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from controlflow_sdk.adapters import xlsx_export as X
+from uticen_lite.adapters import xlsx_export as X
 
 
 def _read(buf_bytes, sheet=0):
@@ -742,7 +742,7 @@ def test_truncation_note_when_over_excel_limit(monkeypatch):
 
 
 def test_missing_openpyxl_raises_adapters_unavailable(monkeypatch):
-    from controlflow_sdk.plane.ingest import AdaptersUnavailable
+    from uticen_lite.plane.ingest import AdaptersUnavailable
 
     def _boom():
         raise ImportError("no openpyxl")
@@ -755,11 +755,11 @@ def test_missing_openpyxl_raises_adapters_unavailable(monkeypatch):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/adapters/test_xlsx_export.py -q`
-Expected: FAIL — `ModuleNotFoundError: controlflow_sdk.adapters.xlsx_export`.
+Expected: FAIL — `ModuleNotFoundError: uticen_lite.adapters.xlsx_export`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `controlflow_sdk/adapters/xlsx_export.py`:
+Create `uticen_lite/adapters/xlsx_export.py`:
 
 ```python
 """Write pipeline step data to ``.xlsx`` for local inspection (NOT the bundle).
@@ -767,7 +767,7 @@ Create `controlflow_sdk/adapters/xlsx_export.py`:
 This is a localhost-only evidence export: raw population rows are written to a workbook the
 author downloads. It never touches the import bundle or the store (cardinal rule, learning
 0001). Requires the ``[adapters]`` extra (``openpyxl``); a missing engine becomes a friendly
-:class:`controlflow_sdk.plane.ingest.AdaptersUnavailable` (learning 0024).
+:class:`uticen_lite.plane.ingest.AdaptersUnavailable` (learning 0024).
 """
 
 from __future__ import annotations
@@ -777,7 +777,7 @@ from typing import Any
 
 import pandas as pd
 
-from controlflow_sdk.plane.ingest import AdaptersUnavailable
+from uticen_lite.plane.ingest import AdaptersUnavailable
 
 # A worksheet holds 1_048_576 rows incl. the header row → this many DATA rows.
 EXCEL_MAX_DATA_ROWS = 1_048_575
@@ -791,7 +791,7 @@ def _require_writer() -> None:
     except ImportError as exc:  # learning 0024 — catch ImportError first, typed re-raise
         raise AdaptersUnavailable(
             "Excel export needs the [adapters] extra. Install with: "
-            "pip install 'controlflow-sdk[adapters]'"
+            "pip install 'uticen-lite[adapters]'"
         ) from exc
 
 
@@ -887,13 +887,13 @@ def write_step_workbook(steps: list[tuple[str, pd.DataFrame]], meta: dict[str, s
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `python -m pytest tests/adapters/test_xlsx_export.py -q && python -m ruff check controlflow_sdk/adapters/xlsx_export.py && python -m mypy controlflow_sdk/adapters/xlsx_export.py`
+Run: `python -m pytest tests/adapters/test_xlsx_export.py -q && python -m ruff check uticen_lite/adapters/xlsx_export.py && python -m mypy uticen_lite/adapters/xlsx_export.py`
 Expected: PASS; ruff/mypy clean.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add controlflow_sdk/adapters/xlsx_export.py tests/adapters/test_xlsx_export.py
+git add uticen_lite/adapters/xlsx_export.py tests/adapters/test_xlsx_export.py
 git commit -m "feat(adapters): xlsx step + workbook writers (openpyxl-gated)"
 git push -u origin HEAD
 ```
@@ -903,9 +903,9 @@ git push -u origin HEAD
 ## Task 5: Step inspector route + drawer + clickable counts
 
 **Files:**
-- Modify: `controlflow_sdk/plane/routes/pipeline.py` (add the inspector route + a `_pipeline_for_view` helper; thread `control_id` into the `ai_apply` `_pipe_cards.html` context)
-- Create: `controlflow_sdk/plane/templates/partials/_step_data.html`
-- Modify: `controlflow_sdk/plane/templates/partials/_pipe_node.html`, `_pipe_diagram.html`, `logic_builder.html`, `logic_flowchart.html`
+- Modify: `uticen_lite/plane/routes/pipeline.py` (add the inspector route + a `_pipeline_for_view` helper; thread `control_id` into the `ai_apply` `_pipe_cards.html` context)
+- Create: `uticen_lite/plane/templates/partials/_step_data.html`
+- Modify: `uticen_lite/plane/templates/partials/_pipe_node.html`, `_pipe_diagram.html`, `logic_builder.html`, `logic_flowchart.html`
 - Test: `tests/plane/test_pipeline_steps.py` (append)
 
 **Interfaces:**
@@ -940,7 +940,7 @@ Expected: FAIL — 404 (route not registered).
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `controlflow_sdk/plane/routes/pipeline.py`:
+In `uticen_lite/plane/routes/pipeline.py`:
 
 1. Add a helper near `_editor_context`:
 
@@ -1025,7 +1025,7 @@ def pd_isna(v: Any) -> bool:
 
 4. In `ai_apply`, add `"control_id": control_id,` to the `partials/_pipe_cards.html` context dict so the clickable count renders a valid URL after an AI draft.
 
-Create `controlflow_sdk/plane/templates/partials/_step_data.html`:
+Create `uticen_lite/plane/templates/partials/_step_data.html`:
 
 ```html
 {# Step inspector drawer body — swapped into #step-drawer by HTMX. #}
@@ -1101,7 +1101,7 @@ In `logic_builder.html` and `logic_flowchart.html`, add a drawer container once 
 <div id="step-drawer" class="step-drawer"></div>
 ```
 
-Add minimal styling to `controlflow_sdk/plane/static/app.css` (route colors through existing tokens, learning 0005):
+Add minimal styling to `uticen_lite/plane/static/app.css` (route colors through existing tokens, learning 0005):
 
 ```css
 .pipe-count-btn { cursor: pointer; background: none; border: 0; font: inherit; color: inherit; padding: 0; }
@@ -1113,13 +1113,13 @@ Add minimal styling to `controlflow_sdk/plane/static/app.css` (route colors thro
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `python -m pytest tests/plane/test_pipeline_steps.py -q && python -m ruff check controlflow_sdk/plane && python -m mypy controlflow_sdk`
+Run: `python -m pytest tests/plane/test_pipeline_steps.py -q && python -m ruff check uticen_lite/plane && python -m mypy uticen_lite`
 Expected: PASS; ruff/mypy clean. Run `python -m pytest -q` for the full suite.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add controlflow_sdk/plane tests/plane/test_pipeline_steps.py
+git add uticen_lite/plane tests/plane/test_pipeline_steps.py
 git commit -m "feat(plane): step inspector drawer + clickable row-counts"
 git push -u origin HEAD
 ```
@@ -1129,7 +1129,7 @@ git push -u origin HEAD
 ## Task 6: Per-step + workbook xlsx export routes
 
 **Files:**
-- Modify: `controlflow_sdk/plane/routes/pipeline.py` (2 routes), `logic_builder.html` (workbook button)
+- Modify: `uticen_lite/plane/routes/pipeline.py` (2 routes), `logic_builder.html` (workbook button)
 - Test: `tests/plane/test_pipeline_steps.py` (append)
 
 **Interfaces:**
@@ -1181,8 +1181,8 @@ Add to `register(...)` in `pipeline.py` (near `step_data`):
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
     ) -> Response:
-        from controlflow_sdk.adapters import xlsx_export
-        from controlflow_sdk.plane.ingest import AdaptersUnavailable
+        from uticen_lite.adapters import xlsx_export
+        from uticen_lite.plane.ingest import AdaptersUnavailable
 
         root = request.app.state.project_root
         pipeline = _pipeline_for_view(repo.get_control(conn, control_id))
@@ -1212,8 +1212,8 @@ Add to `register(...)` in `pipeline.py` (near `step_data`):
         request: Request,
         conn: sqlite3.Connection = Depends(get_conn),
     ) -> Response:
-        from controlflow_sdk.adapters import xlsx_export
-        from controlflow_sdk.plane.ingest import AdaptersUnavailable
+        from uticen_lite.adapters import xlsx_export
+        from uticen_lite.plane.ingest import AdaptersUnavailable
 
         root = request.app.state.project_root
         control = repo.get_control(conn, control_id)
@@ -1263,13 +1263,13 @@ Add the workbook button to `logic_builder.html` near the existing pipeline contr
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `python -m pytest tests/plane/test_pipeline_steps.py -q && python -m ruff check controlflow_sdk/plane && python -m mypy controlflow_sdk`
+Run: `python -m pytest tests/plane/test_pipeline_steps.py -q && python -m ruff check uticen_lite/plane && python -m mypy uticen_lite`
 Expected: PASS; ruff/mypy clean.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add controlflow_sdk/plane tests/plane/test_pipeline_steps.py
+git add uticen_lite/plane tests/plane/test_pipeline_steps.py
 git commit -m "feat(plane): per-step and whole-pipeline xlsx export routes"
 git push -u origin HEAD
 ```
@@ -1283,7 +1283,7 @@ git push -u origin HEAD
 - Create: `tests/e2e/test_step_inspector_smoke.py` (`browser` marker)
 
 **Interfaces:**
-- Consumes: the bundle builder (`controlflow_sdk.store.export_service.build_bundle` or the existing contract-export test harness), the plane test client.
+- Consumes: the bundle builder (`uticen_lite.store.export_service.build_bundle` or the existing contract-export test harness), the plane test client.
 - Produces: regression guards.
 
 - [ ] **Step 1: Write the failing test**
@@ -1357,7 +1357,7 @@ No product code should be needed (the bundle already excludes raw rows — these
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `python -m pytest tests/test_steps_trust_boundary.py -q` (fast lane) and, where a browser is available, `python -m pytest tests/e2e/test_step_inspector_smoke.py -q` (per the e2e lane convention in `pyproject.toml`). Then the full gate: `python -m pytest -q && python -m ruff check . && python -m mypy controlflow_sdk`.
+Run: `python -m pytest tests/test_steps_trust_boundary.py -q` (fast lane) and, where a browser is available, `python -m pytest tests/e2e/test_step_inspector_smoke.py -q` (per the e2e lane convention in `pyproject.toml`). Then the full gate: `python -m pytest -q && python -m ruff check . && python -m mypy uticen_lite`.
 Expected: PASS; ruff/mypy clean; no warnings.
 
 - [ ] **Step 5: Commit**

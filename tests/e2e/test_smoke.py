@@ -55,7 +55,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Page, expect
 
-from controlflow_sdk.schema.validate import validate_bundle
+from uticen_lite.schema.validate import validate_bundle
 
 # Two rows. The deterministic outcome is engineered below so exactly U1 is
 # flagged and U2 passes (see the rule conditions in the test).
@@ -252,7 +252,7 @@ def test_author_run_export_smoke(page: Page, live_server: str, tmp_path: Path) -
         manifest = json.loads(zf.read("manifest.json"))
     assert manifest["schema_version"] == "1.0"
     # THE contract guard (cardinal rule 0001): the exported bundle still passes
-    # the same validator the ControlFlow app vendors.
+    # the same validator the Uticen app vendors.
     assert validate_bundle(manifest) == []
     assert any(c["id"] == "sod" for c in manifest["controls"])
 

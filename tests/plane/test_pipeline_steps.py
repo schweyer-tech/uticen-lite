@@ -7,7 +7,7 @@ import json
 import pandas as pd
 import pytest
 
-from controlflow_sdk.plane.routes import pipeline as P
+from uticen_lite.plane.routes import pipeline as P
 
 # ---------------------------------------------------------------------------
 # Fixture helpers (follow the pattern in test_pipeline_editor.py)
@@ -23,7 +23,7 @@ def _make_source(client, sid, csv_bytes: bytes) -> None:
 
 
 def _conn(client):
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store.db import connect
     return connect(client.app.state.project_root)
 
 

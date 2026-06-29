@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from controlflow_sdk.plane import fetch
+from uticen_lite.plane import fetch
 
 
 def _opener(body: bytes, ctype: str):

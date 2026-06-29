@@ -24,13 +24,13 @@ from __future__ import annotations
 
 import pytest
 
-from controlflow_sdk.pipeline.lint import (
+from uticen_lite.pipeline.lint import (
     OFFRAMP_MESSAGE,
     LintError,
     lint_custom_code,
     lint_pipeline,
 )
-from controlflow_sdk.pipeline.model import parse_pipeline
+from uticen_lite.pipeline.model import parse_pipeline
 
 # ---------------------------------------------------------------------------
 # Code-level deny-scan
@@ -205,7 +205,7 @@ def test_offramp_message_names_the_one_way_door():
 def test_helper_module_alias_is_allowed():
     # The provided helper module (imported under its known name) is on the
     # allowlist so custom nodes can use shared pure helpers.
-    from controlflow_sdk.pipeline.lint import HELPER_MODULE
+    from uticen_lite.pipeline.lint import HELPER_MODULE
 
     code = f"import {HELPER_MODULE}\nrows = rows.head(1)"
     assert lint_custom_code(code) == []

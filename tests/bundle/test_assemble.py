@@ -1,4 +1,4 @@
-"""TDD tests for controlflow_sdk.bundle.assemble (Phase 3, Task 2).
+"""TDD tests for uticen_lite.bundle.assemble (Phase 3, Task 2).
 
 Red → Green cycle:
   1. Write tests (RED – bundle module does not exist yet).
@@ -13,9 +13,9 @@ from typing import Any
 
 import pytest
 
-from controlflow_sdk.model.control import ControlDef, FrameworkRefs, RiskRef, SourceBinding
-from controlflow_sdk.project.discovery import Project
-from controlflow_sdk.project.loader import ProjectConfig
+from uticen_lite.model.control import ControlDef, FrameworkRefs, RiskRef, SourceBinding
+from uticen_lite.project.discovery import Project
+from uticen_lite.project.loader import ProjectConfig
 
 # ---------------------------------------------------------------------------
 # Shared test constants
@@ -151,7 +151,7 @@ def _all_keys(obj: Any) -> set[str]:
 # ---------------------------------------------------------------------------
 
 
-from controlflow_sdk.bundle import BundleError, assemble_bundle  # noqa: E402
+from uticen_lite.bundle import BundleError, assemble_bundle  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Tests: happy path
@@ -275,7 +275,7 @@ class TestAssembleBundleHappyPath:
         self, project: Project, runs_by_control: dict[str, list[dict[str, Any]]]
     ) -> None:
         """The assembled manifest must pass the JSON schema validator."""
-        from controlflow_sdk.schema.validate import validate_bundle
+        from uticen_lite.schema.validate import validate_bundle
 
         result = assemble_bundle(project, runs_by_control, GENERATED_AT)
         errors = validate_bundle(result)
@@ -367,7 +367,7 @@ class TestControlWithNoRuns:
         assert wp["procedures"] == []
 
     def test_still_passes_schema_when_no_runs(self, project: Project) -> None:
-        from controlflow_sdk.schema.validate import validate_bundle
+        from uticen_lite.schema.validate import validate_bundle
 
         result = assemble_bundle(project, {}, GENERATED_AT)
         errors = validate_bundle(result)
@@ -397,7 +397,7 @@ class TestControlWithNullRisk:
         assert result["controls"][0]["risk"] is None
 
     def test_passes_schema_with_null_risk(self, test_py_file: pathlib.Path) -> None:
-        from controlflow_sdk.schema.validate import validate_bundle
+        from uticen_lite.schema.validate import validate_bundle
 
         control_no_risk = ControlDef(
             id="ctrl_no_risk",
@@ -429,7 +429,7 @@ class TestBundleError:
         self, project: Project, runs_by_control: dict[str, list[dict[str, Any]]]
     ) -> None:
         """Monkey-patch validate_bundle to always return errors → BundleError raised."""
-        import controlflow_sdk.bundle.assemble as assemble_mod
+        import uticen_lite.bundle.assemble as assemble_mod
 
         original = assemble_mod.validate_bundle
 
@@ -466,13 +466,13 @@ def test_workpaper_reflects_latest_run_not_oldest(test_py_file: pathlib.Path) ->
     runs that differ in ``failed`` count and asserts that ``assemble_bundle``
     produces a workpaper whose result reflects the NEWER run's numbers.
     """
-    from controlflow_sdk.model.run import RunRecord
-    from controlflow_sdk.model.violation import Violation
-    from controlflow_sdk.store import repo
-    from controlflow_sdk.store.db import connect
-    from controlflow_sdk.store.export_service import _to_run_dicts
-    from controlflow_sdk.store.loader import load_project_from_store
-    from controlflow_sdk.store.migrations import migrate
+    from uticen_lite.model.run import RunRecord
+    from uticen_lite.model.violation import Violation
+    from uticen_lite.store import repo
+    from uticen_lite.store.db import connect
+    from uticen_lite.store.export_service import _to_run_dicts
+    from uticen_lite.store.loader import load_project_from_store
+    from uticen_lite.store.migrations import migrate
 
     root = pathlib.Path(test_py_file).parent
     (root / "data").mkdir(exist_ok=True)
@@ -556,10 +556,10 @@ def test_workpaper_reflects_latest_run_not_oldest(test_py_file: pathlib.Path) ->
 
 
 def test_rule_control_bundles_readable_test_code() -> None:
-    from controlflow_sdk.bundle.assemble import assemble_bundle
-    from controlflow_sdk.model.control import ControlDef, FrameworkRefs
-    from controlflow_sdk.project.discovery import Project
-    from controlflow_sdk.project.loader import ProjectConfig
+    from uticen_lite.bundle.assemble import assemble_bundle
+    from uticen_lite.model.control import ControlDef, FrameworkRefs
+    from uticen_lite.project.discovery import Project
+    from uticen_lite.project.loader import ProjectConfig
 
     control = ControlDef(
         id="sod",

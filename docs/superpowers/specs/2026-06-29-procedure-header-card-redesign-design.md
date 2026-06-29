@@ -74,9 +74,9 @@ without changing `model/control.py`.
 The header markup is produced in two places; **both** change, kept byte-consistent
 (learnings 0038, 0036 corollary):
 
-1. `controlflow_sdk/plane/templates/partials/_pipe_cards.html` — the server-rendered
+1. `uticen_lite/plane/templates/partials/_pipe_cards.html` — the server-rendered
    `<summary>` (Jinja), used on page load and every HTMX `#pipe-cards` swap.
-2. `controlflow_sdk/plane/templates/logic_builder.html` → `newProcedureSection(pid, code)`
+2. `uticen_lite/plane/templates/logic_builder.html` → `newProcedureSection(pid, code)`
    — the client JS string builder for "＋ Add procedure".
 
 **0040 hazard:** the JS builder hand-concatenates the assertion-help tooltip prose, which

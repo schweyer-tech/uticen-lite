@@ -43,5 +43,5 @@ trying to click) revealed it.
 
 ## Reference
 
-- `controlflow_sdk/plane/templates/base.html` (the removed `htmx:load` listener; one-time
+- `uticen_lite/plane/templates/base.html` (the removed `htmx:load` listener; one-time
   `setTimeout` load + 120s `setInterval` check retained).

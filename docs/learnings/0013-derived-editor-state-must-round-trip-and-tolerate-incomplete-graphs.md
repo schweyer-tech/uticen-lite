@@ -76,11 +76,11 @@ persists; a cross-source rule authored in the editor actually RUNS; an incomplet
 
 ## Reference
 
-- `controlflow_sdk/plane/logic_view.py` (`derive_builder_graph`) — the derived representation.
-- `controlflow_sdk/plane/routes/pipeline.py` — `_editor_context` (round-trips the derived graph),
+- `uticen_lite/plane/logic_view.py` (`derive_builder_graph`) — the derived representation.
+- `uticen_lite/plane/routes/pipeline.py` — `_editor_context` (round-trips the derived graph),
   `_other_source_ids` + `_save_pipeline_graph` (binds cross-source sources), `_row_counts`
   (catches `RuleSpecError`); `_materialize_full` + `step_data` (whole-body guards, 2026-06-27).
-- `controlflow_sdk/runner/execute.py` (empty-population guard) + `controlflow_sdk/plane/routes/runs.py`
+- `uticen_lite/runner/execute.py` (empty-population guard) + `uticen_lite/plane/routes/runs.py`
   (catches `RunnerError`/`ProjectError` → `run_error.html`, 422) — the run boundary degrades (2026-06-27).
 - Builds on [0010](0010-new-authoring-representation-compiles-to-the-existing-artifact.md)
   (store-only graph compiles to the artifact) and is verified by the gate in

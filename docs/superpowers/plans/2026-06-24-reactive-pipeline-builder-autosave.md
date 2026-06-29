@@ -13,7 +13,7 @@
 ### Task 1: Add an autosave response mode to the builder save route
 
 **Files:**
-- Modify: `controlflow_sdk/plane/routes/pipeline.py:844-875`
+- Modify: `uticen_lite/plane/routes/pipeline.py:844-875`
 - Test: `tests/plane/test_pipeline_save.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -78,16 +78,16 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add controlflow_sdk/plane/routes/pipeline.py tests/plane/test_pipeline_save.py
+git add uticen_lite/plane/routes/pipeline.py tests/plane/test_pipeline_save.py
 git commit -m "feat(plane): add builder autosave response mode"
 ```
 
 ### Task 2: Make the builder template autosave in place instead of submitting the full page
 
 **Files:**
-- Modify: `controlflow_sdk/plane/templates/logic_builder.html:135-438`
-- Modify: `controlflow_sdk/plane/templates/partials/_pipe_cards.html:1-36`
-- Modify: `controlflow_sdk/plane/templates/partials/_pipe_node.html:58-203`
+- Modify: `uticen_lite/plane/templates/logic_builder.html:135-438`
+- Modify: `uticen_lite/plane/templates/partials/_pipe_cards.html:1-36`
+- Modify: `uticen_lite/plane/templates/partials/_pipe_node.html:58-203`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -137,7 +137,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add controlflow_sdk/plane/templates/logic_builder.html controlflow_sdk/plane/templates/partials/_pipe_cards.html controlflow_sdk/plane/templates/partials/_pipe_node.html
+git add uticen_lite/plane/templates/logic_builder.html uticen_lite/plane/templates/partials/_pipe_cards.html uticen_lite/plane/templates/partials/_pipe_node.html
 git commit -m "feat(plane): make pipeline builder edits autosave in place"
 ```
 

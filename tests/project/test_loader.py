@@ -1,4 +1,4 @@
-"""Tests for controlflow_sdk.project.loader — TDD (write first, implement second)."""
+"""Tests for uticen_lite.project.loader — TDD (write first, implement second)."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from controlflow_sdk.model.control import SourceBinding
-from controlflow_sdk.project import ProjectConfig, ProjectError, load_project_config, load_sources
+from uticen_lite.model.control import SourceBinding
+from uticen_lite.project import ProjectConfig, ProjectError, load_project_config, load_sources
 
 SAMPLE = Path(__file__).parent / "fixtures" / "sample"
 

@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Python ≥ 3.11; ruff target `py311`, line-length 100. Keep `python -m pytest -q` pristine (no stray warnings), `python -m ruff check .` and `python -m mypy controlflow_sdk` green.
+- Python ≥ 3.11; ruff target `py311`, line-length 100. Keep `python -m pytest -q` pristine (no stray warnings), `python -m ruff check .` and `python -m mypy uticen_lite` green.
 - **Preserve every save hook** inside `[data-proc-head]`: `data-proc-id`, `[data-proc-code]`, `[data-proc-name]`, `[data-proc-assert]`, `[data-proc-narrative]`, `[data-proc-pct]`, `[data-proc-count]`, `[data-proc-name-edit]`, `[data-proc-del]`. `serializeProcedures()` reads by attribute, not by structural class (learning 0014/0038).
 - **Both render sites must stay byte-consistent** — the Jinja template and `newProcedureSection()` must emit the same structure (learning 0038/0036).
 - **No apostrophes in the assertion-help tooltip** so the hand-concatenated JS string is escape-safe (learning 0040). Same reworded copy in both sites.
@@ -37,9 +37,9 @@
 
 ## File Structure
 
-- `controlflow_sdk/plane/templates/partials/_pipe_cards.html` — Jinja: the Inputs band summary (add caret) + the per-procedure `<details>`/`<summary>` (3-tier restructure, inline stripe color). **Touched in Task 1.**
-- `controlflow_sdk/plane/static/app.css` — the `.band-*`/`.proc-*` block (~lines 700–799): carets, stripe, identity bar, code chip, name (specificity preserved), icon buttons, settings strip, peer labels, tolerance row, narrative. **Touched in Task 1.**
-- `controlflow_sdk/plane/templates/logic_builder.html` — `newProcedureSection()` JS builder (~lines 337–382): mirror the new structure. **Touched in Task 2.**
+- `uticen_lite/plane/templates/partials/_pipe_cards.html` — Jinja: the Inputs band summary (add caret) + the per-procedure `<details>`/`<summary>` (3-tier restructure, inline stripe color). **Touched in Task 1.**
+- `uticen_lite/plane/static/app.css` — the `.band-*`/`.proc-*` block (~lines 700–799): carets, stripe, identity bar, code chip, name (specificity preserved), icon buttons, settings strip, peer labels, tolerance row, narrative. **Touched in Task 1.**
+- `uticen_lite/plane/templates/logic_builder.html` — `newProcedureSection()` JS builder (~lines 337–382): mirror the new structure. **Touched in Task 2.**
 - `tests/plane/test_logic_bands.py` — structural render test (migrate "Fail if"→"Tolerance", narrative hook). **Touched in Task 1.**
 - `tests/e2e/test_smoke.py` — collapse interaction (`.proc-dot`→`.band-caret`) in Task 1; add-procedure structural-parity + zero-`pageerror` test in Task 2; a computed-style teeth-check in Task 3. **Touched in Tasks 1, 2, 3.**
 - `tests/e2e/test_multi_procedure.py` — not edited; re-run in Task 2 to confirm the builder save still round-trips.
@@ -49,8 +49,8 @@
 ## Task 1: Restructure the server-rendered procedure header (markup + CSS)
 
 **Files:**
-- Modify: `controlflow_sdk/plane/templates/partials/_pipe_cards.html`
-- Modify: `controlflow_sdk/plane/static/app.css` (the `.band-*`/`.proc-*` block, ~700–799)
+- Modify: `uticen_lite/plane/templates/partials/_pipe_cards.html`
+- Modify: `uticen_lite/plane/static/app.css` (the `.band-*`/`.proc-*` block, ~700–799)
 - Test: `tests/plane/test_logic_bands.py` (`test_builder_get_renders_procedure_title_layout`)
 - Test: `tests/e2e/test_smoke.py` (collapse step: `.proc-dot` → `.band-caret`)
 
@@ -98,7 +98,7 @@ Expected: FAIL (`"Tolerance"`/`band-caret` absent; `"Fail if"`/`proc-dot` still 
 
 - [ ] **Step 3: Add the Inputs-band caret + restructure the procedure summary in the template**
 
-In `controlflow_sdk/plane/templates/partials/_pipe_cards.html`:
+In `uticen_lite/plane/templates/partials/_pipe_cards.html`:
 
 (a) At the top of the file (after the opening comment block, before the `insert_zone` macro), define the reworded, apostrophe-free tooltip once:
 
@@ -165,7 +165,7 @@ In `controlflow_sdk/plane/templates/partials/_pipe_cards.html`:
 
 - [ ] **Step 4: Rework the CSS block**
 
-In `controlflow_sdk/plane/static/app.css`, replace the block from `.band-inputs, .proc-section {` (line 706) through `.proc-head .proc-thr-in { width: 56px; }` (line 791) — i.e. everything up to but **not** including `#proc-add` (792) — with:
+In `uticen_lite/plane/static/app.css`, replace the block from `.band-inputs, .proc-section {` (line 706) through `.proc-head .proc-thr-in { width: 56px; }` (line 791) — i.e. everything up to but **not** including `#proc-add` (792) — with:
 
 ```css
 .band-inputs, .proc-section {
@@ -290,14 +290,14 @@ Expected: PASS (collapse now toggles via `.band-caret`).
 
 - [ ] **Step 7: Lint/type gates**
 
-Run: `python -m ruff check . && python -m mypy controlflow_sdk`
+Run: `python -m ruff check . && python -m mypy uticen_lite`
 Expected: clean.
 
 - [ ] **Step 8: Commit + push**
 
 ```bash
-git add controlflow_sdk/plane/templates/partials/_pipe_cards.html \
-        controlflow_sdk/plane/static/app.css \
+git add uticen_lite/plane/templates/partials/_pipe_cards.html \
+        uticen_lite/plane/static/app.css \
         tests/plane/test_logic_bands.py tests/e2e/test_smoke.py
 git commit -m "Procedure header: 3-tier card (server template + CSS), caret toggle replaces dot"
 git push -u origin HEAD
@@ -309,7 +309,7 @@ git push -u origin HEAD
 ## Task 2: Mirror the redesign in the JS "＋ Add procedure" builder
 
 **Files:**
-- Modify: `controlflow_sdk/plane/templates/logic_builder.html` (`newProcedureSection()`, ~337–382)
+- Modify: `uticen_lite/plane/templates/logic_builder.html` (`newProcedureSection()`, ~337–382)
 - Test: `tests/e2e/test_smoke.py` (add a structural-parity + zero-`pageerror` test, modeled on the existing `test_builder_collapse_and_section_insert` seeding idiom)
 
 **Interfaces:**
@@ -393,7 +393,7 @@ Expected: FAIL (the builder still emits the old `.proc-dot`/`proc-title-row` sha
 
 - [ ] **Step 3: Rewrite `newProcedureSection()` to the new shape**
 
-In `controlflow_sdk/plane/templates/logic_builder.html`, replace the `sec.innerHTML = …` assignment in `newProcedureSection()` (the string spanning ~343–379) with the new structure. Keep the trailing `sec.querySelector('[data-proc-code]').value = code;` line:
+In `uticen_lite/plane/templates/logic_builder.html`, replace the `sec.innerHTML = …` assignment in `newProcedureSection()` (the string spanning ~343–379) with the new structure. Keep the trailing `sec.querySelector('[data-proc-code]').value = code;` line:
 
 ```javascript
       sec.innerHTML =
@@ -451,7 +451,7 @@ Expected: PASS (new parity test + the existing two-procedure author/run/export f
 - [ ] **Step 5: Commit + push**
 
 ```bash
-git add controlflow_sdk/plane/templates/logic_builder.html tests/e2e/test_smoke.py
+git add uticen_lite/plane/templates/logic_builder.html tests/e2e/test_smoke.py
 git commit -m "Procedure header: mirror 3-tier shape in the Add-procedure JS builder"
 git push -u origin HEAD
 ```
@@ -498,7 +498,7 @@ Expected: PASS, no warnings.
 Run: `python -m pytest tests/e2e -m browser -q`
 Expected: PASS.
 
-Run: `python -m ruff check . && python -m mypy controlflow_sdk`
+Run: `python -m ruff check . && python -m mypy uticen_lite`
 Expected: clean.
 
 - [ ] **Step 5: Commit + push (only if Step 1 or 2 changed files)**

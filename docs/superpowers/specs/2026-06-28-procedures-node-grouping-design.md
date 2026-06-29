@@ -2,7 +2,7 @@
 
 > Status: **approved design, pre-plan.** Date: 2026-06-28. Author surface: `controlplane` web app.
 > Cardinal rule in play: this touches the bundle (`procedure` object) — additive-optional only,
-> no `schema_version` bump. See [learning 0001](../../learnings/0001-stay-compatible-with-the-controlflow-app.md).
+> no `schema_version` bump. See [learning 0001](../../learnings/0001-stay-compatible-with-the-uticen-app.md).
 
 ## Problem
 
@@ -22,7 +22,7 @@ roll up more than one test.
 
 Let the author **define procedures** (code · name · assertion · threshold) and **assign workflow
 nodes to them**, where a procedure may roll up **several** `Test` nodes into one audit result. Keep the
-ControlFlow-app bundle contract intact (additive-optional only). Reuse the existing graph / compile /
+Uticen-app bundle contract intact (additive-optional only). Reuse the existing graph / compile /
 run / workpaper machinery rather than forking it.
 
 ### Non-goals

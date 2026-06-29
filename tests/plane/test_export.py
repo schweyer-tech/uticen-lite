@@ -157,7 +157,7 @@ def test_export_pipeline_control_bundle_valid_and_node_free(client):
     """A VISUAL pipeline control exports a schema-valid bundle whose test_code is
     the compiled cross-source Python — and the bundle never carries the graph or
     the word 'node' (cardinal rule 0001; store-only graph per learning 0006)."""
-    from controlflow_sdk.schema.validate import validate_bundle
+    from uticen_lite.schema.validate import validate_bundle
 
     _ran_pipeline_control(client)
     resp = client.post("/export")

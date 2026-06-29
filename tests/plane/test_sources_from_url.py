@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 
-from controlflow_sdk.plane import fetch
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
+from uticen_lite.plane import fetch
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
 
 
 def _fake_opener(payload):

@@ -20,7 +20,7 @@ def test_contract_is_byte_identical_to_packaged_schema() -> None:
     """contract/bundle.schema.json must be byte-identical to the packaged schema."""
     # Read the canonical packaged bytes via importlib.resources (works after install too)
     pkg_bytes = (
-        importlib.resources.files("controlflow_sdk.schema")
+        importlib.resources.files("uticen_lite.schema")
         .joinpath("bundle.schema.json")
         .read_bytes()
     )

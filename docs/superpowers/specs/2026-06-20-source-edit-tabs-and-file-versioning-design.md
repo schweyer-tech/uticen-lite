@@ -1,7 +1,7 @@
 # Design — Tabbed Edit Source + per-file as-of date & version history
 
 Date: 2026-06-20
-Area: control plane (`controlflow_sdk/plane/`) + store (`controlflow_sdk/store/`)
+Area: control plane (`uticen_lite/plane/`) + store (`uticen_lite/store/`)
 Status: approved (brainstorm), pending spec review
 
 ## Problem

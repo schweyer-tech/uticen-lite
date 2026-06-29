@@ -48,9 +48,9 @@ reads as a no-op; a page (or new tab) is unmistakable, bookmarkable, and back/fo
 
 ## Reference
 
-- `controlflow_sdk/plane/templates/_source_tabs.html` (shared nav, `active` highlight).
-- `controlflow_sdk/plane/routes/sources.py` (`edit_source`, `source_data`, `source_history`).
-- Drill-down-as-new-tab: `controlflow_sdk/plane/templates/step_data.html` (full page) + the
+- `uticen_lite/plane/templates/_source_tabs.html` (shared nav, `active` highlight).
+- `uticen_lite/plane/routes/sources.py` (`edit_source`, `source_data`, `source_history`).
+- Drill-down-as-new-tab: `uticen_lite/plane/templates/step_data.html` (full page) + the
   `target="_blank"` row-count link in `partials/_pipe_node.html` / `_pipe_diagram.html`;
   `routes/pipeline.py::step_data`.
 - Connection rule for the writing handlers: learning [[0002]].

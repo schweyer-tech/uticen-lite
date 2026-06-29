@@ -4,11 +4,11 @@ import io
 
 import pandas as pd
 
-from controlflow_sdk.adapters.files import source_for
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.loader import _binding
-from controlflow_sdk.store.migrations import migrate
+from uticen_lite.adapters.files import source_for
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.loader import _binding
+from uticen_lite.store.migrations import migrate
 
 
 def test_stored_sheet_is_read_at_runtime(tmp_path):

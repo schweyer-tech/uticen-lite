@@ -54,12 +54,12 @@ pinned with a view-model test asserting a sole procedure's `code == ""` and a 2+
 
 ## Reference
 
-- `controlflow_sdk/pipeline/procedures.py` — `_auto_procedure` / `effective_procedures`
+- `uticen_lite/pipeline/procedures.py` — `_auto_procedure` / `effective_procedures`
   (the `lone` branch that forces `code=""`).
-- `controlflow_sdk/render/html.py` — `_emit_procedures` (`if proc.code:` heading branch);
-  `controlflow_sdk/bundle/assemble.py` — single-procedure path (`code=""`).
-- `controlflow_sdk/plane/routes/pipeline.py` `_procedure_context` (display default) +
-  `controlflow_sdk/plane/templates/logic_builder.html` `serializeProcedures()` (persist
+- `uticen_lite/render/html.py` — `_emit_procedures` (`if proc.code:` heading branch);
+  `uticen_lite/bundle/assemble.py` — single-procedure path (`code=""`).
+- `uticen_lite/plane/routes/pipeline.py` `_procedure_context` (display default) +
+  `uticen_lite/plane/templates/logic_builder.html` `serializeProcedures()` (persist
   default) — the two authoring-surface defaults that must agree (the 2026-06-28 corollary).
 - Keeps the bundle and the local workpaper in parity ([[0001]] cardinal); verdict/threshold
   stay out of the bundle ([[0015]]).

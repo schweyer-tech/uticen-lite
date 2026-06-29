@@ -44,7 +44,7 @@ stop and replace it with a wait-for-the-app-to-write.
 
 - `tests/e2e/test_smoke.py` — `test_builder_collapse_and_section_insert` (the `wait_for_function`
   on the `cflow.logic.collapse.*` key).
-- `controlflow_sdk/plane/templates/logic_builder.html` — the capture-phase `toggle` listener +
+- `uticen_lite/plane/templates/logic_builder.html` — the capture-phase `toggle` listener +
   the on-load `restoreCollapse()`.
 - Strengthens [[0012]] (the control-plane e2e is load-bearing — never dismiss *or paper over* a
   failure).

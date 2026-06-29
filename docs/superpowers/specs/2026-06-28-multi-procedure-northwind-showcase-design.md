@@ -3,7 +3,7 @@
 > Status: **approved design, pre-plan.** Date: 2026-06-28. Surface: the `examples/northwind-trading`
 > demo engagement. Realizes the deferred "multi-procedure Northwind showcase" follow-up from the
 > procedures cycle. **Bundle-additive only** (the `workpaper.procedures` array is already unbounded) —
-> no `schema_version` bump (cardinal rule, [learning 0001](../../learnings/0001-stay-compatible-with-the-controlflow-app.md)).
+> no `schema_version` bump (cardinal rule, [learning 0001](../../learnings/0001-stay-compatible-with-the-uticen-app.md)).
 
 ## Problem
 
@@ -105,7 +105,7 @@ literal tied to this control and update it; assert the new `5` explicitly so the
 
 - **Regenerate** the committed `examples/northwind-trading/controlplane.db` so the shipped one-click demo
   matches the new pipeline (`examples/` is the single source of truth force-included into the wheel; there
-  is **no** separate `controlflow_sdk/_demo/` copy in the tree). Define the regeneration mechanism in the
+  is **no** separate `uticen_lite/_demo/` copy in the tree). Define the regeneration mechanism in the
   plan (fresh migrated db → `import_project(examples/northwind-trading)` → run each control), and verify
   the rebuilt db opens in the control plane with the two-procedure control intact.
 - `tests/examples/test_northwind.py`: keep `Finance.GL.1: 3`; **add** an assertion that the built bundle's

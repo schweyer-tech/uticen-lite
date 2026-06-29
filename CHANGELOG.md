@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the ControlFlow SDK are documented here. This project adheres to [Semantic Versioning](https://semver.org/) for package releases and uses independent `schema_version` for the bundle export contract.
+All notable changes to the Uticen SDK are documented here. This project adheres to [Semantic Versioning](https://semver.org/) for package releases and uses independent `schema_version` for the bundle export contract.
 
 **Current version:** `0.1.0`  
 **Current schema_version:** `1.0`
@@ -16,7 +16,7 @@ For details on versioning and compatibility policy, see [docs/CONTRACT.md](docs/
 - **Upgrade & update-awareness.** The control plane detects how it was installed and can upgrade
   itself in one click — git checkout → `git pull --ff-only` + editable reinstall · pipx →
   `pipx upgrade` · pip → `pip install -U`. The same routine is available headless as
-  `cflow upgrade [--check] [--yes]`. An **opt-in** "check for updates on launch" toggle
+  `uticen-lite upgrade [--check] [--yes]`. An **opt-in** "check for updates on launch" toggle
   (Settings ▸ Updates, **off by default**) preserves the control plane's zero-egress default.
 
 ---
@@ -33,7 +33,7 @@ For details on versioning and compatibility policy, see [docs/CONTRACT.md](docs/
 
 #### Full Local Runner
 
-- **`cflow run`** — Execute test functions against full populations
+- **`uticen-lite run`** — Execute test functions against full populations
   - Load control metadata from `control.yaml`
   - Bind data sources (CSV, Excel, Parquet, REST APIs)
   - Execute user Python test functions with pandas DataFrames
@@ -48,12 +48,12 @@ For details on versioning and compatibility policy, see [docs/CONTRACT.md](docs/
 
 - **Execution modes**:
   - Single control via `--control <id>`
-  - Full project via `cflow run` (all controls)
+  - Full project via `uticen-lite run` (all controls)
   - Custom execution timestamp via `--at <iso-8601>`
 
 #### Bundle Builder
 
-- **`cflow build`** — Package control tests for import into ControlFlow application
+- **`uticen-lite build`** — Package control tests for import into Uticen application
   - Assemble all controls, runs, workpapers, and metadata
   - Validate against `schema_version: "1.0"`
   - Generate `.cflow` archive (ZIP format) ready for upload
@@ -61,11 +61,11 @@ For details on versioning and compatibility policy, see [docs/CONTRACT.md](docs/
 
 #### CLI Commands
 
-- **`cflow init`** — Scaffold a new project with control template
-- **`cflow new`** — Add a new control to an existing project
-- **`cflow validate`** — Check control YAML syntax, test function shape, and data source readability
-- **`cflow run`** — Execute all controls (or one with `--control`)
-- **`cflow build`** — Package and export the project bundle
+- **`uticen-lite init`** — Scaffold a new project with control template
+- **`uticen-lite new`** — Add a new control to an existing project
+- **`uticen-lite validate`** — Check control YAML syntax, test function shape, and data source readability
+- **`uticen-lite run`** — Execute all controls (or one with `--control`)
+- **`uticen-lite build`** — Package and export the project bundle
 
 #### Adapters
 
@@ -116,7 +116,7 @@ None (initial release).
 1. **Before release**: Create a new section `## [X.Y.Z] — YYYY-MM-DD`
 2. **Group changes**: Use subheadings (`Added`, `Changed`, `Fixed`, `Deprecated`, `Removed`, `Security`)
 3. **Note schema changes**: If `schema_version` is incremented, explicitly call it out with migration details
-4. **Coordinate with app**: If schema changes, ensure ControlFlow docs are updated in sync
+4. **Coordinate with app**: If schema changes, ensure Uticen docs are updated in sync
 5. **Keep unreleased section**: Always maintain an `## [Unreleased]` section for in-flight work
 
 ### Schema Version History

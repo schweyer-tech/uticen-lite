@@ -23,8 +23,8 @@ def test_upload_xlsx_infers_columns_and_format(client):
     assert resp.status_code in (302, 303)
     edit = client.get("/sources/gl")
     assert "user_id" in edit.text and "amount" in edit.text
-    from controlflow_sdk.store import repo
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store import repo
+    from uticen_lite.store.db import connect
     conn = connect(client.app.state.project_root)
     assert repo.get_source(conn, "gl")["format"] == "xlsx"
     conn.close()
@@ -51,8 +51,8 @@ def test_xlsx_sheet_selection_persisted(client):
                 files={"file": ("ms.xlsx", io.BytesIO(raw),
                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
                 follow_redirects=False)
-    from controlflow_sdk.store import repo
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store import repo
+    from uticen_lite.store.db import connect
     conn = connect(client.app.state.project_root)
     assert repo.get_source(conn, "ms")["sheet"] == "Second"
     conn.close()
@@ -67,17 +67,17 @@ def test_data_preview_degrades_when_adapters_unavailable(client, monkeypatch):
                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
                 follow_redirects=False)
     # Now simulate the [adapters] extra being absent for the preview read.
-    from controlflow_sdk.plane.ingest import AdaptersUnavailable
+    from uticen_lite.plane.ingest import AdaptersUnavailable
     msg = ("Excel/Parquet support needs the optional dependencies: "
-           "pip install 'controlflow-sdk[adapters]'")
+           "pip install 'uticen-lite[adapters]'")
 
     def _raise(*a, **k):
         raise AdaptersUnavailable(msg)
 
-    monkeypatch.setattr("controlflow_sdk.plane.routes.sources.extract_table", _raise)
+    monkeypatch.setattr("uticen_lite.plane.routes.sources.extract_table", _raise)
     resp = client.get("/sources/gone/data")
     assert resp.status_code == 200  # friendly degrade, never a 500
-    assert "controlflow-sdk[adapters]" in resp.text
+    assert "uticen-lite[adapters]" in resp.text
 
 
 def test_unsupported_xls_rejected(client):
@@ -115,8 +115,8 @@ def test_confirm_refresh_preserves_sheet(client, tmp_path):
     client.post("/sources/refresh_sheet/refresh/confirm",
                 data={"pending": "rs.xlsx", "as_of_date": "2026-06-01"})
 
-    from controlflow_sdk.store import repo
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store import repo
+    from uticen_lite.store.db import connect
     conn = connect(client.app.state.project_root)
     source = repo.get_source(conn, "refresh_sheet")
     conn.close()
@@ -141,8 +141,8 @@ def test_save_source_preserves_sheet(client):
                       "include__val": "on"},
                 follow_redirects=False)
 
-    from controlflow_sdk.store import repo
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store import repo
+    from uticen_lite.store.db import connect
     conn = connect(client.app.state.project_root)
     source = repo.get_source(conn, "ss_sheet")
     conn.close()
@@ -188,8 +188,8 @@ def test_corrupt_parquet_upload_is_friendly(client):
 
 def test_history_tab_shows_secrets_warning_for_url_source(client):
     """GET /sources/{id}/history must show the plaintext-credentials warning for URL sources."""
-    from controlflow_sdk.store import repo
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store import repo
+    from uticen_lite.store.db import connect
 
     # Create a minimal file-based source first
     raw = b"id,name\n1,foo\n"

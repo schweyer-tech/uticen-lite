@@ -14,7 +14,7 @@ def test_pyproject_declares_plane_extra_and_entry():
     joined = " ".join(extras["plane"])
     for dep in ("fastapi", "uvicorn", "jinja2", "python-multipart"):
         assert dep in joined
-    assert data["project"]["scripts"]["controlplane"] == "controlflow_sdk.plane.__main__:main"
+    assert data["project"]["scripts"]["controlplane"] == "uticen_lite.plane.__main__:main"
 
 
 def test_pyproject_declares_ai_extra():
@@ -26,7 +26,7 @@ def test_pyproject_declares_ai_extra():
 
 
 def test_main_entrypoint_importable():
-    from controlflow_sdk.plane.__main__ import main
+    from uticen_lite.plane.__main__ import main
     assert callable(main)
 
 
@@ -42,7 +42,7 @@ def test_ai_module_imports_without_extra():
         "        raise ImportError(name)\n"
         "    return real(name, *a, **k)\n"
         "builtins.__import__ = blocked\n"
-        "import controlflow_sdk.ai as ai\n"
+        "import uticen_lite.ai as ai\n"
         "assert ai.available_providers()\n"
         "assert ai.provider_key_present('ollama') is True\n"
     )
@@ -51,7 +51,7 @@ def test_ai_module_imports_without_extra():
 
 
 def test_ai_modules_ship_in_wheel(tmp_path):
-    # The AI module is package-internal — hatchling packages=["controlflow_sdk"]
+    # The AI module is package-internal — hatchling packages=["uticen_lite"]
     # ships it with no force-include needed (learning 0003). Build and inspect.
     try:
         import build  # noqa: F401
@@ -64,7 +64,7 @@ def test_ai_modules_ship_in_wheel(tmp_path):
     wheels = list(tmp_path.glob("*.whl"))
     assert wheels, "no wheel built"
     names = set(zipfile.ZipFile(wheels[0]).namelist())
-    for mod in ("controlflow_sdk/ai/__init__.py",
-                "controlflow_sdk/ai/draft.py",
-                "controlflow_sdk/ai/providers.py"):
+    for mod in ("uticen_lite/ai/__init__.py",
+                "uticen_lite/ai/draft.py",
+                "uticen_lite/ai/providers.py"):
         assert mod in names, f"{mod} missing from wheel"

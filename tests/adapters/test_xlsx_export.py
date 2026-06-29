@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from controlflow_sdk.adapters import xlsx_export as X
+from uticen_lite.adapters import xlsx_export as X
 
 
 def _read(buf_bytes, sheet=0):
@@ -102,7 +102,7 @@ def test_step_label_summary_does_not_collide_with_summary_sheet():
 
 
 def test_missing_openpyxl_raises_adapters_unavailable(monkeypatch):
-    from controlflow_sdk.plane.ingest import AdaptersUnavailable
+    from uticen_lite.plane.ingest import AdaptersUnavailable
 
     def _boom():
         raise ImportError("no openpyxl")

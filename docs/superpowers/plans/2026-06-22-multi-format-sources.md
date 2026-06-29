@@ -17,7 +17,7 @@
 - **Store evolves via store-only state** (migration `user_version` bump only), never `schema_version`.
 - **Secrets never enter the bundle.** `source_fetch` (url/headers/record_path) is store/UI-only.
 - **Egress is always user-initiated** (button click); no background/polled/auto fetch anywhere.
-- Gates must end green and pristine: `python -m pytest -q` (no stray warnings), `python -m ruff check .`, `python -m mypy controlflow_sdk`.
+- Gates must end green and pristine: `python -m pytest -q` (no stray warnings), `python -m ruff check .`, `python -m mypy uticen_lite`.
 
 ---
 
@@ -30,7 +30,7 @@
   git push -u origin HEAD
   ```
   (Feature branch only — no PR is open during the build, so auto-merge is not armed. Per learning 0018, the PR is opened later, after learnings are committed.)
-- Run from the worktree root: `/Users/dom/repos/controlflow-sdk/.claude/worktrees/multi-format-sources`.
+- Run from the worktree root: `/Users/dom/repos/uticen-lite/.claude/worktrees/multi-format-sources`.
 - TDD throughout: failing test → run it red → minimal implementation → run it green → commit + push.
 
 ---
@@ -39,14 +39,14 @@
 
 | File | Responsibility |
 | --- | --- |
-| `controlflow_sdk/adapters/inspect.py` | **New.** The only pandas in this feature: `read_dataframe(raw, fmt, sheet)`, `sheet_names(raw)`. |
-| `controlflow_sdk/plane/ingest.py` | **New.** `extract_table` + `ExtractedTable` + `AdaptersUnavailable`. CSV stdlib; xlsx/parquet via lazy `adapters.inspect`. |
-| `controlflow_sdk/plane/fetch.py` | **New.** `fetch_snapshot` + `FetchedSnapshot` + `FetchError`; injectable `opener`; JSON→CSV (stdlib). |
-| `controlflow_sdk/store/migrations.py` | **Step 6:** `sources.sheet` column + `source_fetch` table. |
-| `controlflow_sdk/store/repo.py` | `upsert_source(..., sheet=None)`; `upsert_source_fetch` / `get_source_fetch`. |
-| `controlflow_sdk/store/loader.py`, `store/import_service.py` | Thread `sheet` into `SourceBinding.config`. |
-| `controlflow_sdk/plane/routes/sources.py` | Route uploads through `extract_table`; format-from-extension; URL create + re-fetch; friendly errors. |
-| `controlflow_sdk/plane/templates/source_new.html` (+ `source_data.html`, `source_history.html`) | Upload/URL modes, sheet dropdown, re-fetch button, secrets warning, non-CSV preview. |
+| `uticen_lite/adapters/inspect.py` | **New.** The only pandas in this feature: `read_dataframe(raw, fmt, sheet)`, `sheet_names(raw)`. |
+| `uticen_lite/plane/ingest.py` | **New.** `extract_table` + `ExtractedTable` + `AdaptersUnavailable`. CSV stdlib; xlsx/parquet via lazy `adapters.inspect`. |
+| `uticen_lite/plane/fetch.py` | **New.** `fetch_snapshot` + `FetchedSnapshot` + `FetchError`; injectable `opener`; JSON→CSV (stdlib). |
+| `uticen_lite/store/migrations.py` | **Step 6:** `sources.sheet` column + `source_fetch` table. |
+| `uticen_lite/store/repo.py` | `upsert_source(..., sheet=None)`; `upsert_source_fetch` / `get_source_fetch`. |
+| `uticen_lite/store/loader.py`, `store/import_service.py` | Thread `sheet` into `SourceBinding.config`. |
+| `uticen_lite/plane/routes/sources.py` | Route uploads through `extract_table`; format-from-extension; URL create + re-fetch; friendly errors. |
+| `uticen_lite/plane/templates/source_new.html` (+ `source_data.html`, `source_history.html`) | Upload/URL modes, sheet dropdown, re-fetch button, secrets warning, non-CSV preview. |
 | `PRODUCT-MAP.md` | Update Source-manager / Source-editor rows. |
 
 ---
@@ -54,7 +54,7 @@
 ### Task 1: `adapters/inspect.py` — pandas reader + sheet names
 
 **Files:**
-- Create: `controlflow_sdk/adapters/inspect.py`
+- Create: `uticen_lite/adapters/inspect.py`
 - Test: `tests/adapters/test_inspect.py`
 
 **Interfaces:**
@@ -70,7 +70,7 @@ import io
 
 import pandas as pd
 
-from controlflow_sdk.adapters import inspect
+from uticen_lite.adapters import inspect
 
 
 def _xlsx_bytes(sheets: dict[str, pd.DataFrame]) -> bytes:
@@ -105,12 +105,12 @@ def test_read_dataframe_parquet_roundtrip():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/adapters/test_inspect.py -q`
-Expected: FAIL — `ModuleNotFoundError: controlflow_sdk.adapters.inspect`.
+Expected: FAIL — `ModuleNotFoundError: uticen_lite.adapters.inspect`.
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# controlflow_sdk/adapters/inspect.py
+# uticen_lite/adapters/inspect.py
 """Pandas-backed reads for source inspection (header/rows/sheets).
 
 CPython-only — imports pandas (core dep) and, at read time, the optional
@@ -152,7 +152,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add controlflow_sdk/adapters/inspect.py tests/adapters/test_inspect.py
+git add uticen_lite/adapters/inspect.py tests/adapters/test_inspect.py
 git commit -m "feat(adapters): inspect.read_dataframe/sheet_names for xlsx/parquet/csv bytes"
 git push -u origin HEAD
 ```
@@ -162,7 +162,7 @@ git push -u origin HEAD
 ### Task 2: `plane/ingest.py` — `extract_table` format funnel
 
 **Files:**
-- Create: `controlflow_sdk/plane/ingest.py`
+- Create: `uticen_lite/plane/ingest.py`
 - Test: `tests/plane/test_ingest.py`
 
 **Interfaces:**
@@ -180,7 +180,7 @@ import io
 import pandas as pd
 import pytest
 
-from controlflow_sdk.plane import ingest
+from uticen_lite.plane import ingest
 
 
 def test_extract_table_csv_stdlib():
@@ -205,22 +205,22 @@ def test_extract_table_xlsx_rows_and_sheets():
 def test_extract_table_missing_adapters_is_friendly(monkeypatch):
     def boom(*a, **k):
         raise ImportError("Missing optional dependency 'openpyxl'")
-    monkeypatch.setattr("controlflow_sdk.adapters.inspect.sheet_names", boom)
-    monkeypatch.setattr("controlflow_sdk.adapters.inspect.read_dataframe", boom)
+    monkeypatch.setattr("uticen_lite.adapters.inspect.sheet_names", boom)
+    monkeypatch.setattr("uticen_lite.adapters.inspect.read_dataframe", boom)
     with pytest.raises(ingest.AdaptersUnavailable) as exc:
         ingest.extract_table(b"\x00\x01", "xlsx")
-    assert "controlflow-sdk[adapters]" in str(exc.value)
+    assert "uticen-lite[adapters]" in str(exc.value)
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/plane/test_ingest.py -q`
-Expected: FAIL — `ModuleNotFoundError: controlflow_sdk.plane.ingest`.
+Expected: FAIL — `ModuleNotFoundError: uticen_lite.plane.ingest`.
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# controlflow_sdk/plane/ingest.py
+# uticen_lite/plane/ingest.py
 """Format-aware table extraction for the control plane upload/preview paths.
 
 The single funnel that replaces CSV-hardcoded header/row parsing. CSV stays
@@ -265,7 +265,7 @@ def _csv_table(raw: bytes) -> ExtractedTable:
 def _adapters_table(raw: bytes, fmt: str, sheet: str | int | None) -> ExtractedTable:
     # pandas is a core dep so the import succeeds; the engine (openpyxl/pyarrow)
     # is the optional piece and raises ImportError at READ time when absent.
-    from controlflow_sdk.adapters import inspect as _inspect
+    from uticen_lite.adapters import inspect as _inspect
 
     try:
         names = _inspect.sheet_names(raw) if fmt == "xlsx" else []
@@ -273,7 +273,7 @@ def _adapters_table(raw: bytes, fmt: str, sheet: str | int | None) -> ExtractedT
     except ImportError as e:  # openpyxl / pyarrow missing
         raise AdaptersUnavailable(
             "Excel/Parquet support needs the optional dependencies: "
-            "pip install 'controlflow-sdk[adapters]'"
+            "pip install 'uticen-lite[adapters]'"
         ) from e
 
     header = [str(c) for c in df.columns]
@@ -290,7 +290,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add controlflow_sdk/plane/ingest.py tests/plane/test_ingest.py
+git add uticen_lite/plane/ingest.py tests/plane/test_ingest.py
 git commit -m "feat(plane): extract_table format funnel (csv stdlib; xlsx/parquet via adapters)"
 git push -u origin HEAD
 ```
@@ -300,7 +300,7 @@ git push -u origin HEAD
 ### Task 3: Store migration step 6 — `sheet` column + `source_fetch` table
 
 **Files:**
-- Modify: `controlflow_sdk/store/migrations.py` (append a 6th entry to `_STEPS`)
+- Modify: `uticen_lite/store/migrations.py` (append a 6th entry to `_STEPS`)
 - Test: `tests/store/test_migration_step6.py`
 
 **Interfaces:**
@@ -312,8 +312,8 @@ git push -u origin HEAD
 # tests/store/test_migration_step6.py
 from __future__ import annotations
 
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.migrations import migrate
+from uticen_lite.store.db import connect
+from uticen_lite.store.migrations import migrate
 
 
 def _cols(conn, table):
@@ -341,7 +341,7 @@ Expected: FAIL — `source_fetch` table absent / `sheet` not in columns.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Append to `_STEPS` in `controlflow_sdk/store/migrations.py`, immediately after the step-5 string and before the closing `]`:
+Append to `_STEPS` in `uticen_lite/store/migrations.py`, immediately after the step-5 string and before the closing `]`:
 
 ```python
     # --- step 6 -> user_version 6 -------------------------------------------
@@ -373,7 +373,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add controlflow_sdk/store/migrations.py tests/store/test_migration_step6.py
+git add uticen_lite/store/migrations.py tests/store/test_migration_step6.py
 git commit -m "feat(store): migration step 6 — sources.sheet + source_fetch table"
 git push -u origin HEAD
 ```
@@ -383,7 +383,7 @@ git push -u origin HEAD
 ### Task 4: `repo.py` — persist `sheet` + `source_fetch` CRUD
 
 **Files:**
-- Modify: `controlflow_sdk/store/repo.py` (`upsert_source`; add `upsert_source_fetch`, `get_source_fetch`)
+- Modify: `uticen_lite/store/repo.py` (`upsert_source`; add `upsert_source_fetch`, `get_source_fetch`)
 - Test: `tests/store/test_source_fetch_repo.py`
 
 **Interfaces:**
@@ -396,9 +396,9 @@ git push -u origin HEAD
 # tests/store/test_source_fetch_repo.py
 from __future__ import annotations
 
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.migrations import migrate
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.migrations import migrate
 
 
 def _db(tmp_path):
@@ -441,7 +441,7 @@ Expected: FAIL — `upsert_source() got an unexpected keyword argument 'sheet'`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `controlflow_sdk/store/repo.py`, change `upsert_source` to accept and persist `sheet`. Replace the function with:
+In `uticen_lite/store/repo.py`, change `upsert_source` to accept and persist `sheet`. Replace the function with:
 
 ```python
 def upsert_source(
@@ -514,7 +514,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add controlflow_sdk/store/repo.py tests/store/test_source_fetch_repo.py
+git add uticen_lite/store/repo.py tests/store/test_source_fetch_repo.py
 git commit -m "feat(store): upsert_source(sheet=...) + source_fetch CRUD"
 git push -u origin HEAD
 ```
@@ -524,8 +524,8 @@ git push -u origin HEAD
 ### Task 5: Thread `sheet` into `SourceBinding.config` (engine thread-through)
 
 **Files:**
-- Modify: `controlflow_sdk/store/loader.py` (`_binding`)
-- Modify: `controlflow_sdk/store/import_service.py` (the `upsert_source(...)` call)
+- Modify: `uticen_lite/store/loader.py` (`_binding`)
+- Modify: `uticen_lite/store/import_service.py` (the `upsert_source(...)` call)
 - Test: `tests/store/test_sheet_threadthrough.py`
 
 **Interfaces:**
@@ -542,11 +542,11 @@ import io
 
 import pandas as pd
 
-from controlflow_sdk.adapters.files import source_for
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
-from controlflow_sdk.store.loader import _binding
-from controlflow_sdk.store.migrations import migrate
+from uticen_lite.adapters.files import source_for
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+from uticen_lite.store.loader import _binding
+from uticen_lite.store.migrations import migrate
 
 
 def test_stored_sheet_is_read_at_runtime(tmp_path):
@@ -597,7 +597,7 @@ Expected: FAIL — `binding.config.get("sheet")` is `None`, the loaded populatio
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `controlflow_sdk/store/loader.py`, replace the `config=` line of `_binding`. Change:
+In `uticen_lite/store/loader.py`, replace the `config=` line of `_binding`. Change:
 
 ```python
         config={"path": src["path"], "format": src["format"]},
@@ -619,7 +619,7 @@ def _source_config(src: dict) -> dict:
     return config
 ```
 
-In `controlflow_sdk/store/import_service.py`, add `sheet` to the `upsert_source(...)` call:
+In `uticen_lite/store/import_service.py`, add `sheet` to the `upsert_source(...)` call:
 
 ```python
             sheet=binding.config.get("sheet"),
@@ -633,7 +633,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add controlflow_sdk/store/loader.py controlflow_sdk/store/import_service.py tests/store/test_sheet_threadthrough.py
+git add uticen_lite/store/loader.py uticen_lite/store/import_service.py tests/store/test_sheet_threadthrough.py
 git commit -m "feat(store): thread sources.sheet into SourceBinding.config (run reads chosen sheet)"
 git push -u origin HEAD
 ```
@@ -643,7 +643,7 @@ git push -u origin HEAD
 ### Task 6: `plane/fetch.py` — one-time URL snapshot
 
 **Files:**
-- Create: `controlflow_sdk/plane/fetch.py`
+- Create: `uticen_lite/plane/fetch.py`
 - Test: `tests/plane/test_fetch.py`
 
 **Interfaces:**
@@ -659,7 +659,7 @@ import json
 
 import pytest
 
-from controlflow_sdk.plane import fetch
+from uticen_lite.plane import fetch
 
 
 def _opener(body: bytes, ctype: str):
@@ -712,12 +712,12 @@ def test_errors_are_fetcherror():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/plane/test_fetch.py -q`
-Expected: FAIL — `ModuleNotFoundError: controlflow_sdk.plane.fetch`.
+Expected: FAIL — `ModuleNotFoundError: uticen_lite.plane.fetch`.
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# controlflow_sdk/plane/fetch.py
+# uticen_lite/plane/fetch.py
 """One-time, user-initiated URL fetch that snapshots a response to bytes.
 
 NOT a live connector (STRATEGY.md non-goal): a single GET on an explicit user
@@ -854,7 +854,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add controlflow_sdk/plane/fetch.py tests/plane/test_fetch.py
+git add uticen_lite/plane/fetch.py tests/plane/test_fetch.py
 git commit -m "feat(plane): fetch_snapshot — one-time URL GET, JSON->CSV, injectable opener"
 git push -u origin HEAD
 ```
@@ -864,8 +864,8 @@ git push -u origin HEAD
 ### Task 7: Route uploads through `extract_table` (Excel/Parquet end-to-end)
 
 **Files:**
-- Modify: `controlflow_sdk/plane/routes/sources.py`
-- Modify: `controlflow_sdk/plane/templates/source_new.html`
+- Modify: `uticen_lite/plane/routes/sources.py`
+- Modify: `uticen_lite/plane/templates/source_new.html`
 - Test: `tests/plane/test_sources_multiformat.py`
 
 **Interfaces:**
@@ -901,8 +901,8 @@ def test_upload_xlsx_infers_columns_and_format(client):
     assert resp.status_code in (302, 303)
     edit = client.get("/sources/gl")
     assert "user_id" in edit.text and "amount" in edit.text
-    from controlflow_sdk.store import repo
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store import repo
+    from uticen_lite.store.db import connect
     conn = connect(client.app.state.project_root)
     assert repo.get_source(conn, "gl")["format"] == "xlsx"
     conn.close()
@@ -929,8 +929,8 @@ def test_xlsx_sheet_selection_persisted(client):
                 files={"file": ("ms.xlsx", io.BytesIO(raw),
                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
                 follow_redirects=False)
-    from controlflow_sdk.store import repo
-    from controlflow_sdk.store.db import connect
+    from uticen_lite.store import repo
+    from uticen_lite.store.db import connect
     conn = connect(client.app.state.project_root)
     assert repo.get_source(conn, "ms")["sheet"] == "Second"
     conn.close()
@@ -952,12 +952,12 @@ Expected: FAIL — xlsx upload errors (CSV decode) / format not persisted / no p
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `controlflow_sdk/plane/routes/sources.py`:
+In `uticen_lite/plane/routes/sources.py`:
 
 (a) Add imports + an extension map near the top (after the existing imports):
 
 ```python
-from controlflow_sdk.plane.ingest import AdaptersUnavailable, extract_table
+from uticen_lite.plane.ingest import AdaptersUnavailable, extract_table
 
 _UPLOAD_FORMATS = {".csv": "csv", ".xlsx": "xlsx", ".parquet": "parquet"}
 
@@ -1086,7 +1086,7 @@ Expected: PASS (existing CSV tests still pass; the old `format` form field is no
 - [ ] **Step 5: Commit**
 
 ```bash
-git add controlflow_sdk/plane/routes/sources.py controlflow_sdk/plane/templates/source_new.html tests/plane/test_sources_multiformat.py
+git add uticen_lite/plane/routes/sources.py uticen_lite/plane/templates/source_new.html tests/plane/test_sources_multiformat.py
 git commit -m "feat(plane): accept xlsx/parquet uploads via extract_table + sheet selection"
 git push -u origin HEAD
 ```
@@ -1096,8 +1096,8 @@ git push -u origin HEAD
 ### Task 8: Create a source from a URL snapshot
 
 **Files:**
-- Modify: `controlflow_sdk/plane/routes/sources.py` (new `GET`/`POST /sources/from-url`)
-- Modify: `controlflow_sdk/plane/templates/source_new.html` (mode toggle + URL form + secrets warning)
+- Modify: `uticen_lite/plane/routes/sources.py` (new `GET`/`POST /sources/from-url`)
+- Modify: `uticen_lite/plane/templates/source_new.html` (mode toggle + URL form + secrets warning)
 - Test: `tests/plane/test_sources_from_url.py`
 
 **Interfaces:**
@@ -1112,9 +1112,9 @@ from __future__ import annotations
 
 import json
 
-from controlflow_sdk.plane import fetch
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
+from uticen_lite.plane import fetch
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
 
 
 def _fake_opener(payload):
@@ -1171,12 +1171,12 @@ Expected: FAIL — `/sources/from-url` route does not exist (404/405).
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `controlflow_sdk/plane/routes/sources.py`, add imports and a shared header-parser + the two routes (place the routes inside `register(...)`, near `create_source`):
+In `uticen_lite/plane/routes/sources.py`, add imports and a shared header-parser + the two routes (place the routes inside `register(...)`, near `create_source`):
 
 ```python
 import json as jsonmod
 
-from controlflow_sdk.plane import fetch as fetchmod
+from uticen_lite.plane import fetch as fetchmod
 ```
 
 ```python
@@ -1319,7 +1319,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add controlflow_sdk/plane/routes/sources.py controlflow_sdk/plane/templates/source_new.html tests/plane/test_sources_from_url.py
+git add uticen_lite/plane/routes/sources.py uticen_lite/plane/templates/source_new.html tests/plane/test_sources_from_url.py
 git commit -m "feat(plane): create a source from a one-time URL snapshot (+ secrets warning)"
 git push -u origin HEAD
 ```
@@ -1329,8 +1329,8 @@ git push -u origin HEAD
 ### Task 9: Re-fetch from URL through the diff→confirm flow
 
 **Files:**
-- Modify: `controlflow_sdk/plane/routes/sources.py` (new `POST /sources/{id}/refetch`)
-- Modify: `controlflow_sdk/plane/templates/source_data.html` (re-fetch button + secrets warning when URL-backed)
+- Modify: `uticen_lite/plane/routes/sources.py` (new `POST /sources/{id}/refetch`)
+- Modify: `uticen_lite/plane/templates/source_data.html` (re-fetch button + secrets warning when URL-backed)
 - Test: `tests/plane/test_source_refetch.py`
 
 **Interfaces:**
@@ -1459,7 +1459,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add controlflow_sdk/plane/routes/sources.py controlflow_sdk/plane/templates/source_data.html tests/plane/test_source_refetch.py
+git add uticen_lite/plane/routes/sources.py uticen_lite/plane/templates/source_data.html tests/plane/test_source_refetch.py
 git commit -m "feat(plane): Re-fetch from URL routes through the refresh-diff confirm flow"
 git push -u origin HEAD
 ```
@@ -1486,9 +1486,9 @@ import io
 
 import pandas as pd
 
-from controlflow_sdk.adapters.files import source_for
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
+from uticen_lite.adapters.files import source_for
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
 
 
 def test_xlsx_second_sheet_runs_full_population(client):
@@ -1505,7 +1505,7 @@ def test_xlsx_second_sheet_runs_full_population(client):
                 follow_redirects=False)
 
     conn = connect(client.app.state.project_root)
-    from controlflow_sdk.store.loader import _binding
+    from uticen_lite.store.loader import _binding
     src = repo.get_source(conn, "gl")
     conn.close()
     pop = source_for(_binding(src), client.app.state.project_root).load()
@@ -1549,7 +1549,7 @@ Add a sentence to the Source-editor Data-tab row noting **Re-fetch from URL** ro
 ```bash
 python -m pytest -q
 python -m ruff check .
-python -m mypy controlflow_sdk
+python -m mypy uticen_lite
 ```
 
 Expected: all green, no warnings. The contract gate (`tests/test_contract_export.py`, `tests/schema/test_bundle_schema.py`) passes unchanged.

@@ -9,8 +9,8 @@ should also be available on the drilled down control page."
 import io
 import json
 
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
 
 
 def _make_source(client, sid="users", csv=b"user_id,can_create\nU1,true\n"):
@@ -166,7 +166,7 @@ def test_run_unexpected_error_is_friendly_not_500(client, monkeypatch):
         raise RuntimeError("unexpected failure")
 
     monkeypatch.setattr(
-        "controlflow_sdk.plane.routes.runs.run_control_in_store", boom
+        "uticen_lite.plane.routes.runs.run_control_in_store", boom
     )
     resp = client.post("/controls/sod/run", follow_redirects=False)
     assert resp.status_code == 422, resp.text

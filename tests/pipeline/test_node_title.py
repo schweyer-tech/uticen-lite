@@ -1,8 +1,8 @@
 """Nodes carry an optional human-readable ``title`` (rename). It round-trips
 through parse and is excluded from the content-addressed step-cache key, so a
 title-only edit never busts the cache (learning 0030; 2026-06-27 review)."""
-from controlflow_sdk.pipeline.materialize import _step_keys
-from controlflow_sdk.pipeline.model import parse_pipeline
+from uticen_lite.pipeline.materialize import _step_keys
+from uticen_lite.pipeline.model import parse_pipeline
 
 
 def _graph(title_imp="", title_tst=""):

@@ -61,7 +61,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Page, expect
 
-from controlflow_sdk.schema.validate import validate_bundle
+from uticen_lite.schema.validate import validate_bundle
 
 # Two rows. 'user_id eq A1' flags exactly A1 in both branches.
 # Branch A threshold_count=5 → PASS (1 ≤ 5).

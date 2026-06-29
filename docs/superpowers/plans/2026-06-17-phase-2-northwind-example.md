@@ -9,16 +9,16 @@
 - **Never ask the user for permission to continue between tasks.** Execute the full plan start to finish without interruption.
 - On an unresolvable error after 2–3 attempts: note it in the task and **skip to the next task**.
 - **Commit per task; do NOT push** (the controller pushes once the phase gate is green — SDK repo `main`).
-- Work in the SDK repo `/Users/dom/repos/controlflow-sdk`. The CLI is the installed `cflow` (editable → reflects repo state, incl. Phase 1's multi-source `test(pop, sources)`). Toolchain: `ruff`, `mypy`, `python3 -m pytest`.
-- **Depends on Phase 1** (multi-source `test()`). Verify it's present first: `python3 -c "import inspect, controlflow_sdk.runner.execute as e; print(hasattr(e, '_accepts_sources'))"` → `True`.
+- Work in the SDK repo `/Users/dom/repos/uticen-lite`. The CLI is the installed `uticen-lite` (editable → reflects repo state, incl. Phase 1's multi-source `test(pop, sources)`). Toolchain: `ruff`, `mypy`, `python3 -m pytest`.
+- **Depends on Phase 1** (multi-source `test()`). Verify it's present first: `python3 -c "import inspect, uticen_lite.runner.execute as e; print(hasattr(e, '_accepts_sources'))"` → `True`.
 
 ---
 
-**Goal:** A committed, runnable sample engagement — **Northwind Trading Co.**, 8 audit controls across financial close / IT access / procurement over 8 seeded CSV sources — under `examples/northwind-trading/`, that `cflow run` turns into audit-grade workpapers and `cflow build` into an import bundle, guarded by a CI fixture test.
+**Goal:** A committed, runnable sample engagement — **Northwind Trading Co.**, 8 audit controls across financial close / IT access / procurement over 8 seeded CSV sources — under `examples/northwind-trading/`, that `uticen-lite run` turns into audit-grade workpapers and `uticen-lite build` into an import bundle, guarded by a CI fixture test.
 
-**Architecture:** A normal `cflow` project (`cflow.yaml`, `sources.yaml`, `controls/*/{control.yaml,test.py}`, `data/*.csv`). Controls 2/3/4/8 use multi-source `def test(pop, sources)`. The dataset is seeded so each control yields its specified exception count (one control, `mfa-enforcement`, passes clean). A CI fixture (`tests/examples/test_northwind.py`) runs it end-to-end with a fixed `--at` and asserts the outcomes.
+**Architecture:** A normal `uticen-lite` project (`cflow.yaml`, `sources.yaml`, `controls/*/{control.yaml,test.py}`, `data/*.csv`). Controls 2/3/4/8 use multi-source `def test(pop, sources)`. The dataset is seeded so each control yields its specified exception count (one control, `mfa-enforcement`, passes clean). A CI fixture (`tests/examples/test_northwind.py`) runs it end-to-end with a fixed `--at` and asserts the outcomes.
 
-**Tech Stack:** SDK `cflow` CLI, pandas (in `test.py`), CSV data, pytest fixture.
+**Tech Stack:** SDK `uticen-lite` CLI, pandas (in `test.py`), CSV data, pytest fixture.
 
 ## Global Constraints
 
@@ -38,9 +38,9 @@
 - Create: `examples/northwind-trading/cflow.yaml`, `examples/northwind-trading/sources.yaml`, `examples/northwind-trading/.gitignore` (`target/`), `examples/northwind-trading/data/{journal_entries,closed_periods,purchase_orders,invoices,payments,employees,access_accounts,vendor_master}.csv`
 
 **Interfaces:**
-- Produces: a valid project (`cflow validate` passes — controls added later, so an empty `controls/` is fine) and the 8 datasets every later task's control logic asserts against.
+- Produces: a valid project (`uticen-lite validate` passes — controls added later, so an empty `controls/` is fine) and the 8 datasets every later task's control logic asserts against.
 
-- [ ] **Step 1: Scaffold + cflow.yaml.** `cflow init examples/northwind-trading` (or hand-create). Set `cflow.yaml` to a Northwind project: `name: northwind-trading`, `framework: nist-800-53`, `system: { name: "Northwind Trading Co." }`. Add `.gitignore` with `target/`.
+- [ ] **Step 1: Scaffold + cflow.yaml.** `uticen-lite init examples/northwind-trading` (or hand-create). Set `cflow.yaml` to a Northwind project: `name: northwind-trading`, `framework: nist-800-53`, `system: { name: "Northwind Trading Co." }`. Add `.gitignore` with `target/`.
 
 - [ ] **Step 2: Author the 8 data CSVs to these exact seeding targets.** (Author plausible business data; the columns + the *specific violation rows* below are what matters. Keep joins consistent across files — vendor_id / po_id / invoice_id / employee_id must line up.)
 
@@ -61,9 +61,9 @@
     - For `mfa-enforcement` (control 6, **CLEAN**) → EVERY `is_active=true` account has `mfa_enabled=true`. (Inactive/terminated accounts may have `mfa_enabled=false`, but they are not `is_active`.) → 0 exceptions.
   - **`vendor_master.csv`** (~14 rows): `vendor_id,vendor_name,created_by,last_modified_by`. The 2 control-8 violators' vendors have `created_by`/`last_modified_by` matching those payments' `approved_by`.
 
-- [ ] **Step 3: Author `sources.yaml`** with all 8 sources (id = the names above), `type: file`, `config: {path: data/<file>.csv, format: csv}`, `key_config: {mode: single, columns: [<natural id>]}`, and `column_mappings` for each declared column (`original_name`, `display_name`, `data_type` ∈ text/number/date/boolean, `is_key: true` on the id column). Read `controlflow_sdk/schema/sources.schema.json` to match the required shape.
+- [ ] **Step 3: Author `sources.yaml`** with all 8 sources (id = the names above), `type: file`, `config: {path: data/<file>.csv, format: csv}`, `key_config: {mode: single, columns: [<natural id>]}`, and `column_mappings` for each declared column (`original_name`, `display_name`, `data_type` ∈ text/number/date/boolean, `is_key: true` on the id column). Read `uticen_lite/schema/sources.schema.json` to match the required shape.
 
-- [ ] **Step 4: Validate.** Run: `cflow validate examples/northwind-trading`
+- [ ] **Step 4: Validate.** Run: `uticen-lite validate examples/northwind-trading`
   Expected: exit 0 (no controls yet, or controls added later — empty controls/ validates fine).
 
 - [ ] **Step 5: Commit** (do NOT push). `git add examples/northwind-trading && git commit -m "feat(example): Northwind Trading project skeleton + seeded datasets"` — confirm no `target/` is staged.
@@ -77,7 +77,7 @@
 
 **Interfaces:**
 - Consumes: the Task 1 datasets + Phase 1 `def test(pop, sources)`.
-- Produces: 3 controls; `cflow run` flags 3 / 2 / 4 exceptions respectively.
+- Produces: 3 controls; `uticen-lite run` flags 3 / 2 / 4 exceptions respectively.
 
 - [ ] **Step 1: Author `manual-je-review`** (primary `journal_entries`). `control.yaml`: id `manual-je-review`, a real title/objective/narrative, `framework_refs: {nist: [AC-5]}`, `risk`, `sources: [- id: journal_entries]`. `test.py` (`def test(pop)`): flag rows where `entry_type=="manual"` and `float(amount)>=50000` and (`reviewed_by` blank/NaN or `reviewed_by==prepared_by`); each violation `item_key=entry_id`, severity `high`, details `{amount, prepared_by}`.
 
@@ -85,7 +85,7 @@
 
 - [ ] **Step 3: Author `three-way-match`** (multi-source: primary `payments`, also `invoices`, `purchase_orders`). `test.py` (`def test(pop, sources)`): for each payment, look up its invoice (by `invoice_id`) then PO (by `po_id`); flag if invoice missing, PO missing, PO `status!="approved"`, or `abs(payment.amount - po.amount)/po.amount > 0.01`; `item_key=payment_id`, severity `high`, details the reason. `framework_refs: {nist: []}`.
 
-- [ ] **Step 4: Run + assert counts.** Run: `cflow run examples/northwind-trading --control manual-je-review --at 2026-03-31T00:00:00Z` (and the same for the other two, or run all). Confirm the RUN lines show **3**, **2**, **4** violations respectively. If a count is off, FIX the seeded data in `examples/northwind-trading/data/*.csv` (the data is the source of truth for the demo story) — minimally, and re-verify. Clean up any generated `target/` (do not commit it).
+- [ ] **Step 4: Run + assert counts.** Run: `uticen-lite run examples/northwind-trading --control manual-je-review --at 2026-03-31T00:00:00Z` (and the same for the other two, or run all). Confirm the RUN lines show **3**, **2**, **4** violations respectively. If a count is off, FIX the seeded data in `examples/northwind-trading/data/*.csv` (the data is the source of truth for the demo story) — minimally, and re-verify. Clean up any generated `target/` (do not commit it).
 
 - [ ] **Step 5: Commit** (do NOT push). `git add examples/northwind-trading/controls examples/northwind-trading/data && git commit -m "feat(example): financial controls (manual JE review, closed-period postings, 3-way match)"`
 
@@ -98,7 +98,7 @@
 
 **Interfaces:**
 - Consumes: Task 1 datasets (`access_accounts`, `employees`) + Phase 1 multi-source.
-- Produces: 3 controls; `cflow run` flags 3 / 2 / **0** exceptions respectively.
+- Produces: 3 controls; `uticen-lite run` flags 3 / 2 / **0** exceptions respectively.
 
 - [ ] **Step 1: Author `terminated-access`** (multi-source: primary `access_accounts`, also `employees`). `control.yaml`: `framework_refs: {nist: [AC-2]}`. `test.py` (`def test(pop, sources)`): join accounts to `sources["employees"].df` on `employee_id`; flag accounts where `is_active` is true and the employee `status=="terminated"`; `item_key=account_id`, severity `critical`, details `{employee_id, system}`.
 
@@ -106,7 +106,7 @@
 
 - [ ] **Step 3: Author `mfa-enforcement`** (primary `access_accounts`, the **clean** control). `control.yaml`: `framework_refs: {nist: [IA-2]}`. `test.py` (`def test(pop)`): flag where `is_active` is true and `mfa_enabled` is false; `item_key=account_id`, severity `high`. With the Task-1 data this returns `[]` (0 exceptions) — that is the intended passing-workpaper demo.
 
-- [ ] **Step 4: Run + assert counts.** Run `cflow run ... --control <id> --at 2026-03-31T00:00:00Z` for each. Confirm **3**, **2**, **0**. The `mfa-enforcement` workpaper should show a clean pass. Fix the seeded data minimally if a count is off; re-verify. Don't commit `target/`.
+- [ ] **Step 4: Run + assert counts.** Run `uticen-lite run ... --control <id> --at 2026-03-31T00:00:00Z` for each. Confirm **3**, **2**, **0**. The `mfa-enforcement` workpaper should show a clean pass. Fix the seeded data minimally if a count is off; re-verify. Don't commit `target/`.
 
 - [ ] **Step 5: Commit** (do NOT push). `git add examples/northwind-trading/controls examples/northwind-trading/data && git commit -m "feat(example): IT-access controls (terminated access, privileged review, MFA — clean)"`
 
@@ -119,15 +119,15 @@
 
 **Interfaces:**
 - Consumes: Task 1 datasets (`payments`, `vendor_master`) + Phase 1 multi-source.
-- Produces: 2 controls; `cflow run` flags 2 / 2 exceptions. **Re-verify control 3 (`three-way-match`) still flags 4** since `payments` is shared.
+- Produces: 2 controls; `uticen-lite run` flags 2 / 2 exceptions. **Re-verify control 3 (`three-way-match`) still flags 4** since `payments` is shared.
 
 - [ ] **Step 1: Author `duplicate-payments`** (primary `payments`). `control.yaml`: `framework_refs: {nist: []}`. `test.py` (`def test(pop)`): parse `paid_date`; group/scan for payments sharing `vendor_id`+`amount` with another payment within 5 days; flag the LATER one of each pair; `item_key=payment_id`, severity `high`, details `{vendor_id, amount, paid_date}`.
 
 - [ ] **Step 2: Author `vendor-master-sod`** (multi-source: primary `payments`, also `vendor_master`). `control.yaml`: `framework_refs: {nist: [AC-5]}`. `test.py` (`def test(pop, sources)`): join payments to `sources["vendor_master"].df` on `vendor_id`; flag payments whose `approved_by` equals the vendor's `created_by` or `last_modified_by`; `item_key=payment_id`, severity `high`.
 
-- [ ] **Step 3: Run + assert counts (incl. the cross-check).** Run `cflow run ... --control duplicate-payments` → **2**; `... --control vendor-master-sod` → **2**; AND re-run `... --control three-way-match` → still **4** (payments edits in Task 1/here must not change the 3-way-match story). Adjust data minimally + re-verify all three if needed. No `target/` committed.
+- [ ] **Step 3: Run + assert counts (incl. the cross-check).** Run `uticen-lite run ... --control duplicate-payments` → **2**; `... --control vendor-master-sod` → **2**; AND re-run `... --control three-way-match` → still **4** (payments edits in Task 1/here must not change the 3-way-match story). Adjust data minimally + re-verify all three if needed. No `target/` committed.
 
-- [ ] **Step 4: Full run sanity.** Run `cflow run examples/northwind-trading --at 2026-03-31T00:00:00Z` (all controls). Confirm the per-control RUN lines: manual-je-review 3, closed-period-postings 2, three-way-match 4, terminated-access 3, privileged-access-review 2, mfa-enforcement 0, duplicate-payments 2, vendor-master-sod 2.
+- [ ] **Step 4: Full run sanity.** Run `uticen-lite run examples/northwind-trading --at 2026-03-31T00:00:00Z` (all controls). Confirm the per-control RUN lines: manual-je-review 3, closed-period-postings 2, three-way-match 4, terminated-access 3, privileged-access-review 2, mfa-enforcement 0, duplicate-payments 2, vendor-master-sod 2.
 
 - [ ] **Step 5: Commit** (do NOT push). `git add examples/northwind-trading/controls examples/northwind-trading/data && git commit -m "feat(example): procurement controls (duplicate payments, vendor-master SoD)"`
 
@@ -138,7 +138,7 @@
 **Files:**
 - Create: `examples/northwind-trading/README.md`
 
-- [ ] **Step 1: Write the README.** Sections: (a) **The company** — Northwind Trading Co., a ~600-person wholesale distributor; the audit scope; the fixed demo as-of date **2026-03-31**. (b) **The controls** — a table of all 8 (title, domain, sources, NIST ref, what it flags) noting `mfa-enforcement` is the clean/passing one. (c) **Run it** — `cflow run . --at 2026-03-31T00:00:00Z` then open `target/workpapers/<id>.html`; emphasize full-population, provenance. (d) **Import into ControlFlow** — `cflow build . --out import-bundle.zip --at 2026-03-31T00:00:00Z`, then upload at the app's **Settings → Imports** (admin), and what lands (controls + workpapers + exceptions, with the NIST refs). (e) note it doubles as a template to copy.
+- [ ] **Step 1: Write the README.** Sections: (a) **The company** — Northwind Trading Co., a ~600-person wholesale distributor; the audit scope; the fixed demo as-of date **2026-03-31**. (b) **The controls** — a table of all 8 (title, domain, sources, NIST ref, what it flags) noting `mfa-enforcement` is the clean/passing one. (c) **Run it** — `uticen-lite run . --at 2026-03-31T00:00:00Z` then open `target/workpapers/<id>.html`; emphasize full-population, provenance. (d) **Import into Uticen** — `uticen-lite build . --out import-bundle.zip --at 2026-03-31T00:00:00Z`, then upload at the app's **Settings → Imports** (admin), and what lands (controls + workpapers + exceptions, with the NIST refs). (e) note it doubles as a template to copy.
 
 - [ ] **Step 2: Commit** (do NOT push). `git add examples/northwind-trading/README.md && git commit -m "docs(example): Northwind Trading README"`
 
@@ -150,10 +150,10 @@
 - Create: `tests/examples/__init__.py`, `tests/examples/test_northwind.py`
 
 **Interfaces:**
-- Consumes: the committed example + the public CLI (`cflow`) + `controlflow_sdk.schema.validate.validate_bundle`.
+- Consumes: the committed example + the public CLI (`uticen-lite`) + `uticen_lite.schema.validate.validate_bundle`.
 - Produces: a test that runs the example end-to-end and asserts the seeded outcomes + bundle validity, so the example stays correct.
 
-- [ ] **Step 1: Write the test.** `tests/examples/test_northwind.py`: copy `examples/northwind-trading` into a `tmp_path` (so the repo tree isn't dirtied), then drive the CLI via `controlflow_sdk.cli.main([...])` (preferred — in-process, no subprocess) OR `subprocess` to `cflow`:
+- [ ] **Step 1: Write the test.** `tests/examples/test_northwind.py`: copy `examples/northwind-trading` into a `tmp_path` (so the repo tree isn't dirtied), then drive the CLI via `uticen_lite.cli.main([...])` (preferred — in-process, no subprocess) OR `subprocess` to `uticen-lite`:
 
 ```python
 EXPECTED = {
@@ -169,7 +169,7 @@ def test_northwind_runs_and_builds(tmp_path):
     assert main(["validate", str(proj)]) == 0
     assert main(["run", str(proj), "--at", AT]) == 0
     # assert each control's exception count from target/run-log.json (or evidence/*.json)
-    runs = read_runs(proj / "target")            # use controlflow_sdk.runner.runlog.read_runs
+    runs = read_runs(proj / "target")            # use uticen_lite.runner.runlog.read_runs
     by_control = {r["control_id"]: r["failed"] for r in runs}
     for cid, n in EXPECTED.items():
         assert by_control[cid] == n, f"{cid}: expected {n}, got {by_control.get(cid)}"
@@ -180,9 +180,9 @@ def test_northwind_runs_and_builds(tmp_path):
     assert len(manifest["controls"]) == 8
 ```
 
-  (Resolve `EXAMPLE_DIR` relative to the repo root; `read_runs` is `controlflow_sdk.runner.runlog.read_runs`. Confirm the run-log entry field for the per-control id + failed count — read `model/run.py` `RunRecord.to_dict()` / `runlog` to use the exact keys; adjust the accessors to match.)
+  (Resolve `EXAMPLE_DIR` relative to the repo root; `read_runs` is `uticen_lite.runner.runlog.read_runs`. Confirm the run-log entry field for the per-control id + failed count — read `model/run.py` `RunRecord.to_dict()` / `runlog` to use the exact keys; adjust the accessors to match.)
 
-- [ ] **Step 2: Run it.** Run: `python3 -m pytest tests/examples/test_northwind.py -q` → PASS. Then the full gate: `ruff check --fix --unsafe-fixes . && ruff format . && mypy controlflow_sdk && python3 -m pytest -q` → all green.
+- [ ] **Step 2: Run it.** Run: `python3 -m pytest tests/examples/test_northwind.py -q` → PASS. Then the full gate: `ruff check --fix --unsafe-fixes . && ruff format . && mypy uticen_lite && python3 -m pytest -q` → all green.
 
 - [ ] **Step 3: Commit** (do NOT push). `git add tests/examples && git commit -m "test(example): Northwind end-to-end fixture (run + build + validate_bundle + seeded counts)"`
 

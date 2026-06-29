@@ -43,6 +43,6 @@ multi-terminal path persisted the aggregate only for forked controls.
 
 ## Reference
 
-- `controlflow_sdk/store/run_service.py` — `_run_multi_procedure` (the `if len(per_proc_runs) > 1:` aggregate guard), `_distinct_examined`, `_merge_violations`, `_severity_rank`.
+- `uticen_lite/store/run_service.py` — `_run_multi_procedure` (the `if len(per_proc_runs) > 1:` aggregate guard), `_distinct_examined`, `_merge_violations`, `_severity_rank`.
 - `tests/store/test_run_service_procedures.py` — the per-shape run-count + distinct-examined + which-checks assertions.
 - Procedures live store-only in the `pipeline` JSON and compile to the existing artifact ([[0010]]); verdict/threshold stay render/store-only ([[0015]]).

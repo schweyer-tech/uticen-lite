@@ -13,7 +13,7 @@ superseded_by: null
 ## Context
 
 Converting the Northwind `privileged-access-review` control from a hand-written `test.py` to a no-code
-pipeline (Filter `is_privileged` → Test `any`-of [no approver, stale review]) made `cflow run` fail with
+pipeline (Filter `is_privileged` → Test `any`-of [no approver, stale review]) made `uticen-lite run` fail with
 `Object of type Timestamp is not JSON serializable`. The compiled Test builds each violation's `details`
 from `row.to_dict()` over the **referenced condition columns** — and one of those columns, `last_review_date`,
 loads as `datetime64[ns]` (per its `date` data_type, see [[0011]]). So `details` carried a pandas
@@ -65,12 +65,12 @@ local evidence and never touch the bundle ([[0001]]).
 
 ## Reference
 
-- `controlflow_sdk/model/violation.py` (`_json_safe` + `Violation.from_raw` — the single sanitization point).
-- `controlflow_sdk/adapters/xlsx_export.py` (`_coerce_for_excel` — column-wise coercion; the NaT-isinstance +
+- `uticen_lite/model/violation.py` (`_json_safe` + `Violation.from_raw` — the single sanitization point).
+- `uticen_lite/adapters/xlsx_export.py` (`_coerce_for_excel` — column-wise coercion; the NaT-isinstance +
   `Series.map` re-cast traps above).
-- `controlflow_sdk/runner/execute.py` (every raw violation is coerced via `Violation.from_raw`).
-- `controlflow_sdk/pipeline/compile.py` / `controlflow_sdk/rules/render_rule.py` (emit `details` from the
+- `uticen_lite/runner/execute.py` (every raw violation is coerced via `Violation.from_raw`).
+- `uticen_lite/pipeline/compile.py` / `uticen_lite/rules/render_rule.py` (emit `details` from the
   referenced condition columns — the source of the typed scalars).
-- `controlflow_sdk/adapters/files.py::coerce_series` (loads `date`→`datetime64`, `boolean`→bool, `number`→float).
+- `uticen_lite/adapters/files.py::coerce_series` (loads `date`→`datetime64`, `boolean`→bool, `number`→float).
 - `tests/model/test_violation.py::test_from_raw_makes_details_json_safe`.
 - Related dtype trap: [[0011]]; cardinal trust boundary: [[0001]].

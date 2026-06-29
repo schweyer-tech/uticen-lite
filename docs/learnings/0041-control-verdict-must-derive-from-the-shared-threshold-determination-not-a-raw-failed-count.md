@@ -46,8 +46,8 @@ from the run's raw counts.
 
 ## Reference
 
-- `controlflow_sdk/plane/routes/runs.py` (run_view loads `Threshold` → `Determination`),
-  `controlflow_sdk/plane/routes/dashboard.py` (per-row `passed`),
-  `controlflow_sdk/plane/templates/run_view.html`, `dashboard.html`;
-  `controlflow_sdk/model/workpaper.py` `Determination`; tests in `tests/plane/test_runs.py`
+- `uticen_lite/plane/routes/runs.py` (run_view loads `Threshold` → `Determination`),
+  `uticen_lite/plane/routes/dashboard.py` (per-row `passed`),
+  `uticen_lite/plane/templates/run_view.html`, `dashboard.html`;
+  `uticen_lite/model/workpaper.py` `Determination`; tests in `tests/plane/test_runs.py`
   (`test_run_view_verdict_respects_threshold`, `test_dashboard_badge_respects_threshold`).

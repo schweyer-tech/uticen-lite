@@ -48,8 +48,8 @@ filtered workpaper sample as evidence — they are different layers ([[0001]]).
 
 - `tests/test_steps_trust_boundary.py` (the sentinel teeth-check; `include:false` column + zero-leak +
   manifest sanity assertions).
-- `controlflow_sdk/runner/execute.py` (`_sample_from_population` — the `include=True` filter that gates the
+- `uticen_lite/runner/execute.py` (`_sample_from_population` — the `include=True` filter that gates the
   workpaper sample; `MAX_SAMPLE_ROWS` cap).
-- `controlflow_sdk/model/population.py` (`ColumnMeta.include` is sample/render metadata; the raw `df` keeps
+- `uticen_lite/model/population.py` (`ColumnMeta.include` is sample/render metadata; the raw `df` keeps
   every column).
 - Cardinal trust boundary: [[0001]].

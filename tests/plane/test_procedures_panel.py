@@ -10,8 +10,8 @@ procedures) must pre-select each Test's EFFECTIVE owning (auto) procedure — no
 import io
 import json
 
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
 
 
 def _seed(client):

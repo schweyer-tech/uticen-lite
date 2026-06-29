@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import hashlib
 
-from controlflow_sdk.model.run import RunRecord, SourceProvenance
-from controlflow_sdk.model.violation import Severity, Violation
+from uticen_lite.model.run import RunRecord, SourceProvenance
+from uticen_lite.model.violation import Severity, Violation
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from controlflow_sdk.model.control import (
+from uticen_lite.model.control import (
     ControlDef,
     FrameworkRefs,
     RiskRef,

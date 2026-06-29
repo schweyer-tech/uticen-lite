@@ -15,7 +15,7 @@ nodes rather than presented as a header above them.
 Concretely, two things cause this:
 
 1. **The terminal Test node card carries vestigial procedure fields.** In
-   `controlflow_sdk/plane/templates/partials/_pipe_node.html` the "Test terminal extras"
+   `uticen_lite/plane/templates/partials/_pipe_node.html` the "Test terminal extras"
    block renders a **"Procedure title"** input (`data-proc-title` → `node.config.title`,
    lines ~121-126) and **"Threshold %/Count"** inputs (`data-threshold-pct` /
    `data-threshold-count` → `node.config.failure_threshold_pct/count`, lines ~141-150).
@@ -66,10 +66,10 @@ run/build.
 
 ### Unit 1 — Procedure header becomes the complete editor
 
-**Files:** `controlflow_sdk/plane/templates/partials/_pipe_cards.html` (the `proc-head`
-`<span>` inside the section `<summary>`); `controlflow_sdk/plane/templates/logic_builder.html`
+**Files:** `uticen_lite/plane/templates/partials/_pipe_cards.html` (the `proc-head`
+`<span>` inside the section `<summary>`); `uticen_lite/plane/templates/logic_builder.html`
 (the `newProcedureSection` JS innerHTML template + `serializeProcedures()`);
-`controlflow_sdk/plane/static/app.css` (header layout).
+`uticen_lite/plane/static/app.css` (header layout).
 
 - **Thread `narrative` into the `band.proc` view-model (learning 0038).** Today
   `_procedure_context` (pipeline.py ~698-709) builds the procedures view-model WITHOUT a
@@ -91,9 +91,9 @@ run/build.
 
 ### Unit 2 — Test node card becomes pure step mechanics
 
-**Files:** `controlflow_sdk/plane/templates/partials/_pipe_node.html` (the
+**Files:** `uticen_lite/plane/templates/partials/_pipe_node.html` (the
 `{% if node.type == 'test' %}` "Test terminal extras" block);
-`controlflow_sdk/plane/templates/logic_builder.html` (`serialize()` Test branch).
+`uticen_lite/plane/templates/logic_builder.html` (`serialize()` Test branch).
 
 - Remove the **"Procedure title"** `pipe-row` (`data-proc-title`).
 - Remove the **"Threshold %/Count"** `pipe-row` (`data-threshold-pct` /
@@ -109,7 +109,7 @@ run/build.
 
 ### Unit 3 — Sole-procedure code-default correctness fix
 
-**File:** `controlflow_sdk/plane/templates/logic_builder.html` (`serializeProcedures()`).
+**File:** `uticen_lite/plane/templates/logic_builder.html` (`serializeProcedures()`).
 
 Two coupled defaults pre-fill / persist a procedure's code, and both must keep a **sole**
 procedure's code empty so the workpaper heading stays the legacy `P1: title` form (a
@@ -210,7 +210,7 @@ not add error paths.
   narrative text is present (in the pipeline/store and the rendered workpaper/bundle as
   applicable). No count assertions change.
 - **Gates:** `python -m pytest -q` pristine, `python -m ruff check .`,
-  `python -m mypy controlflow_sdk`. Contract gate
+  `python -m mypy uticen_lite`. Contract gate
   (`tests/test_contract_export.py` + `tests/schema/test_bundle_schema.py`) stays green —
   proves no bundle-shape drift.
 

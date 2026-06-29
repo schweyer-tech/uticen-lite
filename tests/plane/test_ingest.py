@@ -5,7 +5,7 @@ import io
 import pandas as pd
 import pytest
 
-from controlflow_sdk.plane import ingest
+from uticen_lite.plane import ingest
 
 
 def test_extract_table_csv_stdlib():
@@ -30,11 +30,11 @@ def test_extract_table_xlsx_rows_and_sheets():
 def test_extract_table_missing_adapters_is_friendly(monkeypatch):
     def boom(*a, **k):
         raise ImportError("Missing optional dependency 'openpyxl'")
-    monkeypatch.setattr("controlflow_sdk.adapters.inspect.sheet_names", boom)
-    monkeypatch.setattr("controlflow_sdk.adapters.inspect.read_dataframe", boom)
+    monkeypatch.setattr("uticen_lite.adapters.inspect.sheet_names", boom)
+    monkeypatch.setattr("uticen_lite.adapters.inspect.read_dataframe", boom)
     with pytest.raises(ingest.AdaptersUnavailable) as exc:
         ingest.extract_table(b"\x00\x01", "xlsx")
-    assert "controlflow-sdk[adapters]" in str(exc.value)
+    assert "uticen-lite[adapters]" in str(exc.value)
 
 
 # ---------------------------------------------------------------------------

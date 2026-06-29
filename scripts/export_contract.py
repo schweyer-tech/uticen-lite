@@ -2,7 +2,7 @@
 """Export the canonical bundle schema to contract/bundle.schema.json.
 
 Run this script whenever the packaged schema changes to refresh the
-exported contract that the ControlFlow app vendors and pins:
+exported contract that the Uticen app vendors and pins:
 
     python scripts/export_contract.py
 
@@ -25,7 +25,7 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 _REPO_ROOT = Path(__file__).parent.parent
-_PKG_SCHEMA = _REPO_ROOT / "controlflow_sdk" / "schema" / "bundle.schema.json"
+_PKG_SCHEMA = _REPO_ROOT / "uticen_lite" / "schema" / "bundle.schema.json"
 _CONTRACT_DIR = _REPO_ROOT / "contract"
 _CONTRACT_SCHEMA = _CONTRACT_DIR / "bundle.schema.json"
 _CONTRACT_README = _CONTRACT_DIR / "README.md"
@@ -35,7 +35,7 @@ def _read_schema_version() -> str:
     """Import SCHEMA_VERSION from the package without a full install."""
     # Cheap import — the schema __init__ has no heavy dependencies.
     sys.path.insert(0, str(_REPO_ROOT))
-    from controlflow_sdk.schema import SCHEMA_VERSION  # noqa: PLC0415
+    from uticen_lite.schema import SCHEMA_VERSION  # noqa: PLC0415
 
     return SCHEMA_VERSION
 
@@ -61,16 +61,16 @@ def _write_readme(version: str) -> None:
     content = f"""\
 # contract/
 
-This directory contains the exported ControlFlow SDK schema contract.
+This directory contains the exported Uticen SDK schema contract.
 
 ## What is this?
 
 `bundle.schema.json` is a verbatim copy of the canonical JSON Schema shipped
-inside the `controlflow_sdk` Python package at:
+inside the `uticen_lite` Python package at:
 
-    controlflow_sdk/schema/bundle.schema.json
+    uticen_lite/schema/bundle.schema.json
 
-It is committed here so that the ControlFlow app can **vendor** it without
+It is committed here so that the Uticen app can **vendor** it without
 depending on the SDK package at build time.
 
 ## Current version
@@ -79,10 +79,10 @@ Schema version: **{version}**
 
 ## How the app pins it
 
-The ControlFlow app should:
+The Uticen app should:
 
 1. Copy `contract/bundle.schema.json` into its own source tree (e.g.
-   `src/lib/controlflow-sdk/bundle.schema.json`).
+   `src/lib/uticen-lite/bundle.schema.json`).
 2. Record the SDK git SHA or release tag it was copied from in a comment or
    a companion `vendor.json` file.
 3. Re-vendor whenever the SDK ships a new schema version and update the

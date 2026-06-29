@@ -12,7 +12,7 @@ Filter materiality) that forks into two terminals — **P1** (self-review, Custo
 (missing reviewer, no-code) — plus a top-level `procedures:` array. The existing compile/run/bundle
 machinery already handles forked multi-terminal pipelines; this is a **demo + tests + docs** change.
 
-**Tech Stack:** YAML pipeline authoring, the `cflow` CLI (`import`/`run`/`build`), pytest, ruff
+**Tech Stack:** YAML pipeline authoring, the `uticen-lite` CLI (`import`/`run`/`build`), pytest, ruff
 (py311, line-length 100), mypy.
 
 ## EXECUTION RULES
@@ -20,7 +20,7 @@ machinery already handles forked multi-terminal pipelines; this is a **demo + te
 - Never ask the user for permission to continue between tasks. Execute the full plan start to finish.
 - On an unresolvable error after 2–3 attempts: note it in the ledger and skip to the next task.
 - After every `git commit`, push: `git push -u origin HEAD`.
-- Keep `python -m pytest -q`, `ruff check .`, and `mypy controlflow_sdk` green after every task.
+- Keep `python -m pytest -q`, `ruff check .`, and `mypy uticen_lite` green after every task.
 
 ## Corrections to the spec discovered during planning (binding)
 
@@ -30,7 +30,7 @@ Two spec assumptions were checked against the code and corrected — the plan re
    **empty** placeholder (0 controls / 0 sources / 0 runs — verified). It holds no control data and cannot
    go stale from a YAML change. **Do not** regenerate or touch it. (If a step seems to need it, stop —
    it doesn't.)
-2. **No `cli/build_cmd.py` code change.** `cflow build` delegates bundle assembly to
+2. **No `cli/build_cmd.py` code change.** `uticen-lite build` delegates bundle assembly to
    `store/export_service.build_bundle`, which already builds `procedure_run_map` + `procedure_info_by_control`
    and emits N-procedure workpapers correctly. `build_cmd`'s own `runs_by_control` is used **only** for the
    printed summary counts. So the multi-procedure control builds correctly via the CLI with no code change.
@@ -39,7 +39,7 @@ Two spec assumptions were checked against the code and corrected — the plan re
 
 - **Cardinal rule (learning 0001):** bundle-additive only. `workpaper.procedures` is already unbounded, so
   two procedures on one control is schema-valid — **no `schema_version` bump**, no edit to
-  `contract/bundle.schema.json` / `controlflow_sdk/schema/` / `controlflow_sdk/bundle/`. The contract gates
+  `contract/bundle.schema.json` / `uticen_lite/schema/` / `uticen_lite/bundle/`. The contract gates
   (`tests/test_contract_export.py`, `tests/schema/test_bundle_schema.py`) must stay green.
 - **No data change:** `examples/northwind-trading/data/journal_entries.csv` is unchanged.
 - **No new control/source:** the demo control count stays **9** (every `== 9` assertion stays valid).
@@ -82,7 +82,7 @@ Two spec assumptions were checked against the code and corrected — the plan re
 - Modify (test): `tests/examples/test_northwind.py`
 
 **Interfaces:**
-- Consumes: the `cflow` CLI (`import`/`run`/`build` via `controlflow_sdk.cli.main`), `repo.list_runs_for`,
+- Consumes: the `uticen-lite` CLI (`import`/`run`/`build` via `uticen_lite.cli.main`), `repo.list_runs_for`,
   `validate_bundle`. The pipeline model parses a top-level `procedures:` array beside `nodes:`; a Test
   node's owning procedure is `config.procedure_id`; `custom_python` test nodes use `config.flavor: test`.
 - Produces: a forked demo control with terminals `sod` (procedure p1) and `review` (procedure p2).
@@ -338,7 +338,7 @@ belong to the broad sweep, note them for Task 2).
 - [ ] **Step 8: Lint, type-check, commit, push**
 
 ```bash
-python -m ruff check . && python -m mypy controlflow_sdk
+python -m ruff check . && python -m mypy uticen_lite
 git add examples/northwind-trading/controls/manual-je-review/ tests/examples/test_northwind.py
 git commit -m "feat: Finance.GL.1 demo — two procedures (SoD + reviewer-assigned)"
 git push -u origin HEAD
@@ -396,7 +396,7 @@ value is correct before changing it — learning 0012/0031).
 - [ ] **Step 4: Full suite + lint + type-check, commit, push**
 
 ```bash
-python -m pytest -q && python -m ruff check . && python -m mypy controlflow_sdk
+python -m pytest -q && python -m ruff check . && python -m mypy uticen_lite
 git add tests
 git commit -m "test: reconcile demo-referencing tests with multi-procedure Finance.GL.1"
 git push -u origin HEAD

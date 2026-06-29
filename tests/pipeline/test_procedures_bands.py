@@ -3,8 +3,8 @@ both the Builder and the Flowchart consume."""
 
 from __future__ import annotations
 
-from controlflow_sdk.pipeline.model import parse_pipeline
-from controlflow_sdk.pipeline.procedures import effective_procedures, group_nodes_by_band
+from uticen_lite.pipeline.model import parse_pipeline
+from uticen_lite.pipeline.procedures import effective_procedures, group_nodes_by_band
 
 
 def test_shared_import_and_private_branches():

@@ -12,7 +12,7 @@ superseded_by: null
 
 ## Context
 
-The control plane (`controlflow_sdk/plane/`) is a local FastAPI + Jinja + HTMX app over a single
+The control plane (`uticen_lite/plane/`) is a local FastAPI + Jinja + HTMX app over a single
 `sqlite3` connection. A per-request `Depends(get_conn)` generator worked for sync `GET` handlers but
 threw on the first `async def` POST: `sqlite3.ProgrammingError: SQLite objects created in a thread
 can only be used in that same thread`. FastAPI runs a **sync** dependency generator in its
@@ -51,8 +51,8 @@ sequentially, never two threads at once. Pinned by `tests/store/test_db_threadin
 
 ## Reference
 
-- `controlflow_sdk/store/db.py` (`connect()` — `check_same_thread=False` + `busy_timeout`).
-- `controlflow_sdk/plane/app.py` (`get_conn` Depends generator).
-- `controlflow_sdk/plane/routes/{sources,controls,runs,export}.py` (async/writing handlers each open
+- `uticen_lite/store/db.py` (`connect()` — `check_same_thread=False` + `busy_timeout`).
+- `uticen_lite/plane/app.py` (`get_conn` Depends generator).
+- `uticen_lite/plane/routes/{sources,controls,runs,export}.py` (async/writing handlers each open
   their own `connect(root)` in `try/finally`; `TemplateResponse(request, ...)` throughout).
 - `tests/store/test_db_threading.py` (pins create-in-one-thread, use-in-another).

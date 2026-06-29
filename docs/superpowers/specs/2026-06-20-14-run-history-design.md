@@ -6,7 +6,7 @@ The dashboard shows only each control's last run and the run view shows a single
 
 ## Locked decisions
 - History list **plus** a small trend, this round.
-- Per-control history page backed by `controlflow_sdk/store/repo.py::list_runs_for`, linked from **both** the dashboard and the control page; each row links to its existing run view (`/controls/{control_id}/runs/{run_id}`).
+- Per-control history page backed by `uticen_lite/store/repo.py::list_runs_for`, linked from **both** the dashboard and the control page; each row links to its existing run view (`/controls/{control_id}/runs/{run_id}`).
 - Modeled as a **server-rendered GET sub-route tab** consistent with learning 0007: the control page gains a tab strip (Definition / History); the new route is `/controls/{control_id}/history`; register the specific sub-route **before** the `/{control_id}` catch-all (0007).
 - Small **trend** of pass-rate / exception counts over runs — lightweight inline SVG sparkline + minimal bars, **no JS / no chart dependency**, routed through `var(--token)` design tokens (0005), works in `[data-theme=light]`.
 - Mind 0004: `list_runs_for` is **newest-first** (`ORDER BY executed_at DESC, created_at DESC`). The trend must render runs **oldest→newest left-to-right**, so reverse a copy for charting; tests use a **2+ run** fixture.
@@ -22,7 +22,7 @@ A small server-side view-model helper turns the newest-first list of run dicts i
 
 ### Files to create
 
-1. **`controlflow_sdk/plane/templates/_control_tabs.html`** — tab strip include, mirroring `_source_tabs.html`. Uses an `active` context key:
+1. **`uticen_lite/plane/templates/_control_tabs.html`** — tab strip include, mirroring `_source_tabs.html`. Uses an `active` context key:
    ```html
    <nav class="tabs">
      <a href="/controls/{{ control.id }}" class="tab {% if active == 'definition' %}active{% endif %}">Definition</a>
@@ -31,14 +31,14 @@ A small server-side view-model helper turns the newest-first list of run dicts i
    ```
    Only render when editing an existing control (a brand-new control has no id and no history — see Definition-tab note below).
 
-2. **`controlflow_sdk/plane/templates/control_history.html`** — `{% extends "base.html" %}`. Structure:
+2. **`uticen_lite/plane/templates/control_history.html`** — `{% extends "base.html" %}`. Structure:
    - Crumb `← Controls` (`href="/"`) and a `page-head` with `{{ control.title }}` + `<p class="muted mono">{{ control.id }}</p>` (same header block as `control_edit.html`).
    - `{% include "_control_tabs.html" %}` with `active == 'history'`.
    - **Trend card** (only when `trend.points` has ≥1 point): a `.card` titled "Trend" containing the inline SVG sparkline + bars partial (see #3). Show a one-line `.hint` summary: "{{ trend.points|length }} runs · latest {{ trend.latest_pass_rate }}% pass".
    - **History table** in a `.table-wrap` (reuse existing table styles). Columns: **Run** (executed-at, formatted), **Result** (pass/fail badge — `badge pass` when `failed == 0` else `badge fail`, label `{{ run.pass_rate }}% pass`), **Failed** (`{{ run.failed }} / {{ run.total }}`), **Run ID** (`mono`, the 16-char id), and a shrink cell with a link **View →** to `/controls/{{ control.id }}/runs/{{ run.run_id }}`. Make the whole row's Run cell a link to the run view too. Iterate `runs` as returned (newest-first) so the list reads most-recent-first.
    - **Empty state** when `runs` is empty: `.empty-state` with "Not yet run" / "Run this control to start building history." and a POST form button to `/controls/{{ control.id }}/run` (reuse the dashboard's inline run form markup).
 
-3. **`controlflow_sdk/plane/templates/partials/_run_trend.html`** — the inline-SVG trend partial (no JS). Given `trend` (chronological, oldest→newest):
+3. **`uticen_lite/plane/templates/partials/_run_trend.html`** — the inline-SVG trend partial (no JS). Given `trend` (chronological, oldest→newest):
    - A `<svg>` with a `viewBox` (e.g. `0 0 320 60`), `width:100%`, `height:auto`, `preserveAspectRatio="none"` is acceptable for a sparkline; keep stroke widths fixed via `vector-effect="non-scaling-stroke"`.
    - **Pass-rate sparkline:** a single `<polyline fill="none" stroke="var(--accent-primary)" .../>` whose points map each run's `pass_rate` (0–100) to y (inverted: `y = H - (pass_rate/100)*H`) and index to x (`x = i/(n-1)*W`, guard `n==1` → single point/dot). Add small `<circle>` dots per point using `var(--accent-primary)`; the final point uses `var(--status-success)` if last `failed==0` else `var(--status-critical)`.
    - **Exception-count mini-bars:** a row of `<rect>`s, one per run, height proportional to `failed / max_failed` (guard `max_failed==0` → all zero-height baseline), filled `var(--status-critical)` (or `var(--status-warning)` for partial); width derived from `n`. Use `var(--border-default)` for the baseline axis line.
@@ -47,7 +47,7 @@ A small server-side view-model helper turns the newest-first list of run dicts i
 
 ### Files to modify
 
-4. **`controlflow_sdk/plane/routes/controls.py`**
+4. **`uticen_lite/plane/routes/controls.py`**
    - Add a small pure helper (module-level), e.g.:
      ```python
      def _history_view(runs: list[dict]) -> dict[str, Any]:
@@ -102,14 +102,14 @@ A small server-side view-model helper turns the newest-first list of run dicts i
      ```
      This is a read-only sync GET, so `Depends(get_conn)` is correct (0002); no per-handler connection needed.
 
-5. **`controlflow_sdk/plane/templates/control_edit.html`**
+5. **`uticen_lite/plane/templates/control_edit.html`**
    - After the existing `page-head` block (around line 31) and before the `<form>`, add the tab strip but only for an existing control:
      ```html
      {% if control %}{% set active = 'definition' %}{% include "_control_tabs.html" %}{% endif %}
      ```
    - Note `edit_control` already passes the `control` dict; the `new_control` path passes `control=None`, so the tabs are correctly hidden for new controls.
 
-6. **`controlflow_sdk/plane/templates/dashboard.html`**
+6. **`uticen_lite/plane/templates/dashboard.html`**
    - In the last-run cell (lines 31–38), when `row.latest` exists, append a small **History** link next to the badge:
      ```html
      <a class="btn btn-sm btn-ghost" href="/controls/{{ row.control.id }}/history">History</a>

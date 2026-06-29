@@ -1,15 +1,15 @@
-# Control Plane — Local Web App for the ControlFlow SDK — Design
+# Control Plane — Local Web App for the Uticen SDK — Design
 
 > Status: **Approved design (2026-06-19)** — pending implementation plan.
-> Repo: `controlflow-sdk`. Reframes how the SDK is *operated*: a `pip install` + one command
+> Repo: `uticen-lite`. Reframes how the SDK is *operated*: a `pip install` + one command
 > launches a tiny localhost web app ("control plane") backed by a per-engagement SQLite database,
 > replacing hand-edited YAML/Python files as the way you author, run, and export full-population
 > control tests. The existing execution/render/bundle core is reused unchanged.
 
 ## 1. Summary & motivation
 
-The SDK today is a developer CLI: you `cflow init`, hand-edit `cflow.yaml` / `sources.yaml` /
-`controls/<id>/control.yaml` + `test.py` in a text editor, then `cflow run` / `cflow build` in a
+The SDK today is a developer CLI: you `uticen-lite init`, hand-edit `cflow.yaml` / `sources.yaml` /
+`controls/<id>/control.yaml` + `test.py` in a text editor, then `uticen-lite run` / `uticen-lite build` in a
 terminal. **Authoring is file editing in a terminal.** That works for a developer but is a
 non-starter for the corporate GRC analyst the SDK is meant to reach during a consulting engagement —
 editing YAML and writing Python in a shell is too much friction to "fly" inside a typical
@@ -25,7 +25,7 @@ database inside a consistent project folder** — no YAML to hand-edit.
 **Strategic fit.** The control plane is the *local authoring surface* of the consulting wedge
 (STRATEGY.md "Test-authoring automation" + "Data connectivity: manual upload first-class"): the
 owner/operator authors and runs full-population tests on-site, then exports a bundle that imports
-into the ControlFlow SaaS where the **CCM loop lives** (exception triage, disposition, self-heal,
+into the Uticen SaaS where the **CCM loop lives** (exception triage, disposition, self-heal,
 sign-off, continuous monitoring). The control plane deliberately **stops at author → run → view →
 export**. It is **not** a competing local mini-platform — that "suite trap" is an explicit non-goal
 (§11).
@@ -33,7 +33,7 @@ export**. It is **not** a competing local mini-platform — that "suite trap" is
 ## 2. Locked decisions (from the 2026-06-19 brainstorm)
 
 1. **SQLite is the source of truth.** A control "lives" in `controlplane.db`, not in YAML/Python
-   files. This mirrors how the ControlFlow app itself stores controls (rows, not files).
+   files. This mirrors how the Uticen app itself stores controls (rows, not files).
 2. **No-code rule builder + Python escape hatch.** Metadata is forms; the test is either a
    structured rule-spec (no code) or raw `def test(pop)` Python. Both compile to the **same**
    execution contract.
@@ -41,7 +41,7 @@ export**. It is **not** a competing local mini-platform — that "suite trap" is
 4. **Server-rendered, no build step.** FastAPI + Jinja2 + HTMX + `sqlite3` (stdlib) + a *vendored*
    offline code editor. No Node, no bundler, no CDN. Pure `pip install`.
 5. **Brittle-by-design.** The control plane *trusts the folder-structure convention* and does only
-   light validation. The hardened, validated, multi-user experience is what paid ControlFlow is for.
+   light validation. The hardened, validated, multi-user experience is what paid Uticen is for.
    This is a feature, not debt — it keeps the local tool tiny.
 
 ## 3. Architecture
@@ -49,18 +49,18 @@ export**. It is **not** a competing local mini-platform — that "suite trap" is
 Layered; only the top three layers are new. The existing core is reused essentially unchanged.
 
 ```
-┌─ Web layer (NEW) ─────────────────────────────┐  controlflow_sdk/plane/
+┌─ Web layer (NEW) ─────────────────────────────┐  uticen_lite/plane/
 │  FastAPI routes + Jinja templates + HTMX       │   __main__.py · app.py · routes/ ·
 │  dashboard · source manager · control editor · │   templates/ · static/ (vendored CodeMirror)
 │  run view · export                             │
-├─ Store (NEW) ─────────────────────────────────┤  controlflow_sdk/store/
+├─ Store (NEW) ─────────────────────────────────┤  uticen_lite/store/
 │  sqlite3 (stdlib) + tiny versioned migrator    │   db.py · migrations.py · repo.py
 │  project · sources · columns · controls ·      │
 │  control_sources · runs · violations           │
-├─ Rule engine (NEW) ───────────────────────────┤  controlflow_sdk/rules/
+├─ Rule engine (NEW) ───────────────────────────┤  uticen_lite/rules/
 │  rule_spec (JSON) → list[violation dict]       │   spec.py · evaluate.py
 │  (vectorized pandas, single-source)            │
-├─ Existing core (REUSED) ──────────────────────┤  controlflow_sdk/{runner,render,
+├─ Existing core (REUSED) ──────────────────────┤  uticen_lite/{runner,render,
 │  runner/execute · render/{html,markdown} ·     │   bundle,model,adapters}
 │  bundle/{assemble,archive} · model/* ·         │
 │  adapters/files (CSV/Parquet/Excel)            │
@@ -88,7 +88,7 @@ the machine (the air-gapped guarantee is structural, not a setting).
 **Key refactor that enables reuse:** today `runner/execute.run_control` is coupled to the YAML
 `project/loader`. Split *loading* (which produces an in-memory `Control` + `list[Population]`) from
 *executing*. Provide two loaders behind one shape: the existing YAML loader (now used only by
-`cflow import`) and a new **store loader** that reads `controlplane.db`. `run_control` itself —
+`uticen-lite import`) and a new **store loader** that reads `controlplane.db`. `run_control` itself —
 violation validation, `RunRecord` assembly, provenance hashing, the 1-arg/2-arg signature dispatch —
 is unchanged.
 
@@ -201,7 +201,7 @@ stable.
 **Export — reuse, never fork.** The bundle is produced by the existing `bundle/assemble` +
 `bundle/archive` and **must validate against `contract/bundle.schema.json`**, which stays the single
 source of truth for the import shape. The control plane is simply a **new producer** of the same
-bundle the file-CLI emits, so ControlFlow imports it unchanged (Settings → Imports). A test asserts
+bundle the file-CLI emits, so Uticen imports it unchanged (Settings → Imports). A test asserts
 conformance against the contract schema (§10).
 
 **Security.** Binds `127.0.0.1` only (`--host`/`--port` override). No auth (localhost single-user
@@ -211,17 +211,17 @@ trust). Zero network egress. User-Python runs unsandboxed by design (§5.3).
 
 SQLite is now the source of truth, so the file-based authoring CLI is superseded:
 
-- **Retire** `cflow init` / `cflow new` (file scaffolding) — replaced by the web app's forms and by
+- **Retire** `uticen-lite init` / `uticen-lite new` (file scaffolding) — replaced by the web app's forms and by
   `controlplane` auto-creating the folder + DB.
-- **Keep** `cflow run [dir]` and `cflow build [dir]` as the **headless/automation** path, now
+- **Keep** `uticen-lite run [dir]` and `uticen-lite build [dir]` as the **headless/automation** path, now
   operating over `controlplane.db` (for the owner's CI/batch re-runs).
-- **Add** `cflow import <yaml-project-dir>` — a one-time YAML-project → `controlplane.db` import,
+- **Add** `uticen-lite import <yaml-project-dir>` — a one-time YAML-project → `controlplane.db` import,
   reusing the existing `project/loader` as its reader.
-- `cflow validate` becomes a light **DB integrity** check (bindings resolve, exactly one test body
+- `uticen-lite validate` becomes a light **DB integrity** check (bindings resolve, exactly one test body
   per control). Low priority.
 
 **The Northwind example** stays committed as a YAML project under `examples/northwind-trading/` and
-becomes the canonical `cflow import` demo: `cflow import examples/northwind-trading` (or a first-run
+becomes the canonical `uticen-lite import` demo: `uticen-lite import examples/northwind-trading` (or a first-run
 prompt) seeds a populated control plane instantly. Its end-to-end CI test now exercises the **import
 → run → build** path so the example stays green.
 
@@ -229,11 +229,11 @@ prompt) seeds a populated control plane instantly. Its end-to-end CI test now ex
 
 - `pyproject.toml`:
   - `[project.optional-dependencies] plane = ["fastapi", "uvicorn", "jinja2", "python-multipart"]`
-  - `[project.scripts] controlplane = "controlflow_sdk.plane.__main__:main"` (keep `cflow`).
+  - `[project.scripts] controlplane = "uticen_lite.plane.__main__:main"` (keep `uticen-lite`).
 - `controlplane` flags: `--project PATH` (default cwd), `--host` (default `127.0.0.1`), `--port`
   (default `8765`), `--no-browser`.
 - CodeMirror vendored as a static asset in the wheel (offline). No Node, no build step — `pip
-  install 'controlflow-sdk[plane]'` is the entire install.
+  install 'uticen-lite[plane]'` is the entire install.
 
 ## 10. Build sequence — five independently-testable phases
 
@@ -241,7 +241,7 @@ prompt) seeds a populated control plane instantly. Its end-to-end CI test now ex
 |---|---|---|
 | 1 | `store/` — SQLite schema, versioned migrator, repo CRUD, model mapping; **decouple `run_control` loading from execution** + a store loader | pytest: CRUD round-trips, migration up, schema-version gate, store-loader produces `Control`+`Population` |
 | 2 | `rules/` — `rule_spec` validation + evaluator | pytest: each operator, AND/OR, safe template, `item_key` default, `is_duplicate`, empty result |
-| 3 | Headless `cflow run`/`build` over the store + `cflow import` (YAML→DB) | pytest: run determinism (fixed `executed_at`); **bundle validates vs `contract/bundle.schema.json`**; import round-trip on Northwind |
+| 3 | Headless `uticen-lite run`/`build` over the store + `uticen-lite import` (YAML→DB) | pytest: run determinism (fixed `executed_at`); **bundle validates vs `contract/bundle.schema.json`**; import round-trip on Northwind |
 | 4 | `plane/` — FastAPI app, 5 screens, HTMX, vendored CodeMirror | pytest `TestClient`: create source → create control (rule + python) → run → view → export |
 | 5 | Packaging (`[plane]` extra + `controlplane` entry), Northwind imported demo, README rewrite | manual smoke: `pip install '.[plane]'` → `controlplane` → author/run/export in browser |
 
@@ -250,9 +250,9 @@ unit-tested; web routes via `TestClient`.
 
 ## 11. Non-goals (explicit — strategy guardrails)
 
-- **No local exception lifecycle** — triage, disposition, self-heal, sign-off live in ControlFlow.
+- **No local exception lifecycle** — triage, disposition, self-heal, sign-off live in Uticen.
   The control plane stops at author → run → view → export.
-- **Not a competing platform.** It produces bundles for ControlFlow; it does not reimplement the
+- **Not a competing platform.** It produces bundles for Uticen; it does not reimplement the
   SaaS. (STRATEGY.md "suite trap" litmus.)
 - **No multi-tenant, no auth, no RLS** — single-user, localhost.
 - **No network connectors in v1** — files only (CSV/Parquet/Excel). Live feeds are the SaaS's job.

@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import pytest
 
-from controlflow_sdk.model.control import Threshold
-from controlflow_sdk.model.workpaper import Determination
+from uticen_lite.model.control import Threshold
+from uticen_lite.model.workpaper import Determination
 
 
 class TestThresholdParse:

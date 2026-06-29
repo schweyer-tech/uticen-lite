@@ -20,15 +20,15 @@
 - **CSS specificity (learning 0032):** the big name-title input rule MUST out-specify the global `input[type="text"]` block declared later in `app.css` (qualify as `.proc-head input.proc-name-title`, specificity (0,2,1) > base (0,1,1)) — or the title silently reverts to the base 13px. Verify the rendered font-size in a real browser (e2e teeth-check).
 - **Tokens / modifier classes (learning 0005):** route every color through `var(--token)`; add component-scoped classes, never mutate a shared base rule.
 - **No-toggle invariants:** `.proc-dot` stays a SIBLING of `.proc-head` (it is the collapse-click target the e2e drives — moving it inside `.proc-head` breaks `test_builder_collapse_and_section_insert`). The name/narrative inputs stay inside `.proc-head` so they inherit the existing keydown no-toggle guard (`logic_builder.html:630`); the pencil click handler additionally `preventDefault()`s so the click cannot toggle the `<details>`.
-- ruff `py311`, line length 100; tests pristine; `python -m ruff check .` + `python -m mypy controlflow_sdk` clean.
+- ruff `py311`, line length 100; tests pristine; `python -m ruff check .` + `python -m mypy uticen_lite` clean.
 
 ---
 
 ### Task 1: Header structure — 3-row markup, JS mirror, focus pencil
 
 **Files:**
-- Modify: `controlflow_sdk/plane/templates/partials/_pipe_cards.html` (the `proc-head` span, lines ~61-71)
-- Modify: `controlflow_sdk/plane/templates/logic_builder.html` (`newProcedureSection()` innerHTML ~347-356; add a `[data-proc-name-edit]` click handler near the existing `#pipe-cards` click delegation ~367)
+- Modify: `uticen_lite/plane/templates/partials/_pipe_cards.html` (the `proc-head` span, lines ~61-71)
+- Modify: `uticen_lite/plane/templates/logic_builder.html` (`newProcedureSection()` innerHTML ~347-356; add a `[data-proc-name-edit]` click handler near the existing `#pipe-cards` click delegation ~367)
 - Test: `tests/plane/test_logic_bands.py`
 
 **Interfaces:**
@@ -161,8 +161,8 @@ Expected: PASS (new test + existing band/proc tests — attributes unchanged).
 - [ ] **Step 7: Gates + commit + push**
 
 ```bash
-python -m ruff check . && python -m mypy controlflow_sdk
-git add controlflow_sdk/plane/templates/partials/_pipe_cards.html controlflow_sdk/plane/templates/logic_builder.html tests/plane/test_logic_bands.py
+python -m ruff check . && python -m mypy uticen_lite
+git add uticen_lite/plane/templates/partials/_pipe_cards.html uticen_lite/plane/templates/logic_builder.html tests/plane/test_logic_bands.py
 git commit -m "feat(plane): procedure header as a titled card — big name + pencil, Assertion label/tooltip, narrative row"
 git push -u origin HEAD
 ```
@@ -172,7 +172,7 @@ git push -u origin HEAD
 ### Task 2: Styling + browser e2e (learnings 0032 + 0012 + 0005)
 
 **Files:**
-- Modify: `controlflow_sdk/plane/static/app.css` (modify the existing `.proc-head` rule ~696; add the new row/title/pencil/help/label rules after the existing `.proc-head .proc-narr` rule)
+- Modify: `uticen_lite/plane/static/app.css` (modify the existing `.proc-head` rule ~696; add the new row/title/pencil/help/label rules after the existing `.proc-head .proc-narr` rule)
 - Modify: `tests/e2e/test_smoke.py` (`test_author_run_export_smoke`)
 
 **Interfaces:**
@@ -261,7 +261,7 @@ Expected: PASS — the existing `[data-proc-name]`/`[data-proc-assert]`/`[data-p
 
 ```bash
 python -m ruff check .
-git add controlflow_sdk/plane/static/app.css tests/e2e/test_smoke.py
+git add uticen_lite/plane/static/app.css tests/e2e/test_smoke.py
 git commit -m "feat(plane): style the procedure header card + e2e (0032 title font-size, pencil focus)"
 git push -u origin HEAD
 ```
@@ -279,12 +279,12 @@ Expected: PASS, pristine (no new warnings).
 
 - [ ] **Step 2: Lint + type gates**
 
-Run: `python -m ruff check . && python -m mypy controlflow_sdk`
+Run: `python -m ruff check . && python -m mypy uticen_lite`
 Expected: clean.
 
 - [ ] **Step 3: Confirm no bundle/route drift**
 
-Run: `git diff --stat origin/main..HEAD -- contract/ controlflow_sdk/schema/ controlflow_sdk/plane/routes/`
+Run: `git diff --stat origin/main..HEAD -- contract/ uticen_lite/schema/ uticen_lite/plane/routes/`
 Expected: EMPTY — the change is presentational (templates/JS/CSS) only.
 
 - [ ] **Step 4: If anything failed, fix and re-run; else the branch is ready for the whole-branch review.**

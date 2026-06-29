@@ -3,9 +3,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from controlflow_sdk.plane.app import create_app
-from controlflow_sdk.store import repo
-from controlflow_sdk.store.db import connect
+from uticen_lite.plane.app import create_app
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
 
 
 @pytest.fixture

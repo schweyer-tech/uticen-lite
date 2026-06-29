@@ -126,7 +126,7 @@ title input remains inside `.proc-head` so it inherits the existing no-toggle gu
   `[data-proc-narrative]` still resolve (unchanged attributes); add a **CSS teeth-check (learning
   0032)** asserting the title input's computed `font-size` is the intended heading size (not the base
   13px), and assert the pencil focuses the name input.
-- **Gates:** `python -m pytest -q` pristine; `python -m ruff check .`; `python -m mypy controlflow_sdk`.
+- **Gates:** `python -m pytest -q` pristine; `python -m ruff check .`; `python -m mypy uticen_lite`.
 
 ## Global constraints
 
