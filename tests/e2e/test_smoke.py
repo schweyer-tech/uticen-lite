@@ -224,14 +224,14 @@ def test_author_run_export_smoke(page: Page, live_server: str, tmp_path: Path) -
     page.click("form[action='/controls/sod/run'] button[type=submit]")
     expect(page).to_have_url(re.compile(r"/controls/sod/runs/"))
 
-    # 5. Assert the run view (run_view.html): Records tested = 2, Failed = 1, the
+    # 5. Assert the run view (run_view.html): Records tested = 2, Exceptions = 1, the
     #    "Operated with deficiencies" pill, and exactly U1 in the exceptions
     #    table. The exceptions table is scoped explicitly: U2 also appears inside
     #    the workpaper <iframe> data preview (a separate frame), so we assert
     #    against the main-document exceptions table only.
     tiles = page.locator(".tile")
     expect(tiles.filter(has_text="Records tested").locator(".tile-value")).to_have_text("2")
-    expect(tiles.filter(has_text="Failed").locator(".tile-value")).to_have_text("1")
+    expect(tiles.filter(has_text="Exceptions").locator(".tile-value")).to_have_text("1")
     expect(page.get_by_text("Operated with deficiencies")).to_be_visible()
 
     exceptions_table = page.locator(".table-wrap table")

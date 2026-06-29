@@ -225,12 +225,12 @@ def test_author_run_export_two_procedure_control(
     #    Both branches flag A1 → aggregate: Records tested=2 (distinct examined).
     #    The control-level aggregate DEDUPLICATES violations by item-key across
     #    procedures (_merge_violations): both branches flag A1, but A1 is one
-    #    distinct item → Failed=1 (run.failed == len(merged violations)).
+    #    distinct item → Exceptions=1 (run.failed == len(merged violations)).
     #    Branch B (tes1) fails implicit-zero threshold → "Operated with
     #    deficiencies".
     tiles = page.locator(".tile")
     expect(tiles.filter(has_text="Records tested").locator(".tile-value")).to_have_text("2")
-    expect(tiles.filter(has_text="Failed").locator(".tile-value")).to_have_text("1")
+    expect(tiles.filter(has_text="Exceptions").locator(".tile-value")).to_have_text("1")
     expect(page.get_by_text("Operated with deficiencies")).to_be_visible()
 
     # ── 9. Assert the workpaper iframe: two procedure sections ──────────────
