@@ -340,30 +340,42 @@
       sec.setAttribute('data-proc-section', '');
       sec.setAttribute('data-band-key', pid);
       sec.setAttribute('open', '');
+      // Deliberately NO inline `style="--proc:…"`: the per-procedure accent colour
+      // (stripe + code-chip tint) is assigned server-side by position order, which the
+      // client can't know. A new section renders with the neutral `var(--proc, <token>)`
+      // fallbacks until the next #pipe-cards server render fills in the palette colour.
       sec.innerHTML =
         '<summary class="band-head proc-head-row">' +
-        '<span class="proc-dot"></span>' +
+        '<span class="band-caret" aria-hidden="true">▸</span>' +
         '<span class="proc-head" data-proc-head data-proc-id="' + pid + '">' +
-        '<div class="proc-title-row">' +
-        '<input class="proc-in proc-code-badge" data-proc-code placeholder="P1" aria-label="Code">' +
+        '<div class="proc-identity">' +
+        '<input class="proc-in proc-code-chip" data-proc-code placeholder="P1" aria-label="Code">' +
         '<input class="proc-in proc-name-title" type="text" data-proc-name placeholder="Procedure name" aria-label="Procedure name">' +
         '<button type="button" class="proc-name-pencil" data-proc-name-edit aria-label="Edit procedure name"></button>' +
-        '<button type="button" class="btn btn-sm btn-ghost proc-del-btn" data-proc-del aria-label="Remove procedure">✕</button>' +
+        '<span class="proc-identity-spacer"></span>' +
+        '<button type="button" class="proc-del-btn" data-proc-del aria-label="Remove procedure">✕</button>' +
         '</div>' +
-        '<div class="proc-fields-row">' +
+        '<div class="proc-settings">' +
+        '<div class="proc-field proc-field-assert">' +
         '<label class="proc-field-label">Assertion ' +
         '<span class="proc-help" tabindex="0" role="img" aria-label="What is an assertion?" ' +
-        'title="The audit assertion this procedure verifies — the specific claim it proves about the control (e.g. \'Segregation of duties\', \'Authorization\', \'Completeness\', \'Existence\'). Shown as the procedure\'s subtitle in the workpaper.">ⓘ</span>' +
+        'title="The audit assertion this procedure verifies — the specific claim it proves about the control (for example: Segregation of duties, Authorization, Completeness, Existence). Shown as the procedure subtitle in the workpaper.">ⓘ</span>' +
         '</label>' +
         '<input class="proc-in proc-assert-in" data-proc-assert placeholder="e.g. Segregation of duties" aria-label="Assertion">' +
-        '<span class="proc-threshold">' +
-        '<span class="proc-field-label">Fail if</span>' +
+        '</div>' +
+        '<div class="proc-field proc-field-tol">' +
+        '<label class="proc-field-label">Tolerance</label>' +
+        '<div class="proc-tol-row">' +
+        '<span class="proc-tol-op">≤</span>' +
         '<input class="proc-in proc-thr-in" data-proc-pct placeholder="—" aria-label="Threshold percent">' +
-        '<span class="proc-field-label">% or</span>' +
+        '<span class="proc-tol-op">% or</span>' +
         '<input class="proc-in proc-thr-in" data-proc-count placeholder="—" aria-label="Threshold count">' +
-        '<span class="proc-field-label">items</span>' +
-        '</span></div>' +
-        '<div class="proc-narrative-row">' +
+        '<span class="proc-tol-op">items</span>' +
+        '<span class="proc-tol-hint">· blank = zero</span>' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+        '<div class="proc-field proc-field-narr">' +
         '<label class="proc-field-label">Narrative</label>' +
         '<textarea class="proc-in proc-narr" data-proc-narrative rows="2" ' +
         'placeholder="What this procedure tests and why" ' +

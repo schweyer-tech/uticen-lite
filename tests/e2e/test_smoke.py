@@ -181,7 +181,7 @@ def test_author_run_export_smoke(page: Page, live_server: str, tmp_path: Path) -
     new_section.locator("[data-proc-code]").fill("P1")
     new_section.locator("[data-proc-name]").fill("Manual JE Review")
     # 0032 teeth-check: the name renders at heading size (not the base 13px input).
-    expect(new_section.locator("[data-proc-name]")).to_have_css("font-size", "20px")
+    expect(new_section.locator("[data-proc-name]")).to_have_css("font-size", "19px")
     # The pencil focuses the name input (no toggle, no separate form).
     new_section.locator("[data-proc-name-edit]").click()
     expect(new_section.locator("[data-proc-name]")).to_be_focused()
@@ -224,14 +224,14 @@ def test_author_run_export_smoke(page: Page, live_server: str, tmp_path: Path) -
     page.click("form[action='/controls/sod/run'] button[type=submit]")
     expect(page).to_have_url(re.compile(r"/controls/sod/runs/"))
 
-    # 5. Assert the run view (run_view.html): Records tested = 2, Failed = 1, the
+    # 5. Assert the run view (run_view.html): Records tested = 2, Exceptions = 1, the
     #    "Operated with deficiencies" pill, and exactly U1 in the exceptions
     #    table. The exceptions table is scoped explicitly: U2 also appears inside
     #    the workpaper <iframe> data preview (a separate frame), so we assert
     #    against the main-document exceptions table only.
     tiles = page.locator(".tile")
     expect(tiles.filter(has_text="Records tested").locator(".tile-value")).to_have_text("2")
-    expect(tiles.filter(has_text="Failed").locator(".tile-value")).to_have_text("1")
+    expect(tiles.filter(has_text="Exceptions").locator(".tile-value")).to_have_text("1")
     expect(page.get_by_text("Operated with deficiencies")).to_be_visible()
 
     exceptions_table = page.locator(".table-wrap table")
@@ -311,12 +311,16 @@ def test_builder_collapse_and_section_insert(page: Page, live_server: str) -> No
     pid = section.get_attribute("data-band-key")
     assert pid == "p1"
     expect(section).to_have_attribute("open", "")
+    # Teeth-check the styled-field intent — the name renders as a 19px heading and
+    # the card carries the 3px accent stripe (both invisible in source/diff; 0032).
+    expect(section.locator("input.proc-name-title").first).to_have_css("font-size", "19px")
+    expect(section).to_have_css("border-left-width", "3px")
 
-    # ── Step 4b: collapse by clicking proc-dot (sits outside .proc-head) ─────
-    # Clicking .proc-dot IS inside <summary> but NOT inside .proc-head, so the
+    # ── Step 4b: collapse by clicking the caret (inside <summary>, outside .proc-head) ─
+    # Clicking .band-caret IS inside <summary> but NOT inside .proc-head, so the
     # JS handler does not call e.preventDefault() and the <details> toggles.
     ls_key = f"cflow.logic.collapse.coltest.{pid}"
-    section.locator(".proc-dot").click()
+    section.locator(".band-caret").click()
     # not_to_have_attribute requires a value: checks the attribute does NOT have
     # the value "" (i.e. the boolean `open` attribute is absent after collapse).
     expect(section).not_to_have_attribute("open", "")
@@ -333,7 +337,7 @@ def test_builder_collapse_and_section_insert(page: Page, live_server: str) -> No
     expect(section).not_to_have_attribute("open", "")
 
     # ── Step 4d: expand again so the insert zones are accessible ────────────
-    section.locator(".proc-dot").click()
+    section.locator(".band-caret").click()
     expect(section).to_have_attribute("open", "")
 
     # ── Step 4e: insert a Test from the section's end insert zone ────────────
@@ -419,6 +423,70 @@ def test_flowchart_band_collapse_roundtrip(page: Page, live_server: str) -> None
     expect(page.locator("g.fc-summary")).to_have_count(1)
     # Only the shared Import node (src) remains as a real fc-box.
     expect(page.locator("g.fc-box:not(.fc-summary)")).to_have_count(1)
+
+
+@pytest.mark.browser
+def test_add_procedure_button_builds_the_new_card_shape(page: Page, live_server: str) -> None:
+    """Clicking ＋ Add procedure builds a section structurally identical to a
+    server-rendered one, with no inline-script pageerror (learning 0040)."""
+    base = live_server
+    errors: list[str] = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    csv_bytes = b"user_id\nU1\nU2\n"
+
+    # ── Minimal setup: source + control + pipeline with one procedure ────────
+    page.goto(base + "/sources/new")
+    page.fill("#s-id", "addsrc")
+    page.set_input_files(
+        "#s-file",
+        files=[{"name": "add.csv", "mimeType": "text/csv", "buffer": csv_bytes}],
+    )
+    page.fill("#s-asof", "2026-01-31")
+    page.click("button[type=submit]")
+    expect(page).to_have_url(base + "/sources/addsrc")
+
+    page.goto(base + "/controls/new")
+    page.fill("#f-id", "addtest")
+    page.fill("#f-title", "Add-procedure e2e control")
+    page.check("input[name='source_ids'][value='addsrc']")
+    page.click("button[type=submit]")
+    expect(page).to_have_url(base + "/controls/addtest")
+
+    graph_with_proc = json.dumps({
+        "nodes": [
+            {"id": "src", "type": "import", "source_id": "addsrc", "inputs": [], "config": {}},
+            {"id": "tst", "type": "test", "inputs": ["src"], "narrative": "", "config": {
+                "logic": "all", "procedure_id": "p1",
+                "conditions": [{"column": "user_id", "op": "not_empty"}],
+                "item_key_column": "user_id",
+            }},
+        ],
+        "procedures": [{"id": "p1", "code": "P1", "name": "Procedure Alpha", "position": 0}],
+    })
+    page.evaluate(
+        """async (args) => {
+            const fd = new FormData();
+            fd.append('pipeline_json', args.graph);
+            await fetch(args.url, {method: 'POST', body: fd, redirect: 'manual'});
+        }""",
+        {"url": f"{base}/controls/addtest/logic/builder", "graph": graph_with_proc},
+    )
+    page.goto(base + "/controls/addtest/logic/builder")
+    page.wait_for_load_state("load")
+
+    # ── Click ＋ Add procedure; the new section must match the server shape ───
+    before = page.locator("details[data-proc-section]").count()
+    page.get_by_role("button", name="Add procedure").click()
+    new = page.locator("details[data-proc-section]").last
+    expect(new.locator(".band-caret")).to_have_count(1)
+    expect(new.locator("[data-proc-head]")).to_have_count(1)
+    for sel in ("[data-proc-code]", "[data-proc-name]", "[data-proc-assert]",
+                "[data-proc-pct]", "[data-proc-count]", "[data-proc-narrative]",
+                "[data-proc-name-edit]", "[data-proc-del]"):
+        expect(new.locator(sel)).to_have_count(1)
+    expect(new.get_by_text("Tolerance", exact=True)).to_be_visible()
+    assert page.locator("details[data-proc-section]").count() == before + 1
+    assert errors == []
 
 
 @pytest.mark.browser

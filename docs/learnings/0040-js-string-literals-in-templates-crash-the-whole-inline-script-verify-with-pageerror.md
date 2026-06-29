@@ -55,6 +55,24 @@ especially when building DOM by string concatenation in an inline `<script>`:
    `newProcedureSection()`) must stay byte-for-byte equivalent in **structure and
    escaping** — the JS copy is the one that bites, so parse-check it.
 
+## Corollary (2026-06-29) — the two render sites are coupled by any whole-PAGE assertion
+
+A procedure-header **redesign** proved the twins are inseparable: a `tests/plane` unit
+test `assert "Fail if" not in page` (reading the FULL rendered page text) FAILS unless
+**both** sites change, because the inline `<script>` source IS part of the page text.
+Consequences:
+
+- A whole-page `assert "<retired-literal>" not in page` is a cheap, reliable **cross-site
+  drift guard** — keep or add one when you remove a literal from a partial that also has a
+  JS-string-builder twin; it fails loudly if either site still emits the old markup.
+- **When planning**, scope BOTH render sites into the **same task** — never split "change
+  the template" and "change the JS builder" across tasks. A whole-page test drags the JS
+  builder forward into the first task anyway, so a split mis-sizes the work (observed: a
+  3-task plan's Task 1 had to absorb Task 2's JS-builder change to go green).
+- Factor shared human prose **once** — a Jinja `{% set ASSERTION_HELP = "…" %}` reused by
+  the template, with the **same literal text** in the JS string — so the two copies can't
+  drift in wording (and keep that prose apostrophe-free per rule 2 above).
+
 ## Reference
 
 - `controlflow_sdk/plane/templates/logic_builder.html` — `newProcedureSection()` inline
