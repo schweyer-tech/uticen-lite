@@ -48,11 +48,20 @@ cascade tie-break (source order) reveals which one applies. A glance at the file
   specificity instead.
 - When you intend a styled field to read as inline/borderless (e.g. an in-place title
   editor), verify in a real browser, not by reading the rule — the cascade tie is silent.
+- **Pin it with an e2e computed-style teeth-check.** Because the tie is invisible in source
+  AND in diff review, assert the rendered property in the browser gate:
+  `expect(locator).to_have_css("font-size", "20px")`. This fails loudly if a future base-rule
+  edit or a too-weak selector reverts the field, where source inspection sees nothing wrong.
+  (2026-06-28: the procedure-name title input `.proc-head input.proc-name-title` (0,2,1)
+  out-specifies the base block; a `to_have_css("font-size", "20px")` e2e pins it.)
 
 ## Reference
 
 - `controlflow_sdk/plane/static/app.css` — the global `input[type="text"], …, textarea,
-  select` block and the `.control-title-edit-form input[type="text"]` rule that must
-  out-specify it.
+  select` block; the `.control-title-edit-form input[type="text"]` and
+  `.proc-head input.proc-name-title` rules that must out-specify it.
+- `tests/e2e/test_smoke.py` — the `to_have_css("font-size", …)` teeth-check on the procedure
+  name title (the 2026-06-28 reinforcement).
 - PR #96 (commit `1ce5961`).
-- Related selector-discipline rule: [[0005]].
+- Related selector-discipline rule: [[0005]]; verify-in-a-real-browser shares spirit with
+  [[0040]] (run a parser/the real page, don't trust source/diff inspection).

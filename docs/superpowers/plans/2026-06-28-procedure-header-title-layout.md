@@ -116,7 +116,7 @@ Replace the proc-head innerHTML string (lines ~347-355, from the `data-proc-code
         '<div class="proc-fields-row">' +
         '<label class="proc-field-label">Assertion ' +
         '<span class="proc-help" tabindex="0" role="img" aria-label="What is an assertion?" ' +
-        'title="The audit assertion this procedure verifies — the specific claim it proves about the control (e.g. \\'Segregation of duties\\', \\'Authorization\\', \\'Completeness\\', \\'Existence\\'). Shown as the procedure\\'s subtitle in the workpaper.">ⓘ</span>' +
+        'title="The audit assertion this procedure verifies — the specific claim it proves about the control (e.g. \'Segregation of duties\', \'Authorization\', \'Completeness\', \'Existence\'). Shown as the procedure\'s subtitle in the workpaper.">ⓘ</span>' +
         '</label>' +
         '<input class="proc-in proc-assert-in" data-proc-assert placeholder="e.g. Segregation of duties" aria-label="Assertion">' +
         '<span class="proc-threshold">' +
