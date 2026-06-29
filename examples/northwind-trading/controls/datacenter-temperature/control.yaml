@@ -7,7 +7,7 @@ objective: >
 narrative: >
   Facilities monitors the outdoor/intake temperature at each data-center site.
   This control demonstrates Uticen Lite's "fetch from URL" on-ramp: the population
-  was snapshotted once from the public Open-Meteo API and frozen to a local CSV,
+  was snapshotted once from the OpenWeatherMap API and frozen to a local CSV,
   then tested full-population like any other source. Any site reading above the
   27°C safe-operating ceiling at the snapshot time is flagged for an environmental
   review. (A deliberately light, real-world-data example — see the README.)
