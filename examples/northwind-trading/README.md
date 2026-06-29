@@ -30,7 +30,7 @@ Nine production-ready audit controls span financial, IT access, and procurement 
 
 **Note:** `mfa-enforcement` is a passing control — all active accounts have MFA enabled. Its workpaper is included to demonstrate a clean audit result.
 
-**Public-API source:** `datacenter-temperature` is built on `datacenter_weather`, a source **snapshotted once from the public [Open-Meteo](https://open-meteo.com) API** (no API key) and frozen to `data/datacenter_weather.csv`. It demonstrates Uticen Lite's "fetch from URL" on-ramp — the local snapshot is the source of truth (one-time snapshot-to-file), so the test stays fully offline and deterministic. To reproduce the fetch in the app: **Sources → Add source → Fetch from URL** with an Open-Meteo `current=temperature_2m,wind_speed_10m` request.
+**Public-API source:** `datacenter-temperature` is built on `datacenter_weather`, a source **snapshotted once from the [OpenWeatherMap](https://openweathermap.org/api) Current Weather API** (free API key required) and frozen to `data/datacenter_weather.csv`. It demonstrates Uticen Lite's "fetch from URL" on-ramp — the local snapshot is the source of truth (one-time snapshot-to-file), so the test stays fully offline and deterministic. To re-snapshot, run `OPENWEATHERMAP_API_KEY=<key> python tools/refresh_datacenter_weather.py`, which fetches current conditions for each site's lat/lon and rewrites the CSV (static site inventory preserved; only the live readings refresh).
 
 ## Run It Locally
 
