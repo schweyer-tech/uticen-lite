@@ -99,19 +99,22 @@
   </div>
 
   {% for t in trace.tests %}
-  {% if t.flagged is none %}{% set vclass = '' %}
+  {% if t.reached == false %}{% set vclass = '' %}
+  {% elif t.flagged is none %}{% set vclass = '' %}
   {% elif t.flagged %}{% set vclass = 'flagged' %}
   {% else %}{% set vclass = 'passed' %}{% endif %}
   <div class="trace-verdict {{ vclass }}">
     <strong>{{ t.label }}:</strong>
-    {% if t.flagged is none %}
+    {% if t.reached == false %}
+      <span class="muted">Did not reach this Test.</span>
+    {% elif t.flagged is none %}
       <span class="muted">{{ t.note or "Verdict unavailable." }}</span>
     {% elif t.flagged %}
       Flagged as an exception.
     {% else %}
       Passed — not flagged.
     {% endif %}
-    {% if t.note and t.flagged is not none %}
+    {% if t.note and t.flagged is not none and t.reached != false %}
     <p class="muted" style="margin:6px 0 0;">{{ t.note }}</p>
     {% endif %}
     {% if t.conditions %}

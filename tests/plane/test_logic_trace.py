@@ -131,3 +131,24 @@ def test_bad_condition_column_never_500s(client):
     c, cid = _seeded(client, conditions=[{"column": "nope", "op": "gt", "value": 1}])
     r = c.get(f"/controls/{cid}/logic/trace", params={"key": "INV001"})
     assert r.status_code == 200  # never 500 (learnings 0013/0033)
+
+
+def test_dropped_record_shows_did_not_reach_not_passed(client):
+    """A record dropped by an upstream Filter must show 'Did not reach this Test', not 'Passed'."""
+    _make_source(client, "invoices", _INVOICES)
+    _configure_source(client)
+    cid = "DRP"
+    _make_control(client, cid)
+    _save_pipeline(client, cid, {"nodes": [
+        {"id": "imp", "type": "import", "source_id": "invoices", "inputs": []},
+        {"id": "flt", "type": "filter", "inputs": ["imp"], "config": {
+            "logic": "all", "conditions": [{"column": "amount", "op": "gt", "value": 200}]}},
+        {"id": "tst", "type": "test", "inputs": ["flt"], "config": {
+            "logic": "all", "conditions": [{"column": "amount", "op": "gt", "value": 100}]}},
+    ]})
+    # INV001 has amount=100, which is not > 200, so it is dropped at the Filter
+    # and never arrives at the Test.
+    r = client.get(f"/controls/{cid}/logic/trace", params={"key": "INV001"})
+    assert r.status_code == 200
+    assert "Did not reach this Test" in r.text
+    assert "Passed — not flagged" not in r.text
