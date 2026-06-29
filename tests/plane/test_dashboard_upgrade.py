@@ -12,6 +12,10 @@ def _enable_check(client):
 
 def test_badge_empty_when_toggle_off(client, monkeypatch):
     # Even if a check WOULD find an update, OFF means no badge and no network.
+    # The toggle defaults ON, so turn it OFF to exercise the zero-egress path.
+    conn = connect(client.app.state.project_root)
+    repo.set_check_updates_on_launch(conn, False)
+    conn.close()
     called = {"n": 0}
 
     def boom(method):

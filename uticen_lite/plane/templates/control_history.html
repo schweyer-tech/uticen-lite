@@ -1,12 +1,15 @@
 {% extends "base.html" %}
 {% block title %}{{ project.name }} — {% if control %}{{ control.title }}{% else %}Control{% endif %} · History{% endblock %}
 {% block body %}
+{% if control %}
+{% set active = 'history' %}{% include "partials/_control_header.html" %}
+{% else %}
 <a class="crumb" href="/">← Controls</a>
 <div class="page-head">
-  <h1>{% if control %}{{ control.title }}{% else %}Control history{% endif %}</h1>
-  <p class="muted mono">{{ control.id if control else control_id }}</p>
+  <h1>Control history</h1>
+  <p class="muted mono">{{ control_id }}</p>
 </div>
-{% if control %}{% include "_control_tabs.html" %}{% endif %}
+{% endif %}
 
 {% if trend.points %}
 <div class="card">

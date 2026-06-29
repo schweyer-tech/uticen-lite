@@ -57,10 +57,15 @@ def get_project(conn: sqlite3.Connection) -> dict | None:
 
 
 def get_check_updates_on_launch(conn: sqlite3.Connection) -> bool:
-    """Whether the control plane checks for a newer version on launch (default False)."""
+    """Whether the control plane checks for a newer version on launch (default True).
+
+    On by default so the header update indicator is visible out of the box; an
+    author who wants strict zero-egress can turn it off in Settings ▸ Updates,
+    and OFF still guarantees no network call.
+    """
     project = get_project(conn) or {}
     system = project.get("system") or {}
-    return bool(system.get("check_updates_on_launch", False))
+    return bool(system.get("check_updates_on_launch", True))
 
 
 def set_check_updates_on_launch(conn: sqlite3.Connection, value: bool) -> None:

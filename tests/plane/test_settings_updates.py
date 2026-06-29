@@ -10,12 +10,13 @@ def test_settings_hub_links_to_updates(client):
     assert 'href="/settings/updates"' in resp.text
 
 
-def test_updates_page_renders_with_toggle_off_by_default(client):
+def test_updates_page_renders_with_toggle_on_by_default(client):
     resp = client.get("/settings/updates")
     assert resp.status_code == 200
     assert "Check for updates" in resp.text
-    # Unchecked by default.
+    # Checked by default — the launch check / header indicator are on out of the box.
     assert "check_on_launch" in resp.text
+    assert "checked" in resp.text
 
 
 def test_toggle_persists_true(client):
@@ -115,6 +116,10 @@ def test_base_template_polls_header_indicator_every_two_minutes(client):
 
 
 def test_refresh_indicator_skips_check_when_toggle_off(client, monkeypatch):
+    # The toggle is ON by default, so turn it OFF to exercise the zero-egress path.
+    conn = connect(client.app.state.project_root)
+    repo.set_check_updates_on_launch(conn, False)
+    conn.close()
     monkeypatch.setattr(
         "uticen_lite.plane.routes.updates.check_for_update",
         lambda method: (_ for _ in ()).throw(AssertionError("unexpected network check")),

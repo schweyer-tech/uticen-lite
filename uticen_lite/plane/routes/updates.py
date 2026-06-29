@@ -1,8 +1,10 @@
-"""Settings ▸ Updates: the opt-in update check + (Task 9) the upgrade trigger.
+"""Settings ▸ Updates: the launch update check + (Task 9) the upgrade trigger.
 
 Egress discipline: the launch/badge check only runs when the toggle is ON; the
 "Check now" button is an explicit user action and may run regardless. No route
-makes a network call while the toggle is OFF (zero-egress default — STRATEGY.md).
+makes a network call while the toggle is OFF. The toggle now defaults ON so the
+header update indicator is visible out of the box — turning it OFF restores
+strict zero egress (see STRATEGY.md; the off path is still guaranteed silent).
 """
 
 from __future__ import annotations

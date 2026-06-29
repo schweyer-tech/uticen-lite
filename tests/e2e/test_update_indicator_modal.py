@@ -5,6 +5,9 @@ from __future__ import annotations
 import pytest
 from playwright.sync_api import expect
 
+from uticen_lite.store import repo
+from uticen_lite.store.db import connect
+
 pytestmark = pytest.mark.browser
 
 
@@ -80,7 +83,14 @@ def test_header_update_modal_traps_focus_and_restores_trigger(page, live_server)
     )
 
 
-def test_header_update_indicator_stays_hidden_when_checks_are_off(page, live_server):
+def test_header_update_indicator_stays_hidden_when_checks_are_off(
+    page, live_server, engagement
+):
+    # The launch check defaults ON, so explicitly turn it OFF to assert the
+    # zero-egress path leaves the header indicator hidden.
+    conn = connect(engagement)
+    repo.set_check_updates_on_launch(conn, False)
+    conn.close()
     base = live_server
     page.goto(base + "/")
     assert "120000" in page.content()
