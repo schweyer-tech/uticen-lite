@@ -707,27 +707,26 @@ legend {
   border: 1px solid var(--border-default); border-radius: var(--radius-card);
   background: var(--bg-surface-2); margin-bottom: 14px; padding: 0 14px 8px;
 }
+/* Per-procedure accent: a left stripe (color set inline from procedure_color()). */
+.proc-section { border-left: 3px solid var(--border-strong); }
+
 .band-head {
-  /* Top-align so the caret + color dot sit on the procedure TITLE row, not
-     centered against the tall multi-row column (audit C3). */
+  /* Top-align so the caret sits on the identity row, not centered on the tall column. */
   display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px;
   padding: 12px 0 10px; cursor: pointer; list-style: none;
 }
 .band-head::-webkit-details-marker { display: none; }
-.band-head::before {
-  content: "▸"; color: var(--text-tertiary); font-size: 12px; transition: transform .12s;
-}
-/* Nudge the procedure caret + dot down to the title line (the procedure header is
-   a tall column; the single-line Inputs band is unaffected). */
-.proc-head-row::before { margin-top: 7px; }
-.proc-head-row > .proc-dot { margin-top: 9px; }
-details[open] > .band-head::before { transform: rotate(90deg); }
+/* Caret is a real element (robust click target + e2e hook), replacing the old ::before. */
+.band-caret { flex: 0 0 auto; color: var(--text-tertiary); font-size: 12px; transition: transform .12s; }
+.proc-head-row .band-caret { margin-top: 6px; }
+details[open] > .band-head > .band-caret { transform: rotate(90deg); }
 .band-title { font-weight: 600; font-size: 14px; }
 .band-sub { font-size: 12px; }
 .band-body { padding-bottom: 6px; }
 .proc-empty { font-size: 12px; margin: 8px 0; }
-.proc-head { display: flex; flex-direction: column; align-items: stretch; gap: 8px; flex: 1; }
-.proc-dot { width: 12px; height: 12px; border-radius: 3px; flex: 0 0 auto; background: var(--border-strong); }
+
+/* The procedure editor column (three stacked tiers). */
+.proc-head { display: flex; flex-direction: column; align-items: stretch; gap: 12px; flex: 1; min-width: 0; }
 .proc-head .proc-in {
   font-size: 13px; padding: 5px 8px; margin: 0; width: auto;
   background: var(--bg-input); color: var(--text-primary);
@@ -736,27 +735,21 @@ details[open] > .band-head::before { transform: rotate(90deg); }
 .proc-head .proc-in:focus {
   outline: none; border-color: var(--accent-primary); box-shadow: 0 0 0 3px var(--accent-muted);
 }
-/* Hold a usable width so the example placeholder isn't clipped when the row wraps
-   (audit C4). */
-.proc-head .proc-assert-in { flex: 1 1 220px; min-width: 220px; }
-.proc-head .proc-narr {
-  flex: 1 0 100%; width: 100%; resize: vertical; min-height: 34px;
-  font-family: inherit; line-height: 1.4;
-}
-.proc-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.proc-fields-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.proc-narrative-row { display: flex; flex-direction: column; gap: 4px; }
 
-/* Code badge: compact, centered. */
-.proc-head .proc-code-badge {
-  width: 48px; text-align: center; font-weight: 600; font-family: var(--font-mono);
+/* Tier 1 — identity bar. */
+.proc-identity { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.proc-identity-spacer { flex: 1; }
+/* Code chip: an editable input styled as a procedure-color-tinted chip. */
+.proc-head .proc-code-chip {
+  width: 46px; text-align: center; font-weight: 600; font-size: 11px;
+  font-family: var(--font-mono); letter-spacing: .02em; padding: 3px 6px;
+  border-radius: 5px;
 }
-
 /* Name as an in-place heading. The `input.` qualifier raises specificity to (0,2,1)
    so it beats the later global `input[type="text"]` block (0,1,1) — learning 0032. */
 .proc-head input.proc-name-title {
   flex: 1; min-width: 200px; margin: 0;
-  font-family: var(--font-sans); font-size: 20px; font-weight: 600;
+  font-family: var(--font-sans); font-size: 19px; font-weight: 650; letter-spacing: -.01em;
   color: var(--text-primary); background: transparent;
   border: 1px solid transparent; border-radius: var(--radius-input); padding: 4px 8px;
 }
@@ -765,30 +758,46 @@ details[open] > .band-head::before { transform: rotate(90deg); }
   outline: none; background: var(--bg-input);
   border-color: var(--accent-primary); box-shadow: 0 0 0 3px var(--accent-muted);
 }
-
-/* Pencil — mirrors .control-title-pencil. */
-.proc-name-pencil {
+/* Quiet icon buttons (pencil + delete); border/colour wake on card hover. */
+.proc-name-pencil, .proc-del-btn {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 24px; height: 24px; padding: 0;
-  border: 1px solid var(--border-strong); border-radius: 999px;
-  background: transparent; color: var(--text-secondary); cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  width: 26px; height: 26px; padding: 0; flex: 0 0 auto;
+  border: 1px solid transparent; border-radius: 999px;
+  background: transparent; color: var(--text-tertiary); cursor: pointer;
+  font-size: 13px; line-height: 1; transition: color .15s, border-color .15s;
+}
+.proc-section:hover .proc-name-pencil, .proc-section:hover .proc-del-btn {
+  border-color: var(--border-strong); color: var(--text-secondary);
 }
 .proc-name-pencil:hover { color: var(--accent-primary); border-color: var(--accent-primary); }
+.proc-del-btn:hover { color: var(--status-critical); border-color: var(--status-critical); }
 .proc-name-pencil::before { content: '✎'; font-size: 12px; }
 
-/* Field labels + the assertion help tooltip. */
+/* Tier 2 — settings strip; top-aligned so the three field labels share one baseline. */
+.proc-settings { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 22px; }
+.proc-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.proc-field-assert { flex: 1 1 320px; }
+.proc-field-tol { flex: 0 0 auto; }
 .proc-field-label {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: 12px; color: var(--text-secondary);
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--text-tertiary);
 }
 .proc-help {
   display: inline-flex; align-items: center; justify-content: center;
-  font-size: 13px; color: var(--text-tertiary); cursor: help;
+  width: 13px; height: 13px; font-size: 10px; cursor: help;
+  color: var(--text-tertiary); border: 1px solid var(--border-strong); border-radius: 999px;
 }
-.proc-help:hover, .proc-help:focus { color: var(--accent-primary); outline: none; }
-.proc-threshold { display: inline-flex; align-items: center; gap: 6px; }
-.proc-head .proc-thr-in { width: 56px; }
+.proc-help:hover, .proc-help:focus { color: var(--accent-primary); border-color: var(--accent-primary); outline: none; }
+.proc-head .proc-assert-in { width: 100%; }
+.proc-tol-row { display: flex; align-items: center; gap: 6px; }
+.proc-tol-op, .proc-tol-hint { font-size: 11.5px; color: var(--text-tertiary); }
+.proc-head .proc-thr-in { width: 48px; text-align: center; }
+
+/* Tier 3 — narrative (full-width row in the column). */
+.proc-head .proc-narr {
+  width: 100%; resize: vertical; min-height: 38px; font-family: inherit; line-height: 1.4;
+}
 #proc-add { margin-top: 4px; }
 .proc-chip {
   display: inline-flex; align-items: center; font-size: 11px; font-weight: 600;

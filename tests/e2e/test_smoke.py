@@ -181,7 +181,7 @@ def test_author_run_export_smoke(page: Page, live_server: str, tmp_path: Path) -
     new_section.locator("[data-proc-code]").fill("P1")
     new_section.locator("[data-proc-name]").fill("Manual JE Review")
     # 0032 teeth-check: the name renders at heading size (not the base 13px input).
-    expect(new_section.locator("[data-proc-name]")).to_have_css("font-size", "20px")
+    expect(new_section.locator("[data-proc-name]")).to_have_css("font-size", "19px")
     # The pencil focuses the name input (no toggle, no separate form).
     new_section.locator("[data-proc-name-edit]").click()
     expect(new_section.locator("[data-proc-name]")).to_be_focused()
@@ -312,11 +312,11 @@ def test_builder_collapse_and_section_insert(page: Page, live_server: str) -> No
     assert pid == "p1"
     expect(section).to_have_attribute("open", "")
 
-    # ── Step 4b: collapse by clicking proc-dot (sits outside .proc-head) ─────
-    # Clicking .proc-dot IS inside <summary> but NOT inside .proc-head, so the
+    # ── Step 4b: collapse by clicking the caret (inside <summary>, outside .proc-head) ─
+    # Clicking .band-caret IS inside <summary> but NOT inside .proc-head, so the
     # JS handler does not call e.preventDefault() and the <details> toggles.
     ls_key = f"cflow.logic.collapse.coltest.{pid}"
-    section.locator(".proc-dot").click()
+    section.locator(".band-caret").click()
     # not_to_have_attribute requires a value: checks the attribute does NOT have
     # the value "" (i.e. the boolean `open` attribute is absent after collapse).
     expect(section).not_to_have_attribute("open", "")
@@ -333,7 +333,7 @@ def test_builder_collapse_and_section_insert(page: Page, live_server: str) -> No
     expect(section).not_to_have_attribute("open", "")
 
     # ── Step 4d: expand again so the insert zones are accessible ────────────
-    section.locator(".proc-dot").click()
+    section.locator(".band-caret").click()
     expect(section).to_have_attribute("open", "")
 
     # ── Step 4e: insert a Test from the section's end insert zone ────────────

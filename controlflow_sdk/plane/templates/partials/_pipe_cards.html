@@ -10,6 +10,8 @@
    Context: bands, sources, op_choices, join_mode_choices, control_id, procedures,
    selected_procedure_for, node_procedures. #}
 
+{% set ASSERTION_HELP = "The audit assertion this procedure verifies — the specific claim it proves about the control (for example: Segregation of duties, Authorization, Completeness, Existence). Shown as the procedure subtitle in the workpaper." %}
+
 {% macro insert_zone(up, down, proc, pos) %}
 <div class="pipe-insert pipe-insert-{{ pos }}">
   <button type="button" class="pipe-insert-toggle" data-insert-toggle
@@ -40,6 +42,7 @@
 
 <details class="band-inputs" data-band-key="{{ bands.shared.key }}" open>
   <summary class="band-head">
+    <span class="band-caret" aria-hidden="true">▸</span>
     <span class="band-title">Inputs &amp; shared steps</span>
     <span class="band-sub muted">data sources and steps feeding more than one procedure</span>
   </summary>
@@ -55,31 +58,39 @@
 </details>
 
 {% for band in bands.procedures %}
-<details class="proc-section" data-proc-section data-band-key="{{ band.key }}" open>
+<details class="proc-section" data-proc-section data-band-key="{{ band.key }}"
+         style="border-left-color:{{ band.proc.color }}" open>
   <summary class="band-head proc-head-row">
-    <span class="proc-dot" style="background:{{ band.proc.color }}"></span>
+    <span class="band-caret" aria-hidden="true">▸</span>
     <span class="proc-head" data-proc-head data-proc-id="{{ band.proc.id }}">
-      <div class="proc-title-row">
-        <input class="proc-in proc-code-badge" data-proc-code value="{{ band.proc.code }}" placeholder="P1" aria-label="Code">
+      <div class="proc-identity">
+        <input class="proc-in proc-code-chip" data-proc-code value="{{ band.proc.code }}" placeholder="P1" aria-label="Code">
         <input class="proc-in proc-name-title" type="text" data-proc-name value="{{ band.proc.name }}" placeholder="Procedure name" aria-label="Procedure name">
         <button type="button" class="proc-name-pencil" data-proc-name-edit aria-label="Edit procedure name"></button>
-        <button type="button" class="btn btn-sm btn-ghost proc-del-btn" data-proc-del aria-label="Remove procedure">✕</button>
+        <span class="proc-identity-spacer"></span>
+        <button type="button" class="proc-del-btn" data-proc-del aria-label="Remove procedure">✕</button>
       </div>
-      <div class="proc-fields-row">
-        <label class="proc-field-label">Assertion
-          <span class="proc-help" tabindex="0" role="img" aria-label="What is an assertion?"
-                title="The audit assertion this procedure verifies — the specific claim it proves about the control (e.g. 'Segregation of duties', 'Authorization', 'Completeness', 'Existence'). Shown as the procedure's subtitle in the workpaper.">&#9432;</span>
-        </label>
-        <input class="proc-in proc-assert-in" data-proc-assert value="{{ band.proc.assertion }}" placeholder="e.g. Segregation of duties" aria-label="Assertion">
-        <span class="proc-threshold">
-          <span class="proc-field-label">Fail if</span>
-          <input class="proc-in proc-thr-in" data-proc-pct value="{{ band.proc.failure_threshold_pct if band.proc.failure_threshold_pct is not none else '' }}" placeholder="&#8212;" aria-label="Threshold percent">
-          <span class="proc-field-label">% or</span>
-          <input class="proc-in proc-thr-in" data-proc-count value="{{ band.proc.failure_threshold_count if band.proc.failure_threshold_count is not none else '' }}" placeholder="&#8212;" aria-label="Threshold count">
-          <span class="proc-field-label">items</span>
-        </span>
+      <div class="proc-settings">
+        <div class="proc-field proc-field-assert">
+          <label class="proc-field-label">Assertion
+            <span class="proc-help" tabindex="0" role="img" aria-label="What is an assertion?"
+                  title="{{ ASSERTION_HELP }}">&#9432;</span>
+          </label>
+          <input class="proc-in proc-assert-in" data-proc-assert value="{{ band.proc.assertion }}" placeholder="e.g. Segregation of duties" aria-label="Assertion">
+        </div>
+        <div class="proc-field proc-field-tol">
+          <label class="proc-field-label">Tolerance</label>
+          <div class="proc-tol-row">
+            <span class="proc-tol-op">&#8804;</span>
+            <input class="proc-in proc-thr-in" data-proc-pct value="{{ band.proc.failure_threshold_pct if band.proc.failure_threshold_pct is not none else '' }}" placeholder="&#8212;" aria-label="Threshold percent">
+            <span class="proc-tol-op">% or</span>
+            <input class="proc-in proc-thr-in" data-proc-count value="{{ band.proc.failure_threshold_count if band.proc.failure_threshold_count is not none else '' }}" placeholder="&#8212;" aria-label="Threshold count">
+            <span class="proc-tol-op">items</span>
+            <span class="proc-tol-hint">· blank = zero</span>
+          </div>
+        </div>
       </div>
-      <div class="proc-narrative-row">
+      <div class="proc-field proc-field-narr">
         <label class="proc-field-label">Narrative</label>
         <textarea class="proc-in proc-narr" data-proc-narrative rows="2"
                   placeholder="What this procedure tests and why"
