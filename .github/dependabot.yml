@@ -1,10 +1,11 @@
 version: 2
-# uticen-lite is a main-only public package (no staging integration branch), so
-# Dependabot targets the default branch (main). Bumps auto-merge once CI (ruff + mypy +
+# Dependabot targets the staging integration branch (target-branch below), so bumps
+# flow staging -> main like every other change. Auto-merge once CI (ruff + mypy +
 # pytest on 3.11/3.12) is green, via .github/workflows/dependabot-auto-merge.yml.
 # Updates are grouped so it opens one PR per ecosystem per week, not a flood.
 updates:
   - package-ecosystem: "pip"
+    target-branch: "staging"
     directory: "/"
     schedule:
       interval: "weekly"
@@ -14,6 +15,7 @@ updates:
     labels: ["dependencies"]
 
   - package-ecosystem: "github-actions"
+    target-branch: "staging"
     directory: "/"
     schedule:
       interval: "weekly"

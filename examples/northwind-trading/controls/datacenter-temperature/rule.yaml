@@ -2,7 +2,7 @@
 # exceeds the 27°C ASHRAE-recommended ceiling. temperature_c loads as the source's
 # `number` data_type, so the comparison value is numeric (learning 0011: match the
 # value type to the column's loaded dtype). Expected: 2 violations on the frozen
-# snapshot (Singapore 30.9°C, Mumbai 27.5°C).
+# snapshot (Ashburn 29.4°C, Mumbai 27.9°C).
 logic: all
 severity: medium
 item_key_column: site_id

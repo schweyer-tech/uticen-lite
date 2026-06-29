@@ -301,15 +301,23 @@ sources:
 
   # Snapshotted from a PUBLIC API to demonstrate the "fetch from URL" on-ramp.
   # The local CSV is the source of truth (one-time snapshot-to-file; see learning
-  # 0025) — origin: Open-Meteo (https://api.open-meteo.com/v1/forecast, no API key).
+  # 0025) — origin: OpenWeatherMap (https://api.openweathermap.org/data/2.5/weather,
+  # API key required). Refresh via tools/refresh_datacenter_weather.py.
   - id: datacenter_weather
     type: file
-    title: Data Center Site Weather (Open-Meteo)
+    title: Data Center Site Weather (OpenWeatherMap API)
     description: >
-      Current outdoor temperature/wind for each data-center site, snapshotted once
-      from the public Open-Meteo API (api.open-meteo.com) and frozen to a local CSV.
-    completeness_accuracy: One-time snapshot of the Open-Meteo current-conditions API for the 8 in-scope data-center sites.
-    extract_date: "2026-03-31"
+      API-backed source. Current outdoor temperature/wind for each data-center site,
+      snapshotted from the OpenWeatherMap Current Weather API
+      (https://api.openweathermap.org/data/2.5/weather) and frozen to a local CSV.
+      Requires an OpenWeather API key to refresh — get a free key at
+      https://openweathermap.org/api, then run
+      `OPENWEATHERMAP_API_KEY=<your-key> python tools/refresh_datacenter_weather.py`
+      to re-fetch live readings for all sites and rewrite the snapshot. The site
+      inventory (site_id/city/country/lat/lon) is preserved; only temperature_c,
+      wind_kmh, and observed_at refresh.
+    completeness_accuracy: One-time snapshot of the OpenWeatherMap current-conditions API for the 8 in-scope data-center sites; refresh on demand with your own OpenWeather API key.
+    extract_date: "2026-06-29"
     config:
       path: data/datacenter_weather.csv
       format: csv
