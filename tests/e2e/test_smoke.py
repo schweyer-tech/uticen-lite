@@ -311,6 +311,10 @@ def test_builder_collapse_and_section_insert(page: Page, live_server: str) -> No
     pid = section.get_attribute("data-band-key")
     assert pid == "p1"
     expect(section).to_have_attribute("open", "")
+    # Teeth-check the styled-field intent — the name renders as a 19px heading and
+    # the card carries the 3px accent stripe (both invisible in source/diff; 0032).
+    expect(section.locator("input.proc-name-title").first).to_have_css("font-size", "19px")
+    expect(section).to_have_css("border-left-width", "3px")
 
     # ── Step 4b: collapse by clicking the caret (inside <summary>, outside .proc-head) ─
     # Clicking .band-caret IS inside <summary> but NOT inside .proc-head, so the

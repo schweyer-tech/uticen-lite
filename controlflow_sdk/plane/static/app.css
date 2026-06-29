@@ -746,6 +746,7 @@ details[open] > .band-head > .band-caret { transform: rotate(90deg); }
   border-radius: 5px;
   color: var(--proc, var(--text-secondary));
   border-color: var(--proc, var(--border-default));
+  background: color-mix(in srgb, var(--proc, var(--bg-input)) 14%, var(--bg-input));
 }
 /* Name as an in-place heading. The `input.` qualifier raises specificity to (0,2,1)
    so it beats the later global `input[type="text"]` block (0,1,1) — learning 0032. */
