@@ -153,6 +153,83 @@ def _condition_rows(
     return rows
 
 
+def _node_step(
+    node: Node, frame: Any, key_column: str, key: str, dropped: bool
+) -> tuple[NodeStep, bool]:
+    """Classify one non-terminal node's status for the traced record.
+
+    Returns ``(step, dropped)`` where *dropped* tracks whether the record has
+    already left the pipeline at an earlier step.
+    """
+    present = _present(frame, key_column, key)
+    if present is None:
+        status = "indeterminate"
+        reason = (
+            "Not computed yet." if frame is None
+            else "The key column isn't carried past this step."
+        )
+    elif present:
+        status, reason = "present", ""
+    elif not dropped:
+        status, reason = "dropped", _DROP_REASON.get(node.type, "Excluded here.")
+        dropped = True
+    else:
+        status, reason = "absent", "Removed at an earlier step."
+    return NodeStep(node.id, _node_label(node), node.type, status, reason), dropped
+
+
+def _walk_nonterminals(
+    pipeline: Pipeline, frames: dict[str, Any], terminal_ids: set[str],
+    key_column: str, key: str,
+) -> list[NodeStep]:
+    """Present / dropped / indeterminate status for every non-terminal node."""
+    steps: list[NodeStep] = []
+    dropped = False
+    for node in pipeline.topological():
+        if node.id in terminal_ids:
+            continue
+        step, dropped = _node_step(node, frames.get(node.id), key_column, key, dropped)
+        steps.append(step)
+    return steps
+
+
+def _build_test_step(
+    t: Node, frames: dict[str, Any], key_column: str, key: str,
+    sources: dict[str, Population],
+) -> TestStep:
+    """Per-terminal Test detail: reached / flagged + per-condition verdicts."""
+    input_frame = frames.get(t.inputs[0]) if t.inputs else None
+    reached = _present(input_frame, key_column, key)
+    flagged = _present(frames.get(t.id), key_column, key)
+    logic = str(t.config.get("logic", "all"))
+    step = TestStep(
+        id=t.id, label=_node_label(t), reached=reached, flagged=flagged, logic=logic,
+    )
+    if t.type != "test":
+        step.note = "This Test is authored in custom Python — no per-condition detail."
+        return step
+    if reached is None:
+        step.note = (
+            "Couldn't locate this record at the Test input "
+            "(the key column isn't carried here)."
+        )
+        return step
+    if not reached:
+        step.note = "This record didn't reach the Test."
+        return step
+    try:
+        spec = parse_rule_spec(t.config)
+    except RuleSpecError as exc:
+        step.note = f"Couldn't read this Test's conditions: {exc}"
+        return step
+    step.conditions = _condition_rows(input_frame, key_column, key, spec, sources)
+    if step.flagged is None and step.conditions:
+        passes = [c.passed for c in step.conditions if c.passed is not None]
+        if passes:
+            step.flagged = all(passes) if logic == "all" else any(passes)
+    return step
+
+
 def trace_record(
     pipeline: Pipeline,
     frames: dict[str, Any],
@@ -193,62 +270,11 @@ def trace_record(
     terminal_ids = {t.id for t in pipeline.terminals}
 
     # ── non-terminal walk: present / dropped / indeterminate ──────────────
-    dropped = False
-    for node in pipeline.topological():
-        if node.id in terminal_ids:
-            continue
-        frame = frames.get(node.id)
-        present = _present(frame, key_column, key)
-        if present is None:
-            status = "indeterminate"
-            reason = (
-                "Not computed yet." if frame is None
-                else "The key column isn't carried past this step."
-            )
-        elif present:
-            status, reason = "present", ""
-        elif not dropped:
-            status, reason = "dropped", _DROP_REASON.get(node.type, "Excluded here.")
-            dropped = True
-        else:
-            status, reason = "absent", "Removed at an earlier step."
-        result.steps.append(NodeStep(node.id, _node_label(node), node.type, status, reason))
+    result.steps = _walk_nonterminals(pipeline, frames, terminal_ids, key_column, key)
 
     # ── per-terminal Test detail ──────────────────────────────────────────
-    for t in pipeline.terminals:
-        input_frame = frames.get(t.inputs[0]) if t.inputs else None
-        reached = _present(input_frame, key_column, key)
-        flagged = _present(frames.get(t.id), key_column, key)
-        logic = str(t.config.get("logic", "all"))
-        step = TestStep(
-            id=t.id, label=_node_label(t), reached=reached, flagged=flagged, logic=logic,
-        )
-        if t.type != "test":
-            step.note = "This Test is authored in custom Python — no per-condition detail."
-            result.tests.append(step)
-            continue
-        if reached is None:
-            step.note = (
-                "Couldn't locate this record at the Test input "
-                "(the key column isn't carried here)."
-            )
-            result.tests.append(step)
-            continue
-        if not reached:
-            step.note = "This record didn't reach the Test."
-            result.tests.append(step)
-            continue
-        try:
-            spec = parse_rule_spec(t.config)
-        except RuleSpecError as exc:
-            step.note = f"Couldn't read this Test's conditions: {exc}"
-            result.tests.append(step)
-            continue
-        step.conditions = _condition_rows(input_frame, key_column, key, spec, sources)
-        if step.flagged is None and step.conditions:
-            passes = [c.passed for c in step.conditions if c.passed is not None]
-            if passes:
-                step.flagged = all(passes) if logic == "all" else any(passes)
-        result.tests.append(step)
+    result.tests = [
+        _build_test_step(t, frames, key_column, key, sources) for t in pipeline.terminals
+    ]
 
     return result

@@ -7,12 +7,11 @@ header update indicator is visible out of the box — turning it OFF restores
 strict zero egress (see STRATEGY.md; the off path is still guaranteed silent).
 """
 
-from __future__ import annotations
-
 import shlex
 import sqlite3
 import sys
 from collections.abc import Callable, Generator
+from typing import Annotated
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -20,10 +19,61 @@ from fastapi.templating import Jinja2Templates
 
 from uticen_lite.store import repo
 from uticen_lite.store.db import connect
-from uticen_lite.upgrade.check import check_for_update, current_version
+from uticen_lite.upgrade.check import UpdateInfo, check_for_update, current_version
 from uticen_lite.upgrade.command import build_upgrade_command
 from uticen_lite.upgrade.detect import InstallMethod, detect_install, source_dir
 from uticen_lite.upgrade.spawn import schedule_shutdown, spawn_detached_upgrade
+
+
+def _cached_update_info(request: Request) -> UpdateInfo:
+    """Return the cached update check, computing + caching it on first miss."""
+    info = getattr(request.app.state, "update_check", None)
+    if info is None:
+        info = check_for_update(detect_install())
+        request.app.state.update_check = info
+    return info
+
+
+def _perform_upgrade(templates: Jinja2Templates, request: Request) -> HTMLResponse:
+    """Spawn the detached upgrade and render the 'upgrading' page (or the
+    unavailable page when the install method can't self-upgrade)."""
+    method = detect_install()
+    current = current_version()
+    if method is InstallMethod.UNKNOWN:
+        return templates.TemplateResponse(
+            request, "upgrade_unavailable.html", {"current": current}
+        )
+    src = source_dir() if method is InstallMethod.GIT_EDITABLE else None
+    commands = build_upgrade_command(method, source_dir=str(src) if src else None)
+    restart_command = [
+        sys.executable,
+        "-m",
+        "uticen_lite.plane",
+        "--project",
+        str(request.app.state.project_root),
+        "--no-browser",
+    ]
+    if request.url.port:
+        restart_command.extend(["--port", str(request.url.port)])
+    spawn_detached_upgrade(
+        request.app.state.project_root,
+        commands,
+        current=current,
+        restart_command=restart_command,
+    )
+    schedule_shutdown()
+    # shlex.quote so the copyable re-run command is paste-and-run even when the
+    # engagement path contains spaces.
+    project_dir = shlex.quote(str(request.app.state.project_root))
+    return templates.TemplateResponse(
+        request,
+        "upgrading.html",
+        {
+            "current": current,
+            "project_dir": project_dir,
+            "app_url": str(request.base_url).rstrip("/"),
+        },
+    )
 
 
 def register(
@@ -34,7 +84,7 @@ def register(
     @app.get("/settings/updates", response_class=HTMLResponse)
     def updates_home(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: Annotated[sqlite3.Connection, Depends(get_conn)],
     ) -> HTMLResponse:
         method = detect_install()
         return templates.TemplateResponse(
@@ -73,15 +123,12 @@ def register(
     @app.get("/updates/badge", response_class=HTMLResponse)
     def update_badge(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: Annotated[sqlite3.Connection, Depends(get_conn)],
     ) -> HTMLResponse:
         # OFF → zero egress, no badge.
         if not repo.get_check_updates_on_launch(conn):
             return HTMLResponse("")
-        info = getattr(request.app.state, "update_check", None)
-        if info is None:
-            info = check_for_update(detect_install())
-            request.app.state.update_check = info
+        info = _cached_update_info(request)
         if not info.available:
             return HTMLResponse("")
         return templates.TemplateResponse(
@@ -91,15 +138,12 @@ def register(
     @app.get("/updates/indicator", response_class=HTMLResponse)
     def update_indicator(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: Annotated[sqlite3.Connection, Depends(get_conn)],
     ) -> HTMLResponse:
         # Header indicator: OFF → no indicator; ON → show status + click-to-upgrade
         if not repo.get_check_updates_on_launch(conn):
             return HTMLResponse("")
-        info = getattr(request.app.state, "update_check", None)
-        if info is None:
-            info = check_for_update(detect_install())
-            request.app.state.update_check = info
+        info = _cached_update_info(request)
         return templates.TemplateResponse(
             request,
             "partials/header_update_indicator.html",
@@ -109,7 +153,7 @@ def register(
     @app.post("/updates/indicator/check", response_class=HTMLResponse)
     def refresh_update_indicator(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: Annotated[sqlite3.Connection, Depends(get_conn)],
     ) -> HTMLResponse:
         if not repo.get_check_updates_on_launch(conn):
             return HTMLResponse("")
@@ -123,40 +167,4 @@ def register(
 
     @app.post("/upgrade", response_class=HTMLResponse)
     def do_upgrade(request: Request) -> HTMLResponse:
-        method = detect_install()
-        current = current_version()
-        if method is InstallMethod.UNKNOWN:
-            return templates.TemplateResponse(
-                request, "upgrade_unavailable.html", {"current": current}
-            )
-        src = source_dir() if method is InstallMethod.GIT_EDITABLE else None
-        commands = build_upgrade_command(method, source_dir=str(src) if src else None)
-        restart_command = [
-            sys.executable,
-            "-m",
-            "uticen_lite.plane",
-            "--project",
-            str(request.app.state.project_root),
-            "--no-browser",
-        ]
-        if request.url.port:
-            restart_command.extend(["--port", str(request.url.port)])
-        spawn_detached_upgrade(
-            request.app.state.project_root,
-            commands,
-            current=current,
-            restart_command=restart_command,
-        )
-        schedule_shutdown()
-        # shlex.quote so the copyable re-run command is paste-and-run even when the
-        # engagement path contains spaces.
-        project_dir = shlex.quote(str(request.app.state.project_root))
-        return templates.TemplateResponse(
-            request,
-            "upgrading.html",
-            {
-                "current": current,
-                "project_dir": project_dir,
-                "app_url": str(request.base_url).rstrip("/"),
-            },
-        )
+        return _perform_upgrade(templates, request)

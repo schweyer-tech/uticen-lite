@@ -83,7 +83,7 @@ def test_upgrade_spawns_and_renders_upgrading(client, monkeypatch):
     assert resp.text.count('class="copy-btn"') == 2
     assert 'data-copy="controlplane --project' in resp.text
     assert 'data-copy="python -m uticen_lite.plane --project' in resp.text
-    assert 'window.location.href = "/"' in resp.text
+    assert 'globalThis.location.href = "/"' in resp.text
 
 
 def test_upgrade_unknown_renders_instructions(client, monkeypatch):

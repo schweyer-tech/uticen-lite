@@ -16,12 +16,10 @@ run before any backend import. Writing handlers open a per-handler connection
 (learning 0002); the read-only ``GET`` uses ``Depends(get_conn)``.
 """
 
-from __future__ import annotations
-
 import sqlite3
 from collections.abc import Callable, Generator
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import pandas as pd
 from fastapi import Depends, FastAPI, Request
@@ -65,7 +63,8 @@ def _build_sample(conn: sqlite3.Connection, root: Path, source_id: str) -> dict[
         return None
     try:
         pop = source_for(binding, root).load()
-    except (FileNotFoundError, UnsupportedSourceError, OSError, ValueError):
+    except (UnsupportedSourceError, OSError, ValueError):
+        # FileNotFoundError is a subclass of OSError, so it is already covered.
         return None
 
     cols = [c for c in pop.columns if c.include]
@@ -87,6 +86,82 @@ def _cell(value: Any) -> str:
     return str(value)
 
 
+def _draft_failure_message(exc: Exception) -> str:
+    """Friendly message for a failed AI draft (verbatim for ``DraftError``)."""
+    from uticen_lite.ai.draft import DraftError
+
+    if isinstance(exc, DraftError):
+        return str(exc)
+    return (
+        "The AI provider could not produce a usable rule. Try again or "
+        "build the rule by hand."
+    )
+
+
+def _draft_response(
+    templates: Jinja2Templates,
+    request: Request,
+    conn: sqlite3.Connection,
+    root: Path,
+    objective: str,
+    source_ids: list[str],
+) -> HTMLResponse:
+    """Draft a ``rule_spec`` and return the prefilled rule builder (or an error
+    banner). Extracted from the handler so ``register`` stays flat (S3776)."""
+    cfg = _ai_config(conn)
+    if cfg is None:
+        return _error(templates, request,
+                      "AI is not configured. Pick a provider in Settings.")
+
+    from uticen_lite.ai.providers import provider_key_present
+
+    if not provider_key_present(cfg["provider"]):
+        return _error(
+            templates, request,
+            "AI is not enabled — the selected provider's API key is not set "
+            "in this environment.",
+        )
+
+    if not source_ids:
+        return _error(templates, request, "Bind a data source to this control first.")
+
+    sample = _build_sample(conn, root, source_ids[0])
+    if sample is None:
+        return _error(templates, request, "Bind a data file to the source first.")
+
+    from uticen_lite.ai.draft import draft_and_validate
+    from uticen_lite.rules.spec import RuleSpecError
+
+    try:
+        draft = draft_and_validate(
+            objective=objective,
+            source_schema={"columns": sample["schema"]},
+            data_sample=sample,
+            provider=cfg["provider"],
+            model=cfg["model"],
+        )
+    except RuleSpecError as exc:
+        return _error(templates, request,
+                      f"The drafted rule was malformed: {exc}")
+    except Exception as exc:  # DraftError + any backend/transport failure
+        return _error(templates, request, _draft_failure_message(exc))
+
+    # Render the rule builder prefilled from the validated draft. The
+    # synthetic control carries .rule_spec + test_kind=="rule" so the
+    # existing partial renders it; author reviews and submits the form.
+    from uticen_lite.plane.routes.controls import _primary_columns
+
+    return templates.TemplateResponse(
+        request,
+        "partials/rule_builder.html",
+        {
+            "control": {"rule_spec": draft, "test_kind": "rule"},
+            "columns": _primary_columns(conn, source_ids),
+            "all_sources": repo.list_sources(conn),
+        },
+    )
+
+
 def register(
     app: FastAPI,
     templates: Jinja2Templates,
@@ -95,7 +170,7 @@ def register(
     @app.get("/settings/ai", response_class=HTMLResponse)
     def ai_settings(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: Annotated[sqlite3.Connection, Depends(get_conn)],
     ) -> HTMLResponse:
         from uticen_lite.ai.providers import available_providers
 
@@ -144,65 +219,7 @@ def register(
             form = await request.form()
             objective = str(form.get("objective", ""))
             source_ids = [str(s) for s in form.getlist("source_ids") if s]
-
-            cfg = _ai_config(conn)
-            if cfg is None:
-                return _error(templates, request,
-                              "AI is not configured. Pick a provider in Settings.")
-
-            from uticen_lite.ai.providers import provider_key_present
-
-            if not provider_key_present(cfg["provider"]):
-                return _error(
-                    templates, request,
-                    "AI is not enabled — the selected provider's API key is not set "
-                    "in this environment.",
-                )
-
-            if not source_ids:
-                return _error(templates, request, "Bind a data source to this control first.")
-
-            sample = _build_sample(conn, root, source_ids[0])
-            if sample is None:
-                return _error(templates, request, "Bind a data file to the source first.")
-
-            from uticen_lite.ai.draft import draft_and_validate
-            from uticen_lite.rules.spec import RuleSpecError
-
-            try:
-                draft = draft_and_validate(
-                    objective=objective,
-                    source_schema={"columns": sample["schema"]},
-                    data_sample=sample,
-                    provider=cfg["provider"],
-                    model=cfg["model"],
-                )
-            except RuleSpecError as exc:
-                return _error(templates, request,
-                              f"The drafted rule was malformed: {exc}")
-            except Exception as exc:  # DraftError + any backend/transport failure
-                from uticen_lite.ai.draft import DraftError
-
-                msg = str(exc) if isinstance(exc, DraftError) else (
-                    "The AI provider could not produce a usable rule. Try again or "
-                    "build the rule by hand."
-                )
-                return _error(templates, request, msg)
-
-            # Render the rule builder prefilled from the validated draft. The
-            # synthetic control carries .rule_spec + test_kind=="rule" so the
-            # existing partial renders it; author reviews and submits the form.
-            from uticen_lite.plane.routes.controls import _primary_columns
-
-            return templates.TemplateResponse(
-                request,
-                "partials/rule_builder.html",
-                {
-                    "control": {"rule_spec": draft, "test_kind": "rule"},
-                    "columns": _primary_columns(conn, source_ids),
-                    "all_sources": repo.list_sources(conn),
-                },
-            )
+            return _draft_response(templates, request, conn, root, objective, source_ids)
         finally:
             conn.close()
 

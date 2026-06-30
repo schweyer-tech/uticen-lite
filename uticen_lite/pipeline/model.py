@@ -204,6 +204,42 @@ def _parse_procedure(rp: dict) -> ProcedureDef:
     )
 
 
+def _validate_join_config(node_id: str, inputs: list, config: dict) -> None:
+    """Raise ``PipelineError`` if a Join node's inputs/config are malformed."""
+    if len(inputs) != 2:
+        raise PipelineError(f"Join node {node_id!r} requires exactly two inputs")
+    mode = config.get("mode")
+    if mode not in JOIN_MODES:
+        raise PipelineError(f"Join node {node_id!r} has unknown mode {mode!r}")
+    for key in ("left_key", "right_key"):
+        if not config.get(key):
+            raise PipelineError(f"Join node {node_id!r} requires {key}")
+
+
+def _validate_custom_python_config(node_id: str, config: dict) -> None:
+    """Raise ``PipelineError`` if a custom_python node's config is malformed."""
+    flavor = config.get("flavor")
+    if flavor not in CUSTOM_FLAVORS:
+        raise PipelineError(
+            f"custom_python node {node_id!r} has unknown flavor {flavor!r}"
+        )
+    if not config.get("code"):
+        raise PipelineError(f"custom_python node {node_id!r} requires code")
+
+
+def _parse_import_node(
+    node_id: str, rn: dict, config: dict, inputs: list, narrative: str, title: str
+) -> Node:
+    """Build an ``import`` Node, validating its source_id and (absent) inputs."""
+    source_id = rn.get("source_id")
+    if not source_id:
+        raise PipelineError(f"import node {node_id!r} requires a source_id")
+    if inputs:
+        raise PipelineError(f"import node {node_id!r} must have no inputs")
+    return Node(id=node_id, type="import", narrative=narrative, title=title,
+                config=config, inputs=[], source_id=str(source_id))
+
+
 def _parse_node(rn: dict) -> Node:
     node_id = rn.get("id")
     if not node_id or not isinstance(node_id, str):
@@ -222,33 +258,14 @@ def _parse_node(rn: dict) -> Node:
     title = str(rn.get("title", "") or "")
 
     if node_type == "import":
-        source_id = rn.get("source_id")
-        if not source_id:
-            raise PipelineError(f"import node {node_id!r} requires a source_id")
-        if inputs:
-            raise PipelineError(f"import node {node_id!r} must have no inputs")
-        return Node(id=node_id, type="import", narrative=narrative, title=title,
-                    config=config, inputs=[], source_id=str(source_id))
+        return _parse_import_node(node_id, rn, config, inputs, narrative, title)
 
     if node_type == "join":
-        if len(inputs) != 2:
-            raise PipelineError(f"Join node {node_id!r} requires exactly two inputs")
-        mode = config.get("mode")
-        if mode not in JOIN_MODES:
-            raise PipelineError(f"Join node {node_id!r} has unknown mode {mode!r}")
-        for key in ("left_key", "right_key"):
-            if not config.get(key):
-                raise PipelineError(f"Join node {node_id!r} requires {key}")
+        _validate_join_config(node_id, inputs, config)
     elif node_type == "custom_python":
-        flavor = config.get("flavor")
-        if flavor not in CUSTOM_FLAVORS:
-            raise PipelineError(
-                f"custom_python node {node_id!r} has unknown flavor {flavor!r}"
-            )
-        if not config.get("code"):
-            raise PipelineError(f"custom_python node {node_id!r} requires code")
+        _validate_custom_python_config(node_id, config)
 
-    if node_type != "import" and not inputs:
+    if not inputs:
         raise PipelineError(f"node {node_id!r} of type {node_type!r} requires inputs")
 
     return Node(id=node_id, type=node_type, narrative=narrative, title=title,
@@ -286,7 +303,7 @@ def _validate_terminal(nodes: list[Node]) -> None:
 
 def _reject_cycles(nodes: list[Node]) -> None:
     by_id = {n.id: n for n in nodes}
-    state: dict[str, int] = {}  # 0=unvisited, 1=on-stack, 2=done
+    state: dict[str, int] = {}  # 0 unvisited, 1 on-stack, 2 done
 
     def visit(nid: str) -> None:
         s = state.get(nid, 0)

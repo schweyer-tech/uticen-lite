@@ -108,28 +108,49 @@ def materialize_steps(
     cache and only the edited step + its descendants recompute. *recomputed_out*, if given, is
     filled with the ids actually recomputed (for tests).
     """
-    import pandas as pd
-
     needed = set(pipeline.import_source_ids())
     if not needed.issubset(frames.keys()):
         return {}
 
     use_cache = cache is not None and source_versions is not None
     keys = _step_keys(pipeline, source_versions or {}) if use_cache else {}
-    if use_cache:
-        assert cache is not None  # guarded by use_cache; narrows type for mypy
-        recompute = {n.id for n in pipeline.nodes if keys[n.id] not in cache}
-        seed = {n.id: cache[keys[n.id]] for n in pipeline.nodes if keys[n.id] in cache}
-        for n in pipeline.nodes:           # mark reused entries as recently used
-            if keys[n.id] in cache:
-                cache.move_to_end(keys[n.id])
-    else:
-        recompute = {n.id for n in pipeline.nodes}
-        seed = {}
+    recompute, seed = _plan_recompute(pipeline, keys, cache if use_cache else None)
     if recomputed_out is not None:
         recomputed_out.clear()
         recomputed_out.update(recompute)
 
+    raw = _exec_materialize(pipeline, frames, recompute, seed)
+    out = _finalize_materialized(pipeline, raw, recompute)
+
+    if use_cache:
+        assert cache is not None  # guarded by use_cache; narrows type for mypy
+        _update_cache(cache, keys, recompute, out)
+    return out
+
+
+def _plan_recompute(
+    pipeline: Pipeline,
+    keys: dict[str, str],
+    cache: OrderedDict[str, Any] | None,
+) -> tuple[set[str], dict[str, Any]]:
+    """Decide which node ids to recompute and seed the rest from *cache*."""
+    if cache is None:
+        return {n.id for n in pipeline.nodes}, {}
+    recompute = {n.id for n in pipeline.nodes if keys[n.id] not in cache}
+    seed = {n.id: cache[keys[n.id]] for n in pipeline.nodes if keys[n.id] in cache}
+    for n in pipeline.nodes:           # mark reused entries as recently used
+        if keys[n.id] in cache:
+            cache.move_to_end(keys[n.id])
+    return recompute, seed
+
+
+def _exec_materialize(
+    pipeline: Pipeline,
+    frames: dict[str, Any],
+    recompute: set[str],
+    seed: dict[str, Any],
+) -> dict[str, Any]:
+    """Compile + exec the per-node body and return the raw ``{node_id: value}`` map."""
     from uticen_lite.pipeline.compile import _emit_custom_helper
 
     namespace: dict[str, Any] = {}
@@ -139,14 +160,25 @@ def materialize_steps(
     body = _emit_materialize_body(pipeline, recompute)
     src = "\n\n\n".join([*helper_parts, body])
     try:
-        exec(src, namespace)  # noqa: S102 — author code, guardrailed by lint
+        # author code, guardrailed by lint
+        exec(src, namespace)  # noqa: S102
         node_fns = {
             n.id: namespace[f"_node_{n.id}"]
             for n in pipeline.nodes if n.type == "custom_python"
         }
-        raw = namespace["_materialize"](frames, node_fns, seed)
-    except Exception as exc:  # noqa: BLE001 — surface as a typed, contained error
+        return namespace["_materialize"](frames, node_fns, seed)
+    # surface as a typed, contained error
+    except Exception as exc:  # noqa: BLE001
         raise MaterializeError(str(exc)) from exc
+
+
+def _finalize_materialized(
+    pipeline: Pipeline,
+    raw: dict[str, Any],
+    recompute: set[str],
+) -> dict[str, Any]:
+    """Coerce custom-test terminal lists to DataFrames; return ``{node_id: frame}``."""
+    import pandas as pd
 
     out: dict[str, Any] = {}
     terminal_ids = {t.id for t in pipeline.terminals}
@@ -155,13 +187,20 @@ def materialize_steps(
         if nid in recompute and nid in terminal_ids and node.type == "custom_python":
             val = pd.DataFrame(val)        # custom-test terminal returns a list
         out[nid] = val
-    if use_cache:
-        assert cache is not None  # guarded by use_cache; narrows type for mypy
-        for nid in recompute:
-            cache[keys[nid]] = out[nid]
-        while len(cache) > _CACHE_MAX:
-            cache.popitem(last=False)
     return out
+
+
+def _update_cache(
+    cache: OrderedDict[str, Any],
+    keys: dict[str, str],
+    recompute: set[str],
+    out: dict[str, Any],
+) -> None:
+    """Store recomputed frames and evict LRU entries beyond the cap."""
+    for nid in recompute:
+        cache[keys[nid]] = out[nid]
+    while len(cache) > _CACHE_MAX:
+        cache.popitem(last=False)
 
 
 def _ancestor_closure(pipeline: Pipeline, node: Node) -> list[Node]:

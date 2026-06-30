@@ -67,7 +67,7 @@
     f.addEventListener('load', function () {
       try {
         f.style.height = (f.contentWindow.document.documentElement.scrollHeight + 2) + 'px';
-      } catch (e) { /* same-origin guard */ }
+      } catch (e) { console.error(e); /* same-origin guard */ }
     });
   });
 </script>

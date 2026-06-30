@@ -104,6 +104,55 @@ def _to_run_dicts(
     return runs_by_control, procedure_run_map
 
 
+def _control_proc_info(raw: dict) -> list[dict] | None:
+    """Per-procedure metadata for one multi-terminal pipeline control, or None.
+
+    Returns ``None`` for single-terminal / non-pipeline / unparseable controls
+    (they use the single-procedure path in ``_build_workpaper``).
+    """
+    if raw.get("test_kind") != "pipeline":
+        return None
+    graph = raw.get("pipeline")
+    if not graph:
+        return None
+    try:
+        pipeline = parse_pipeline(graph)
+    except ValueError:
+        return None
+    if len(pipeline.terminals) < 2:
+        return None
+
+    from uticen_lite.model.control import ControlDef, FrameworkRefs
+    from uticen_lite.pipeline.compile import compile_pipeline_procedures
+    from uticen_lite.rules.resolve import resolve_test_code
+
+    proc_info: list[dict] = []
+    for proc in compile_pipeline_procedures(pipeline):
+        # Build a transient ControlDef carrying only this procedure's artifact
+        # so resolve_test_code renders rule→text the same way run_service does.
+        transient = ControlDef(
+            id=raw["id"],
+            title=proc.title,
+            objective=raw["objective"],
+            narrative=proc.narrative,
+            framework_refs=FrameworkRefs(),
+            risk=None,
+            sources=[],
+            test_path="",
+            test_code=proc.result.test_code if proc.result.test_kind == "python" else None,
+            rule_spec=proc.result.rule_spec if proc.result.test_kind == "rule" else None,
+        )
+        proc_info.append({
+            "procedure_id": proc.procedure_id,
+            "code": proc.code,
+            "assertion": proc.assertion,
+            "title": proc.title,
+            "narrative": proc.narrative,
+            "test_code": resolve_test_code(transient),
+        })
+    return proc_info
+
+
 def _procedure_info_by_control(conn: sqlite3.Connection) -> dict[str, list[dict]]:
     """Build per-procedure metadata for multi-terminal pipeline controls.
 
@@ -116,50 +165,11 @@ def _procedure_info_by_control(conn: sqlite3.Connection) -> dict[str, list[dict]
     generated Python) derived from each terminal's sub-pipeline — the same
     source used by ``_run_multi_procedure`` when building the workpaper.
     """
-    from uticen_lite.model.control import ControlDef, FrameworkRefs
-    from uticen_lite.pipeline.compile import compile_pipeline_procedures
-    from uticen_lite.rules.resolve import resolve_test_code
-
     out: dict[str, list[dict]] = {}
     for raw in repo.list_controls(conn):
-        if raw.get("test_kind") != "pipeline":
-            continue
-        graph = raw.get("pipeline")
-        if not graph:
-            continue
-        try:
-            pipeline = parse_pipeline(graph)
-        except ValueError:
-            continue
-        if len(pipeline.terminals) < 2:
-            continue
-
-        procs = compile_pipeline_procedures(pipeline)
-        proc_info: list[dict] = []
-        for proc in procs:
-            # Build a transient ControlDef carrying only this procedure's artifact
-            # so resolve_test_code renders rule→text the same way run_service does.
-            transient = ControlDef(
-                id=raw["id"],
-                title=proc.title,
-                objective=raw["objective"],
-                narrative=proc.narrative,
-                framework_refs=FrameworkRefs(),
-                risk=None,
-                sources=[],
-                test_path="",
-                test_code=proc.result.test_code if proc.result.test_kind == "python" else None,
-                rule_spec=proc.result.rule_spec if proc.result.test_kind == "rule" else None,
-            )
-            proc_info.append({
-                "procedure_id": proc.procedure_id,
-                "code": proc.code,
-                "assertion": proc.assertion,
-                "title": proc.title,
-                "narrative": proc.narrative,
-                "test_code": resolve_test_code(transient),
-            })
-        out[raw["id"]] = proc_info
+        info = _control_proc_info(raw)
+        if info is not None:
+            out[raw["id"]] = info
     return out
 
 

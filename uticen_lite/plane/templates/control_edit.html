@@ -128,9 +128,9 @@ function filterSourceOptions(input) {
   if (!results) return;
   let shown = 0;
   results.querySelectorAll('.source-option-row').forEach(function(row) {
-    const label = row.getAttribute('data-label') || '';
+    const label = row.dataset.label || '';
     // Empty query shows every source; typing narrows to matches.
-    const match = q === '' || label.indexOf(q) !== -1;
+    const match = q === '' || label.includes(q);
     row.style.display = match ? '' : 'none';
     if (match) shown++;
   });

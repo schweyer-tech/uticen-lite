@@ -5,8 +5,6 @@ POST handlers act on that screen. Both write to the store, so each opens its own
 connection in the handler body (see docs/learnings/0002).
 """
 
-from __future__ import annotations
-
 import sqlite3
 from collections.abc import Callable, Generator
 from datetime import UTC, datetime

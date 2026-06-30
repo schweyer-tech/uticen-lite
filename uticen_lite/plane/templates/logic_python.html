@@ -59,8 +59,8 @@
 <script>
   (function () {
     var textarea = document.querySelector('textarea[name="test_code"]');
-    if (textarea && typeof window.CodeMirror !== "undefined") {
-      window.CodeMirror.fromTextArea(textarea, {
+    if (textarea && globalThis.CodeMirror !== undefined) {
+      globalThis.CodeMirror.fromTextArea(textarea, {
         mode: "python", lineNumbers: true, indentUnit: 4, matchBrackets: true
       });
     }

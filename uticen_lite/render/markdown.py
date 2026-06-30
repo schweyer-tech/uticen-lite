@@ -177,6 +177,34 @@ def _render_control(
     lines.append("")
 
 
+def _render_one_source(
+    lines: list[str],
+    prov: SourceProvenance,
+    sample: DataSample | None,
+    run_executed_at: str,
+    *,
+    date_format: str,
+    tz: str,
+) -> None:
+    """Render one source's provenance bullet block (+ optional preview table)."""
+    lines.append(f"- **{prov.path}** — {prov.row_count} rows")
+    lines.append(f"  - SHA-256: `{prov.sha256}`")
+    lines.append(f"  - Source: `{prov.source_id}`")
+    raw_extract = sample.extract_date if sample is not None else None
+    extract_display = format_display_date(
+        raw_extract or run_executed_at, date_format=date_format, tz=tz
+    )
+    lines.append(f"  - **Extract Date:** {extract_display}")
+    description = sample.description if sample is not None else None
+    if description:
+        lines.append(f"  - **Description:** {description}")
+    ca_text = _completeness_accuracy_text(prov, sample)
+    lines.append(f"  - **Completeness & Accuracy:** {ca_text}")
+    lines.append("")
+    if sample is not None and sample.columns:
+        _append_preview_table(lines, sample)
+
+
 def _render_data_sources(
     lines: list[str],
     sources: list[SourceProvenance],
@@ -191,82 +219,80 @@ def _render_data_sources(
     lines.append("")
     if sources:
         for prov in sources:
-            sample = samples_by_id.get(prov.source_id)
-            lines.append(f"- **{prov.path}** — {prov.row_count} rows")
-            lines.append(f"  - SHA-256: `{prov.sha256}`")
-            lines.append(f"  - Source: `{prov.source_id}`")
-            raw_extract = sample.extract_date if sample is not None else None
-            extract_display = format_display_date(
-                raw_extract or run_executed_at, date_format=date_format, tz=tz
+            _render_one_source(
+                lines, prov, samples_by_id.get(prov.source_id), run_executed_at,
+                date_format=date_format, tz=tz,
             )
-            lines.append(f"  - **Extract Date:** {extract_display}")
-            description = sample.description if sample is not None else None
-            if description:
-                lines.append(f"  - **Description:** {description}")
-            ca_text = _completeness_accuracy_text(prov, sample)
-            lines.append(f"  - **Completeness & Accuracy:** {ca_text}")
-            lines.append("")
-            if sample is not None and sample.columns:
-                _append_preview_table(lines, sample)
     else:
         lines.append("No data sources recorded.")
     lines.append("")
+
+
+def _render_procedure_violations(lines: list[str], violations: list[Violation]) -> None:
+    """Per-procedure violations table (adds a "Failed checks" column when any)."""
+    has_checks = any(v.details.get("checks") for v in violations)
+    if has_checks:
+        lines.append("| Item Key | Severity | Description | Failed checks |")
+        lines.append("| --- | --- | --- | --- |")
+    else:
+        lines.append("| Item Key | Severity | Description |")
+        lines.append("| --- | --- | --- |")
+    for v in violations:
+        key = _md_cell(v.item_key)
+        sev = _md_cell(v.severity)
+        desc = _md_cell(v.description)
+        checks_raw: list[str] = v.details.get("checks") or []
+        checks_cell = f" | {_md_cell(', '.join(checks_raw))}" if has_checks else ""
+        lines.append(f"| {key} | {sev} | {desc}{checks_cell} |")
+    lines.append("")
+
+
+def _render_procedure(lines: list[str], proc, idx: int, multi: bool) -> None:
+    """Render one procedure block (heading, code, metrics, verdict, violations)."""
+    run = proc.result
+    status = "PASS" if run.failed == 0 else "FAIL"
+    # Heading: show code prefix when present (guard keeps N≤1 byte-identical when empty).
+    if proc.code:
+        lines.append(f"### {proc.code}: {proc.title} — {status}")
+    else:
+        lines.append(f"### P{idx}: {proc.title} — {status}")
+    lines.append("")
+    # Assertion subtitle — suppressed when empty (byte-identical guard).
+    if proc.assertion:
+        lines.append(f"_Assertion: {proc.assertion}_")
+        lines.append("")
+    lines.append(proc.narrative)
+    lines.append("")
+    lines.append("```python")
+    lines.append(proc.test_code)
+    lines.append("```")
+    lines.append("")
+    lines.append("| Metric | Value |")
+    lines.append("| --- | --- |")
+    lines.append(f"| Population | {_md_cell(run.population_size)} |")
+    lines.append(f"| Passed | {_md_cell(run.passed)} |")
+    lines.append(f"| Failed | {_md_cell(run.failed)} |")
+    lines.append(f"| Pass Rate | {_md_cell(run.pass_rate)}% |")
+    lines.append("")
+    # per-procedure verdict — only for N>1 (N==1 is byte-identical to today)
+    if multi:
+        det = proc.determination
+        threshold_text, result_text = det.conclusion_text()
+        lines.append(
+            f"**Procedure verdict: {det.verdict}** — {threshold_text} {result_text}"
+        )
+        lines.append("")
+    if run.violations:
+        _render_procedure_violations(lines, run.violations)
 
 
 def _render_procedures(lines: list[str], wp: Workpaper) -> None:
     """── Procedures ──"""
     lines.append("## Procedures")
     lines.append("")
+    multi = len(wp.procedures) > 1
     for i, proc in enumerate(wp.procedures, start=1):
-        run = proc.result
-        status = "PASS" if run.failed == 0 else "FAIL"
-        # Heading: show code prefix when present (guard keeps N≤1 byte-identical when empty).
-        if proc.code:
-            lines.append(f"### {proc.code}: {proc.title} — {status}")
-        else:
-            lines.append(f"### P{i}: {proc.title} — {status}")
-        lines.append("")
-        # Assertion subtitle — suppressed when empty (byte-identical guard).
-        if proc.assertion:
-            lines.append(f"_Assertion: {proc.assertion}_")
-            lines.append("")
-        lines.append(proc.narrative)
-        lines.append("")
-        lines.append("```python")
-        lines.append(proc.test_code)
-        lines.append("```")
-        lines.append("")
-        lines.append("| Metric | Value |")
-        lines.append("| --- | --- |")
-        lines.append(f"| Population | {_md_cell(run.population_size)} |")
-        lines.append(f"| Passed | {_md_cell(run.passed)} |")
-        lines.append(f"| Failed | {_md_cell(run.failed)} |")
-        lines.append(f"| Pass Rate | {_md_cell(run.pass_rate)}% |")
-        lines.append("")
-        # per-procedure verdict — only for N>1 (N==1 is byte-identical to today)
-        if len(wp.procedures) > 1:
-            det = proc.determination
-            threshold_text, result_text = det.conclusion_text()
-            lines.append(
-                f"**Procedure verdict: {det.verdict}** — {threshold_text} {result_text}"
-            )
-            lines.append("")
-        if run.violations:
-            has_checks = any(v.details.get("checks") for v in run.violations)
-            if has_checks:
-                lines.append("| Item Key | Severity | Description | Failed checks |")
-                lines.append("| --- | --- | --- | --- |")
-            else:
-                lines.append("| Item Key | Severity | Description |")
-                lines.append("| --- | --- | --- |")
-            for v in run.violations:
-                key = _md_cell(v.item_key)
-                sev = _md_cell(v.severity)
-                desc = _md_cell(v.description)
-                checks_raw: list[str] = v.details.get("checks") or []
-                checks_cell = f" | {_md_cell(', '.join(checks_raw))}" if has_checks else ""
-                lines.append(f"| {key} | {sev} | {desc}{checks_cell} |")
-            lines.append("")
+        _render_procedure(lines, proc, i, multi)
 
 
 def _render_exceptions(lines: list[str], violations: list[Violation]) -> None:

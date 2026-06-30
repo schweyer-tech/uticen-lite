@@ -11,6 +11,7 @@ from __future__ import annotations
 from io import BytesIO
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from uticen_lite.plane.ingest import AdaptersUnavailable
@@ -44,32 +45,32 @@ def _sanitize_sheet_name(name: str, used: set[str]) -> str:
     return clean
 
 
+def _excel_cell(v: Any) -> Any:
+    """Coerce one cell to an openpyxl-writable value (native numbers/dates kept)."""
+    if v is None or v is pd.NaT or v is pd.NA:
+        return None
+    if isinstance(v, pd.Timestamp):
+        return None if pd.isna(v) else v.to_pydatetime()
+    if isinstance(v, (list, dict, set, tuple)):
+        return str(v)
+    if isinstance(v, np.generic):
+        scalar = v.item()
+        return None if isinstance(scalar, float) and pd.isna(scalar) else scalar
+    try:
+        if v is None or (np.isscalar(v) and pd.isna(v)):  # type: ignore[arg-type]
+            return None
+    except (TypeError, ValueError):
+        pass
+    return v
+
+
 def _coerce_for_excel(frame: pd.DataFrame) -> pd.DataFrame:
     """Make every cell openpyxl-writable, keeping native numbers/dates (learning 0020)."""
-    import numpy as np
-
-    def cell(v: Any) -> Any:
-        if v is None or v is pd.NaT or v is pd.NA:
-            return None
-        if isinstance(v, pd.Timestamp):
-            return None if pd.isna(v) else v.to_pydatetime()
-        if isinstance(v, (list, dict, set, tuple)):
-            return str(v)
-        if isinstance(v, np.generic):
-            scalar = v.item()
-            return None if isinstance(scalar, float) and pd.isna(scalar) else scalar
-        try:
-            if v is None or (np.isscalar(v) and pd.isna(v)):  # type: ignore[arg-type]
-                return None
-        except (TypeError, ValueError):
-            pass
-        return v
-
     out = frame.copy()
     for col in out.columns:
         # Use a list comprehension + object dtype so None cells are preserved as None
         # (Series.map on typed columns — e.g. datetime64 — would re-cast None back to NaT).
-        out[col] = pd.Series([cell(v) for v in out[col]], dtype=object, index=out.index)
+        out[col] = pd.Series([_excel_cell(v) for v in out[col]], dtype=object, index=out.index)
     return out
 
 

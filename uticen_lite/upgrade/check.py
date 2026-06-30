@@ -73,7 +73,7 @@ def _default_git_run(source: Path) -> GitRunner:
     return run
 
 
-def _git_behind(source: Path, git_run: GitRunner) -> tuple[int, str | None]:
+def _git_behind(git_run: GitRunner) -> tuple[int, str | None]:
     git_run(["git", "fetch", "--quiet"])
     rev = git_run(["git", "rev-list", "--count", "HEAD..@{u}"])
     try:
@@ -95,7 +95,7 @@ def check_for_update(
         src = source_dir()
         if src is None:
             return UpdateInfo(method, current, None, False, "Could not locate the source checkout.")
-        count, sha = _git_behind(src, git_run or _default_git_run(src))
+        count, sha = _git_behind(git_run or _default_git_run(src))
         if count > 0:
             return UpdateInfo(method, current, sha, True, f"{count} commit(s) behind origin.")
         return UpdateInfo(method, current, sha, False, "Up to date with origin.")

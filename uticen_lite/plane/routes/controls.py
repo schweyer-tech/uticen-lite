@@ -1,10 +1,8 @@
-from __future__ import annotations
-
 import json
 import sqlite3
 from collections.abc import Callable, Generator
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -12,6 +10,8 @@ from fastapi.templating import Jinja2Templates
 
 from uticen_lite.store import repo
 from uticen_lite.store.db import connect
+
+_CONTROL_EDIT_TEMPLATE = "control_edit.html"
 
 
 def _fmt_executed(iso: str) -> str:
@@ -127,7 +127,7 @@ def _rule_spec_from_form(form: Any) -> dict[str, Any]:
             continue
         cond: dict[str, Any] = {"column": resolved, "op": op}
         if op in ("is_empty", "not_empty", "is_duplicate"):
-            pass
+            pass  # unary operators take no value — nothing to attach
         elif op in ("in", "not_in"):
             cond["value"] = [_typed(p) for p in raw.split("|") if p.strip()]
         else:
@@ -320,6 +320,67 @@ def _node_id_for_import(nodes: list[dict[str, Any]], source_id: str) -> str:
     return f"{base}_{i}"
 
 
+def _dedupe_preserving_order(items: list[str]) -> list[str]:
+    """Unique items, first occurrence wins, order preserved."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for it in items:
+        if it not in seen:
+            seen.add(it)
+            out.append(it)
+    return out
+
+
+def _partition_import_nodes(
+    nodes: list[dict[str, Any]], selected_set: set[str]
+) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]], set[str]]:
+    """Split nodes into kept Import nodes (by source), non-Import nodes, and the
+    ids of Import nodes dropped (de-selected source or duplicate of a kept one)."""
+    removed_ids: set[str] = set()
+    import_by_source: dict[str, dict[str, Any]] = {}
+    non_import_nodes: list[dict[str, Any]] = []
+    for n in nodes:
+        if n.get("type") != "import":
+            non_import_nodes.append(dict(n))
+            continue
+        sid = str(n.get("source_id") or "")
+        if sid not in selected_set or sid in import_by_source:
+            removed_ids.add(str(n.get("id") or ""))
+            continue
+        import_by_source[sid] = dict(n)
+    return import_by_source, non_import_nodes, removed_ids
+
+
+def _strip_dangling_inputs(
+    non_import_nodes: list[dict[str, Any]], removed_ids: set[str]
+) -> None:
+    """Drop references to removed Import node ids from every node's ``inputs``."""
+    for n in non_import_nodes:
+        if isinstance(n.get("inputs"), list):
+            n["inputs"] = [i for i in n["inputs"] if i not in removed_ids]
+
+
+def _ordered_import_nodes(
+    selected_order: list[str],
+    import_by_source: dict[str, dict[str, Any]],
+    non_import_nodes: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Import nodes in selected order, synthesising any newly bound source."""
+    ordered_imports: list[dict[str, Any]] = []
+    id_scope = [*non_import_nodes]
+    for sid in selected_order:
+        existing = import_by_source.get(sid)
+        if existing is None:
+            existing = {
+                "id": _node_id_for_import(id_scope + ordered_imports, sid),
+                "type": "import",
+                "source_id": sid,
+                "narrative": "",
+            }
+        ordered_imports.append(existing)
+    return ordered_imports
+
+
 def _reconcile_pipeline_imports(
     pipeline: dict[str, Any] | None,
     selected_source_ids: list[str],
@@ -333,50 +394,47 @@ def _reconcile_pipeline_imports(
     if not isinstance(pipeline, dict):
         return pipeline
     nodes = list(pipeline.get("nodes") or [])
-    selected_order: list[str] = []
-    selected_set: set[str] = set()
-    for sid in selected_source_ids:
-        if sid not in selected_set:
-            selected_set.add(sid)
-            selected_order.append(sid)
+    selected_order = _dedupe_preserving_order(selected_source_ids)
+    selected_set = set(selected_order)
 
-    removed_ids: set[str] = set()
-    import_by_source: dict[str, dict[str, Any]] = {}
-    non_import_nodes: list[dict[str, Any]] = []
-    for n in nodes:
-        if n.get("type") != "import":
-            non_import_nodes.append(dict(n))
-            continue
-        sid = str(n.get("source_id") or "")
-        if sid not in selected_set:
-            removed_ids.add(str(n.get("id") or ""))
-            continue
-        if sid in import_by_source:
-            removed_ids.add(str(n.get("id") or ""))
-            continue
-        import_by_source[sid] = dict(n)
-
+    import_by_source, non_import_nodes, removed_ids = _partition_import_nodes(
+        nodes, selected_set
+    )
     if removed_ids:
-        for n in non_import_nodes:
-            if isinstance(n.get("inputs"), list):
-                n["inputs"] = [i for i in n["inputs"] if i not in removed_ids]
+        _strip_dangling_inputs(non_import_nodes, removed_ids)
 
-    ordered_imports: list[dict[str, Any]] = []
-    id_scope = [*non_import_nodes]
-    for sid in selected_order:
-        existing = import_by_source.get(sid)
-        if existing is None:
-            existing = {
-                "id": _node_id_for_import(id_scope + ordered_imports, sid),
-                "type": "import",
-                "source_id": sid,
-                "narrative": "",
-            }
-        ordered_imports.append(existing)
-
+    ordered_imports = _ordered_import_nodes(
+        selected_order, import_by_source, non_import_nodes
+    )
     out = dict(pipeline)
     out["nodes"] = [*ordered_imports, *non_import_nodes]
     return out
+
+
+def _resolve_control_id(
+    conn: sqlite3.Connection, form: Any, original_id: str | None
+) -> str:
+    """Resolve the saved control id, applying a rename for an existing control.
+
+    A changed id on an existing control is a rename (moves the row, sources and
+    runs); an empty field falls back to the original so a blank submit never
+    corrupts the record. ``rename_control_id`` may raise ``ValueError``.
+    """
+    cid = str(form.get("id")).strip()
+    if original_id is None:
+        return cid
+    if not cid:
+        cid = original_id
+    if cid != original_id:
+        repo.rename_control_id(conn, original_id, cid)
+    return cid
+
+
+def _union_required_sources(existing: dict, source_ids: list[str]) -> None:
+    """Append logic-required sources (in place) so a needed binding is never dropped."""
+    for sid in _required_source_ids(existing):
+        if sid not in source_ids:
+            source_ids.append(sid)
 
 
 def _save_from_form(conn: sqlite3.Connection, form: Any, original_id: str | None = None) -> str:
@@ -397,15 +455,7 @@ def _save_from_form(conn: sqlite3.Connection, form: Any, original_id: str | None
     - Non-pipeline controls: preserve existing logic and union logic-required
       sources into posted ``source_ids`` so needed bindings are never dropped.
     """
-    cid = str(form.get("id")).strip()
-    # The Control ID is an editable Details field. On an existing control a
-    # changed id is a rename (moves the row, sources and runs); an empty field
-    # falls back to the original so a blank submit never corrupts the record.
-    if original_id is not None:
-        if not cid:
-            cid = original_id
-        if cid != original_id:
-            repo.rename_control_id(conn, original_id, cid)  # may raise ValueError
+    cid = _resolve_control_id(conn, form, original_id)
     nist = [s.strip() for s in str(form.get("framework_nist", "")).split(",") if s.strip()]
     pct = form.get("failure_threshold_pct")
     cnt = form.get("failure_threshold_count")
@@ -424,9 +474,7 @@ def _save_from_form(conn: sqlite3.Connection, form: Any, original_id: str | None
             existing = dict(existing)
             existing["pipeline"] = pipeline
         # Union logic-required sources so a needed source is never dropped.
-        for sid in _required_source_ids(existing):
-            if sid not in source_ids:
-                source_ids.append(sid)
+        _union_required_sources(existing, source_ids)
     else:
         test_kind = "pipeline"
         rule_spec = None
@@ -452,6 +500,143 @@ def _save_from_form(conn: sqlite3.Connection, form: Any, original_id: str | None
     return cid
 
 
+def _control_edit_context(
+    conn: sqlite3.Connection,
+    control: dict | None,
+    **extra: Any,
+) -> dict[str, Any]:
+    """Shared template context for ``control_edit.html`` (no bound source → []) ."""
+    from uticen_lite.plane.routes.ai import _ai_configured
+
+    ctx: dict[str, Any] = {
+        "project": repo.get_project(conn) or {"name": ""},
+        "control": control,
+        "sources": repo.list_sources(conn),
+        "columns": _primary_columns(conn, control["source_ids"]) if control else [],
+        "all_sources": repo.list_sources(conn),
+        "ai_enabled": _ai_configured(conn),
+    }
+    ctx.update(extra)
+    return ctx
+
+
+def _rerender_with_error(
+    templates: Jinja2Templates,
+    request: Request,
+    conn: sqlite3.Connection,
+    control_id: str | None,
+    errors: list[str],
+) -> HTMLResponse:
+    """Re-render the edit form with an inline error banner (HTTP 422).
+
+    Used when a save is REFUSED (e.g. the §8 allowlist deny-scan): the offending
+    node's offramp message reaches the author rather than persisting an unsafe
+    node or returning a bare 500.
+    """
+    control = repo.get_control(conn, control_id) if control_id else None
+    return templates.TemplateResponse(
+        request,
+        _CONTROL_EDIT_TEMPLATE,
+        _control_edit_context(conn, control, save_errors=errors),
+        status_code=422,
+    )
+
+
+def _apply_source_action(existing: dict, action: str, source_id: str) -> list[str]:
+    """The new bound-source list after a single add/remove, keeping logic-required
+    bindings (pipeline imports / cross-source refs) — mirrors the metadata save."""
+    current = list(existing["source_ids"])
+    if action == "add" and source_id not in current:
+        current.append(source_id)
+    elif action == "remove":
+        current = [s for s in current if s != source_id]
+    _union_required_sources(existing, current)
+    return current
+
+
+def _decorate_runs(runs: list[dict]) -> list[dict]:
+    """Annotate each run (in place) with a human-readable ``executed_display``."""
+    for r in runs:
+        r["executed_display"] = _fmt_executed(r.get("executed_at", ""))
+    return runs
+
+
+def _create_or_rerender(
+    templates: Jinja2Templates, request: Request, conn: sqlite3.Connection, form: Any
+) -> HTMLResponse | RedirectResponse:
+    """Create a control, or re-render the form with a save error."""
+    from uticen_lite.pipeline.lint import LintError
+    from uticen_lite.pipeline.model import PipelineError
+
+    try:
+        cid = _save_from_form(conn, form)
+    except LintError as exc:
+        return _rerender_with_error(templates, request, conn, None, exc.errors)
+    except PipelineError as exc:
+        return _rerender_with_error(templates, request, conn, None, [str(exc)])
+    return RedirectResponse(f"/controls/{cid}", status_code=303)
+
+
+def _update_or_rerender(
+    templates: Jinja2Templates,
+    request: Request,
+    conn: sqlite3.Connection,
+    form: Any,
+    control_id: str,
+) -> HTMLResponse | RedirectResponse:
+    """Update a control, or re-render the form with a save error."""
+    from uticen_lite.pipeline.lint import LintError
+    from uticen_lite.pipeline.model import PipelineError
+
+    try:
+        cid = _save_from_form(conn, form, original_id=control_id)
+    except LintError as exc:
+        return _rerender_with_error(templates, request, conn, control_id, exc.errors)
+    except PipelineError as exc:
+        return _rerender_with_error(templates, request, conn, control_id, [str(exc)])
+    except ValueError as exc:
+        # A bad rename (blank/duplicate id) or unparsable threshold —
+        # surface it inline rather than 500.
+        return _rerender_with_error(templates, request, conn, control_id, [str(exc)])
+    return RedirectResponse(f"/controls/{cid}", status_code=303)
+
+
+def _update_title_or_rerender(
+    templates: Jinja2Templates,
+    request: Request,
+    conn: sqlite3.Connection,
+    control_id: str,
+    title: str,
+) -> HTMLResponse | RedirectResponse:
+    """Rename a control's title, or re-render the form with a validation error."""
+    if not title:
+        return _rerender_with_error(
+            templates, request, conn, control_id, ["Control title is required."]
+        )
+    existing = repo.get_control(conn, control_id)
+    if existing is None:
+        return _rerender_with_error(
+            templates, request, conn, control_id, [f"Control {control_id!r} does not exist."]
+        )
+    repo.upsert_control(
+        conn,
+        id=existing["id"],
+        title=title,
+        objective=existing["objective"],
+        narrative=existing["narrative"],
+        framework_refs=existing["framework_refs"],
+        test_kind=existing["test_kind"],
+        rule_spec=existing["rule_spec"],
+        test_code=existing["test_code"],
+        pipeline=existing["pipeline"],
+        failure_threshold_pct=existing["failure_threshold_pct"],
+        failure_threshold_count=existing["failure_threshold_count"],
+        failure_threshold_rationale=existing["failure_threshold_rationale"],
+    )
+    repo.set_control_sources(conn, control_id, existing["source_ids"])
+    return RedirectResponse(f"/controls/{control_id}", status_code=303)
+
+
 def register(
     app: FastAPI,
     templates: Jinja2Templates,
@@ -460,8 +645,8 @@ def register(
     @app.get("/controls/_condition_row", response_class=HTMLResponse)
     def condition_row(
         request: Request,
+        conn: Annotated[sqlite3.Connection, Depends(get_conn)],
         source_id: str = "",
-        conn: sqlite3.Connection = Depends(get_conn),
     ) -> HTMLResponse:
         cols = _primary_columns(conn, [source_id]) if source_id else []
         return templates.TemplateResponse(
@@ -472,7 +657,7 @@ def register(
     @app.get("/controls/_conditions", response_class=HTMLResponse)
     def conditions_refresh(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: Annotated[sqlite3.Connection, Depends(get_conn)],
     ) -> HTMLResponse:
         """Re-render the condition rows for the currently-checked sources (U1).
 
@@ -498,29 +683,19 @@ def register(
     @app.get("/controls/new", response_class=HTMLResponse)
     def new_control(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: Annotated[sqlite3.Connection, Depends(get_conn)],
     ) -> HTMLResponse:
-        from uticen_lite.plane.routes.ai import _ai_configured
-
+        # No bound source yet → columns fall back to [] (free-text input).
         return templates.TemplateResponse(
-            request,
-            "control_edit.html",
-            {
-                "project": repo.get_project(conn) or {"name": ""},
-                "control": None,
-                "sources": repo.list_sources(conn),
-                "columns": [],  # no bound source yet → free-text fallback
-                "all_sources": repo.list_sources(conn),
-                "ai_enabled": _ai_configured(conn),
-            },
+            request, _CONTROL_EDIT_TEMPLATE, _control_edit_context(conn, None)
         )
 
     @app.post("/controls/{control_id}/sources", response_class=HTMLResponse)
     def update_control_sources(
         control_id: str,
         request: Request,
-        action: str = Form(...),
-        source_id: str = Form(...),
+        action: Annotated[str, Form()],
+        source_id: Annotated[str, Form()],
     ) -> HTMLResponse:
         """Add/remove a single source binding and re-render the bound-sources
         fragment in place (HTMX swap), so the page never reloads or scrolls to
@@ -530,17 +705,9 @@ def register(
         try:
             existing = repo.get_control(conn, control_id)
             if existing is not None:
-                current = list(existing["source_ids"])
-                if action == "add" and source_id not in current:
-                    current.append(source_id)
-                elif action == "remove":
-                    current = [s for s in current if s != source_id]
-                # Never drop a binding the logic requires (pipeline imports /
-                # cross-source refs) — mirrors the metadata-save reconciliation.
-                for sid in _required_source_ids(existing):
-                    if sid not in current:
-                        current.append(sid)
-                repo.set_control_sources(conn, control_id, current)
+                repo.set_control_sources(
+                    conn, control_id, _apply_source_action(existing, action, source_id)
+                )
             control = repo.get_control(conn, control_id)
             sources = repo.list_sources(conn)
         finally:
@@ -557,12 +724,10 @@ def register(
     def control_history(
         control_id: str,
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: Annotated[sqlite3.Connection, Depends(get_conn)],
     ) -> HTMLResponse:
         control = repo.get_control(conn, control_id)
-        runs = repo.list_runs_for(conn, control_id)  # newest-first (0004)
-        for r in runs:
-            r["executed_display"] = _fmt_executed(r.get("executed_at", ""))
+        runs = _decorate_runs(repo.list_runs_for(conn, control_id))  # newest-first (0004)
         return templates.TemplateResponse(
             request,
             "control_history.html",
@@ -580,91 +745,30 @@ def register(
     def edit_control(
         control_id: str,
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: Annotated[sqlite3.Connection, Depends(get_conn)],
     ) -> HTMLResponse:
-        from uticen_lite.plane.routes.ai import _ai_configured
-
         control = repo.get_control(conn, control_id)
         return templates.TemplateResponse(
-            request,
-            "control_edit.html",
-            {
-                "project": repo.get_project(conn) or {"name": ""},
-                "control": control,
-                "sources": repo.list_sources(conn),
-                "columns": _primary_columns(conn, control["source_ids"]) if control else [],
-                "all_sources": repo.list_sources(conn),
-                "ai_enabled": _ai_configured(conn),
-            },
-        )
-
-    def _rerender_with_error(
-        request: Request, conn: sqlite3.Connection, control_id: str | None,
-        errors: list[str],
-    ) -> HTMLResponse:
-        """Re-render the edit form with an inline error banner (HTTP 422).
-
-        Used when a pipeline save is REFUSED by the §8 allowlist deny-scan: the
-        offending Custom Python node's offramp message reaches the author rather
-        than persisting an unsafe node or returning a bare 500.
-        """
-        from uticen_lite.plane.routes.ai import _ai_configured
-
-        control = repo.get_control(conn, control_id) if control_id else None
-        return templates.TemplateResponse(
-            request,
-            "control_edit.html",
-            {
-                "project": repo.get_project(conn) or {"name": ""},
-                "control": control,
-                "sources": repo.list_sources(conn),
-                "columns": _primary_columns(conn, control["source_ids"]) if control else [],
-                "all_sources": repo.list_sources(conn),
-                "ai_enabled": _ai_configured(conn),
-                "save_errors": errors,
-            },
-            status_code=422,
+            request, _CONTROL_EDIT_TEMPLATE, _control_edit_context(conn, control)
         )
 
     @app.post("/controls", response_model=None)
     async def create_control(request: Request) -> HTMLResponse | RedirectResponse:
-        from uticen_lite.pipeline.lint import LintError
-        from uticen_lite.pipeline.model import PipelineError
-
         root = request.app.state.project_root
         conn = connect(root)
         try:
             form = await request.form()
-            try:
-                cid = _save_from_form(conn, form)
-            except LintError as exc:
-                return _rerender_with_error(request, conn, None, exc.errors)
-            except PipelineError as exc:
-                return _rerender_with_error(request, conn, None, [str(exc)])
-            return RedirectResponse(f"/controls/{cid}", status_code=303)
+            return _create_or_rerender(templates, request, conn, form)
         finally:
             conn.close()
 
     @app.post("/controls/{control_id}", response_model=None)
     async def update_control(control_id: str, request: Request) -> HTMLResponse | RedirectResponse:
-        from uticen_lite.pipeline.lint import LintError
-        from uticen_lite.pipeline.model import PipelineError
-
         root = request.app.state.project_root
         conn = connect(root)
         try:
             form = await request.form()
-            try:
-                cid = _save_from_form(conn, form, original_id=control_id)
-            except LintError as exc:
-                return _rerender_with_error(request, conn, control_id, exc.errors)
-            except PipelineError as exc:
-                return _rerender_with_error(request, conn, control_id, [str(exc)])
-            except ValueError as exc:
-                # A bad rename (blank/duplicate id) or unparsable threshold —
-                # surface it inline rather than 500.
-                return _rerender_with_error(request, conn, control_id, [str(exc)])
-            return RedirectResponse(f"/controls/{cid}", status_code=303)
+            return _update_or_rerender(templates, request, conn, form, control_id)
         finally:
             conn.close()
 
@@ -677,31 +781,6 @@ def register(
         try:
             form = await request.form()
             title = str(form.get("title", "")).strip()
-            if not title:
-                return _rerender_with_error(
-                    request, conn, control_id, ["Control title is required."]
-                )
-            existing = repo.get_control(conn, control_id)
-            if existing is None:
-                return _rerender_with_error(
-                    request, conn, control_id, [f"Control {control_id!r} does not exist."]
-                )
-            repo.upsert_control(
-                conn,
-                id=existing["id"],
-                title=title,
-                objective=existing["objective"],
-                narrative=existing["narrative"],
-                framework_refs=existing["framework_refs"],
-                test_kind=existing["test_kind"],
-                rule_spec=existing["rule_spec"],
-                test_code=existing["test_code"],
-                pipeline=existing["pipeline"],
-                failure_threshold_pct=existing["failure_threshold_pct"],
-                failure_threshold_count=existing["failure_threshold_count"],
-                failure_threshold_rationale=existing["failure_threshold_rationale"],
-            )
-            repo.set_control_sources(conn, control_id, existing["source_ids"])
-            return RedirectResponse(f"/controls/{control_id}", status_code=303)
+            return _update_title_or_rerender(templates, request, conn, control_id, title)
         finally:
             conn.close()

@@ -65,14 +65,15 @@
      confirmation. getAttribute returns the un-escaped attribute value, so the
      exact command (incl. any shell quoting) reaches the clipboard. */
   (function () {
-    document.querySelectorAll(".copy-btn").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var text = btn.getAttribute("data-copy");
-        navigator.clipboard.writeText(text).then(function () {
-          btn.classList.add("copied");
-          setTimeout(function () { btn.classList.remove("copied"); }, 1400);
-        });
+    function handleCopyClick(btn) {
+      var text = btn.dataset.copy;
+      navigator.clipboard.writeText(text).then(function () {
+        btn.classList.add("copied");
+        setTimeout(function () { btn.classList.remove("copied"); }, 1400);
       });
+    }
+    document.querySelectorAll(".copy-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () { handleCopyClick(btn); });
     });
   })();
 
@@ -88,7 +89,7 @@
           if (!resp.ok) return;
           clearInterval(timer);
           if (status) status.textContent = "Upgrade finished. Reconnecting…";
-          window.location.href = "/";
+          globalThis.location.href = "/";
         })
         .catch(function () {});
       if (Date.now() - started > 120000) {

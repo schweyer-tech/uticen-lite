@@ -14,10 +14,9 @@ The read-only ``GET`` uses ``Depends(get_conn)``; the writing ``POST`` opens its
 own per-handler connection (learning 0002).
 """
 
-from __future__ import annotations
-
 import sqlite3
 from collections.abc import Callable, Generator
+from typing import Annotated
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -36,7 +35,7 @@ def register(
     @app.get("/settings", response_class=HTMLResponse)
     def settings_home(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: Annotated[sqlite3.Connection, Depends(get_conn)],
     ) -> HTMLResponse:
         return templates.TemplateResponse(
             request,

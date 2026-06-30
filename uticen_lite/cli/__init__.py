@@ -27,6 +27,8 @@ from uticen_lite.cli.build_cmd import build_cmd
 from uticen_lite.cli.import_cmd import import_cmd
 from uticen_lite.cli.run_cmd import run_cmd
 
+_DIR_ARG_HELP = "Project root directory (default: current directory)."
+
 
 def _version() -> str:
     """Return the installed ``uticen-lite`` version, or ``"unknown"``.
@@ -48,7 +50,7 @@ def _version() -> str:
 # ---------------------------------------------------------------------------
 
 
-def _cmd_validate(args: argparse.Namespace) -> int:
+def _cmd_validate() -> int:
     """Handle ``uticen-lite validate [dir]`` — deprecated stub, returns 0."""
     print(
         "NOTE: `uticen-lite validate` is deprecated. "
@@ -82,7 +84,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "dir",
         nargs="?",
         default=".",
-        help="Project root directory (default: current directory).",
+        help=_DIR_ARG_HELP,
     )
 
     # -- run -----------------------------------------------------------------
@@ -94,7 +96,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "dir",
         nargs="?",
         default=".",
-        help="Project root directory (default: current directory).",
+        help=_DIR_ARG_HELP,
     )
     run_p.add_argument(
         "--control",
@@ -134,7 +136,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "dir",
         nargs="?",
         default=".",
-        help="Project root directory (default: current directory).",
+        help=_DIR_ARG_HELP,
     )
     build_p.add_argument(
         "--out",
@@ -187,7 +189,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "validate":
-        return _cmd_validate(args)
+        return _cmd_validate()
     if args.command == "run":
         # Clock boundary: inject current UTC time only when --at is not supplied.
         if args.at is None:

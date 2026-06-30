@@ -108,6 +108,37 @@ def _distinct_examined(node_frames: dict[str, Any], tests: list[Node]) -> int | 
     return len(seen)
 
 
+def _merge_into_slot(
+    by_key: dict[str, dict[str, Any]],
+    order: list[str],
+    label: str,
+    v: Violation,
+) -> None:
+    """Fold one violation into its item-key slot (creating the slot on first sight)."""
+    slot = by_key.get(v.item_key)
+    if slot is None:
+        slot = {
+            "item_key": v.item_key,
+            "description": v.description,
+            "severity": v.severity,
+            "details": dict(v.details),
+            "_checks": [],
+            "_sev_rank": _severity_rank(v.severity),
+        }
+        by_key[v.item_key] = slot
+        order.append(v.item_key)
+    slot["details"].update(v.details)
+    for existing in v.details.get("checks", []):  # carry forward on re-merge
+        if existing and existing not in slot["_checks"]:
+            slot["_checks"].append(existing)
+    if label and label not in slot["_checks"]:
+        slot["_checks"].append(label)
+    if _severity_rank(v.severity) > slot["_sev_rank"]:
+        slot["_sev_rank"] = _severity_rank(v.severity)
+        slot["severity"] = v.severity
+        slot["description"] = v.description
+
+
 def _merge_violations(per_check: list[tuple[str, list[Violation]]]) -> list[Violation]:
     """Collapse per-check violations into one :class:`Violation` per item-key.
 
@@ -121,28 +152,7 @@ def _merge_violations(per_check: list[tuple[str, list[Violation]]]) -> list[Viol
     order: list[str] = []
     for label, vlist in per_check:
         for v in vlist:
-            slot = by_key.get(v.item_key)
-            if slot is None:
-                slot = {
-                    "item_key": v.item_key,
-                    "description": v.description,
-                    "severity": v.severity,
-                    "details": dict(v.details),
-                    "_checks": [],
-                    "_sev_rank": _severity_rank(v.severity),
-                }
-                by_key[v.item_key] = slot
-                order.append(v.item_key)
-            slot["details"].update(v.details)
-            for existing in v.details.get("checks", []):  # carry forward on re-merge
-                if existing and existing not in slot["_checks"]:
-                    slot["_checks"].append(existing)
-            if label and label not in slot["_checks"]:
-                slot["_checks"].append(label)
-            if _severity_rank(v.severity) > slot["_sev_rank"]:
-                slot["_sev_rank"] = _severity_rank(v.severity)
-                slot["severity"] = v.severity
-                slot["description"] = v.description
+            _merge_into_slot(by_key, order, label, v)
     merged: list[Violation] = []
     for k in order:
         slot = by_key[k]
@@ -155,6 +165,153 @@ def _merge_violations(per_check: list[tuple[str, list[Violation]]]) -> list[Viol
             "details": details,
         }))
     return merged
+
+
+def _run_procedure_checks(
+    control: ControlDef, proc: Any, sources: dict, root: Path,
+    executed_at: str, pipeline: Pipeline, tests: list[Node],
+) -> tuple[list[tuple[str, list[Violation]]], RunRecord | None]:
+    """Run each of a procedure's Test nodes separately → (per-check, last run)."""
+    per_check: list[tuple[str, list[Violation]]] = []
+    last_run: RunRecord | None = None
+    for t in tests:
+        compiled = compile_pipeline(_subpipeline_for(pipeline, t))
+        transient = ControlDef(
+            id=control.id,
+            title=proc.name or control.title,
+            objective=control.objective,
+            narrative=proc.narrative,
+            framework_refs=control.framework_refs,
+            risk=control.risk,
+            sources=control.sources,
+            test_path="",
+            test_code=compiled.test_code if compiled.test_kind == "python" else None,
+            rule_spec=compiled.rule_spec if compiled.test_kind == "rule" else None,
+            threshold=control.threshold,
+        )
+        r = run_control(transient, sources, root, executed_at)
+        label = t.title or t.config.get("title") or t.id
+        per_check.append((str(label), list(r.violations)))
+        last_run = r
+    return per_check, last_run
+
+
+def _procedure_display_code(control: ControlDef, proc: Any, union_cp: Any) -> str:
+    """The displayed ``test_code`` for a procedure (union compile → text/python)."""
+    if union_cp is not None and union_cp.result.test_kind == "python":
+        return union_cp.result.test_code or ""
+    return resolve_test_code(ControlDef(
+        id=control.id,
+        title=proc.name or control.title,
+        objective=control.objective,
+        narrative=proc.narrative,
+        framework_refs=control.framework_refs,
+        risk=control.risk,
+        sources=control.sources,
+        test_path="",
+        test_code=(union_cp.result.test_code if union_cp else None),
+        rule_spec=(union_cp.result.rule_spec if union_cp else None),
+        threshold=control.threshold,
+    ))
+
+
+def _run_one_procedure(
+    conn: sqlite3.Connection, root: Path, control: ControlDef, sources: dict,
+    executed_at: str, pipeline: Pipeline, node_frames: dict[str, Any],
+    union_by_pid: dict, proc: Any,
+) -> tuple[ProcedureSpec, RunRecord] | None:
+    """Run one procedure's checks, persist its run, and build its ProcedureSpec.
+
+    Returns ``None`` for a procedure with no runnable Test node.
+    """
+    tests = tests_for_procedure(pipeline, proc.id)
+    if not tests:
+        return None
+
+    per_check, last_run = _run_procedure_checks(
+        control, proc, sources, root, executed_at, pipeline, tests
+    )
+    merged = _merge_violations(per_check)
+    population = _distinct_examined(node_frames, tests)
+    if population is None:
+        population = last_run.population_size if last_run else 0
+
+    proc_run = RunRecord(
+        control_id=control.id,
+        executed_at=executed_at,
+        population_size=population,
+        violations=merged,
+        provenance=last_run.provenance if last_run else [],
+    )
+    proc_run.procedure_id = proc.id
+    # Re-derive run_id to incorporate procedure_id; prevents collision when two
+    # procedures share the same source snapshot (identical prov hashes → same base id).
+    object.__setattr__(proc_run, "run_id", _procedure_run_id(proc_run, proc.id))
+    repo.insert_run(conn, proc_run)
+
+    display_code = _procedure_display_code(control, proc, union_by_pid.get(proc.id))
+    proc_threshold = _per_procedure_threshold(
+        {"failure_threshold_pct": proc.failure_threshold_pct,
+         "failure_threshold_count": proc.failure_threshold_count},
+        control.threshold,
+    )
+    spec = ProcedureSpec(
+        code=proc.code,
+        title=proc.name or display_code,
+        assertion=proc.assertion,
+        narrative=proc.narrative,
+        test_code=display_code,
+        threshold=proc_threshold,
+    )
+    return spec, proc_run
+
+
+def _write_procedure_outputs(
+    root: Path, control: ControlDef, wp: Workpaper, all_violations: list[Violation]
+) -> None:
+    """Write the workpaper (html + md) and the aggregate evidence JSON under *root*."""
+    wp_dir = root / "target" / "workpapers"
+    ev_dir = root / "target" / "evidence"
+    wp_dir.mkdir(parents=True, exist_ok=True)
+    ev_dir.mkdir(parents=True, exist_ok=True)
+
+    (wp_dir / f"{control.id}.html").write_text(render_html(wp), encoding="utf-8")
+    (wp_dir / f"{control.id}.md").write_text(render_markdown(wp), encoding="utf-8")
+    (ev_dir / f"{control.id}-violations.json").write_text(
+        json.dumps([v.to_dict() for v in all_violations], indent=2),
+        encoding="utf-8",
+    )
+
+
+def _aggregate_run(
+    conn: sqlite3.Connection, control: ControlDef, executed_at: str, pipeline: Pipeline,
+    node_frames: dict[str, Any], per_proc_runs: list[tuple[ProcedureSpec, RunRecord]],
+    all_violations: list[Violation],
+) -> RunRecord:
+    """Return (and, for multi-procedure controls, persist) the control-level run.
+
+    Single-procedure pipeline → exactly ONE persisted run (the procedure run itself);
+    no redundant ``procedure_id=""`` aggregate. A multi-procedure control additionally
+    persists a control-level aggregate carrying the distinct-examined population across
+    ALL checks of ALL procedures + merged violations.
+    """
+    union_run = per_proc_runs[0][1]
+    if len(per_proc_runs) > 1:
+        all_tests = [t for proc in effective_procedures(pipeline)
+                     for t in tests_for_procedure(pipeline, proc.id)]
+        agg_population = _distinct_examined(node_frames, all_tests)
+        union_run = RunRecord(
+            control_id=control.id,
+            executed_at=executed_at,
+            population_size=(agg_population if agg_population is not None
+                             else per_proc_runs[0][1].population_size),
+            violations=all_violations,
+            provenance=per_proc_runs[0][1].provenance,
+        )
+        union_run.procedure_id = ""
+        # Persist the aggregate so the run view can look it up by run_id.
+        repo.insert_run(conn, union_run)
+    return union_run
 
 
 def _run_multi_procedure(
@@ -199,87 +356,12 @@ def _run_multi_procedure(
 
     per_proc_runs: list[tuple[ProcedureSpec, RunRecord]] = []
     for proc in effective_procedures(pipeline):
-        tests = tests_for_procedure(pipeline, proc.id)
-        if not tests:
-            continue
-
-        # Run each check separately so we know which check flagged each item.
-        per_check: list[tuple[str, list[Violation]]] = []
-        last_run: RunRecord | None = None
-        for t in tests:
-            compiled = compile_pipeline(_subpipeline_for(pipeline, t))
-            transient = ControlDef(
-                id=control.id,
-                title=proc.name or control.title,
-                objective=control.objective,
-                narrative=proc.narrative,
-                framework_refs=control.framework_refs,
-                risk=control.risk,
-                sources=control.sources,
-                test_path="",
-                test_code=compiled.test_code if compiled.test_kind == "python" else None,
-                rule_spec=compiled.rule_spec if compiled.test_kind == "rule" else None,
-                threshold=control.threshold,
-            )
-            r = run_control(transient, sources, root, executed_at)
-            label = t.title or t.config.get("title") or t.id
-            per_check.append((str(label), list(r.violations)))
-            last_run = r
-
-        merged = _merge_violations(per_check)
-        population = _distinct_examined(node_frames, tests)
-        if population is None:
-            population = last_run.population_size if last_run else 0
-
-        proc_run = RunRecord(
-            control_id=control.id,
-            executed_at=executed_at,
-            population_size=population,
-            violations=merged,
-            provenance=last_run.provenance if last_run else [],
+        result = _run_one_procedure(
+            conn, root, control, sources, executed_at,
+            pipeline, node_frames, union_by_pid, proc,
         )
-        proc_run.procedure_id = proc.id
-        # Re-derive run_id to incorporate procedure_id; prevents collision when two
-        # procedures share the same source snapshot (identical prov hashes → same base id).
-        object.__setattr__(proc_run, "run_id", _procedure_run_id(proc_run, proc.id))
-        repo.insert_run(conn, proc_run)
-
-        # Displayed test_code: the union compile of all the procedure's checks (rule→text
-        # or the generated union Python), resolved the same way as the single-control path.
-        union_cp = union_by_pid.get(proc.id)
-        if union_cp is not None and union_cp.result.test_kind == "python":
-            display_code = union_cp.result.test_code or ""
-        else:
-            display_code = resolve_test_code(ControlDef(
-                id=control.id,
-                title=proc.name or control.title,
-                objective=control.objective,
-                narrative=proc.narrative,
-                framework_refs=control.framework_refs,
-                risk=control.risk,
-                sources=control.sources,
-                test_path="",
-                test_code=(union_cp.result.test_code if union_cp else None),
-                rule_spec=(union_cp.result.rule_spec if union_cp else None),
-                threshold=control.threshold,
-            ))
-
-        proc_threshold = _per_procedure_threshold(
-            {"failure_threshold_pct": proc.failure_threshold_pct,
-             "failure_threshold_count": proc.failure_threshold_count},
-            control.threshold,
-        )
-        per_proc_runs.append((
-            ProcedureSpec(
-                code=proc.code,
-                title=proc.name or display_code,
-                assertion=proc.assertion,
-                narrative=proc.narrative,
-                test_code=display_code,
-                threshold=proc_threshold,
-            ),
-            proc_run,
-        ))
+        if result is not None:
+            per_proc_runs.append(result)
 
     wp = Workpaper.assemble_procedures(
         control,
@@ -288,23 +370,12 @@ def _run_multi_procedure(
         data_samples=samples,
     )
 
-    wp_dir = root / "target" / "workpapers"
-    ev_dir = root / "target" / "evidence"
-    wp_dir.mkdir(parents=True, exist_ok=True)
-    ev_dir.mkdir(parents=True, exist_ok=True)
-
-    (wp_dir / f"{control.id}.html").write_text(render_html(wp), encoding="utf-8")
-    (wp_dir / f"{control.id}.md").write_text(render_markdown(wp), encoding="utf-8")
-
     # Evidence: union of all procedures' violations (lossless re-merge keeps each
     # item's contributing check labels).
     all_violations = _merge_violations(
         [("", [v for _, run in per_proc_runs for v in run.violations])]
     )
-    (ev_dir / f"{control.id}-violations.json").write_text(
-        json.dumps([v.to_dict() for v in all_violations], indent=2),
-        encoding="utf-8",
-    )
+    _write_procedure_outputs(root, control, wp, all_violations)
 
     if not per_proc_runs:
         # Defensive: a pipeline with no runnable procedure — degrade, never 500 (0013).
@@ -313,27 +384,9 @@ def _run_multi_procedure(
         repo.insert_run(conn, empty)
         return empty
 
-    # Single-procedure pipeline → exactly ONE persisted run (the procedure run itself,
-    # tagged with its procedure_id); no redundant ``procedure_id=""`` aggregate. A
-    # multi-procedure control additionally persists a control-level aggregate run carrying
-    # the distinct-examined population across ALL checks of ALL procedures + merged violations.
-    union_run = per_proc_runs[0][1]
-    if len(per_proc_runs) > 1:
-        all_tests = [t for proc in effective_procedures(pipeline)
-                     for t in tests_for_procedure(pipeline, proc.id)]
-        agg_population = _distinct_examined(node_frames, all_tests)
-        union_run = RunRecord(
-            control_id=control.id,
-            executed_at=executed_at,
-            population_size=(agg_population if agg_population is not None
-                             else per_proc_runs[0][1].population_size),
-            violations=all_violations,
-            provenance=per_proc_runs[0][1].provenance,
-        )
-        union_run.procedure_id = ""
-        # Persist the aggregate so the run view can look it up by run_id.
-        repo.insert_run(conn, union_run)
-    return union_run
+    return _aggregate_run(
+        conn, control, executed_at, pipeline, node_frames, per_proc_runs, all_violations
+    )
 
 
 def run_control_in_store(

@@ -1,9 +1,8 @@
-from __future__ import annotations
-
 import sqlite3
 from collections.abc import Callable, Generator
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
@@ -23,7 +22,7 @@ def register(
     @app.get("/export", response_class=HTMLResponse)
     def export_page(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: Annotated[sqlite3.Connection, Depends(get_conn)],
     ) -> HTMLResponse:
         project = repo.get_project(conn) or {"name": ""}
         return templates.TemplateResponse(request, "export.html", {"project": project})

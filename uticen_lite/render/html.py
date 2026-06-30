@@ -35,6 +35,15 @@ _DEFAULT_TZ = "America/New_York"
 # Default page length for the interactive data table (configurable constant).
 _TABLE_PAGE_LENGTH = 10
 
+# Repeated closing-tag fragments (kept as constants so the rendered output stays
+# byte-identical while the duplicated literals are defined once).
+_DIV_CLOSE = "</div>"
+_SECTION_CLOSE = "</section>"
+_TBODY_TABLE_CLOSE = "</tbody></table>"
+_DETAILS_OPEN = "<details>"
+_DETAILS_CLOSE = "</details>"
+_DETAILS_BODY_OPEN = '<div class="details-body">'
+
 # ---------------------------------------------------------------------------
 # Canonical section model (app-ordered). The sidebar lists these 7 entries.
 # Sign-off (app section 7) and Evaluation (round-2 revision) are omitted; the
@@ -612,7 +621,7 @@ def render_html(
     _emit_conclusion(emit, agg)
 
     emit("</main>")
-    emit("</div>")  # /wp-layout
+    emit(_DIV_CLOSE)  # /wp-layout
 
     # ── footer ────────────────────────────────────────────────────────────────
     emit(
@@ -707,7 +716,7 @@ def _emit_resultbar(emit, agg: _Agg, wp: Workpaper) -> None:
         "</span>"
     )
     emit(f'<span class="rb-verdict"><span class="pill {pill_cls}">{_e(agg.verdict)}</span></span>')
-    emit("</div>")
+    emit(_DIV_CLOSE)
 
 
 # ---------------------------------------------------------------------------
@@ -733,9 +742,9 @@ def _emit_results(emit, agg: _Agg) -> None:
         f'<div class="{exc_cls}"><div class="tile-label">Exceptions</div>'
         f'<div class="tile-value">{agg.exceptions}</div></div>'
     )
-    emit("</div>")
+    emit(_DIV_CLOSE)
     emit(f'<p class="muted">Pass Rate <span class="mono">{agg.pass_rate}%</span></p>')
-    emit("</section>")
+    emit(_SECTION_CLOSE)
 
 
 # ---------------------------------------------------------------------------
@@ -747,7 +756,7 @@ def _emit_objective_scope(emit, wp: Workpaper) -> None:
     # The full-population methodology is stated once in the header, not here.
     _section_open(emit, "objective-scope")
     emit(f"<p>{_e(wp.objective)}</p>")
-    emit("</section>")
+    emit(_SECTION_CLOSE)
 
 
 # ---------------------------------------------------------------------------
@@ -765,7 +774,7 @@ def _emit_control(
     emit('<table class="kv"><tbody>')
     emit(f'<tr><td>Control ID</td><td class="mono">{_e(wp.control_id)}</td></tr>')
     emit(f"<tr><td>Title</td><td>{_e(wp.title)}</td></tr>")
-    emit("</tbody></table>")
+    emit(_TBODY_TABLE_CLOSE)
     emit(f"<p>{_e(wp.narrative)}</p>")
 
     emit("<h3>Framework References</h3>")
@@ -779,7 +788,7 @@ def _emit_control(
         emit("</p>")
     else:
         emit('<p class="muted">None</p>')
-    emit("</section>")
+    emit(_SECTION_CLOSE)
 
 
 # ---------------------------------------------------------------------------
@@ -798,12 +807,12 @@ def _emit_data_sources(
     _section_open(emit, "data-sources")
     if not sources:
         emit('<p class="empty-state">No data sources recorded.</p>')
-        emit("</section>")
+        emit(_SECTION_CLOSE)
         return
     samples_by_id: dict[str, DataSample] = {s.source_id: s for s in data_samples}
     for prov in sources:
         sample = samples_by_id.get(prov.source_id)
-        emit("<details>")
+        emit(_DETAILS_OPEN)
         emit(
             "<summary>"
             '<span class="tri" aria-hidden="true">&#9656;</span>'
@@ -811,13 +820,13 @@ def _emit_data_sources(
             f'<span class="rowcount-badge">{_e(prov.row_count)} rows</span>'
             "</summary>"
         )
-        emit('<div class="details-body">')
+        emit(_DETAILS_BODY_OPEN)
         # provenance chip (sha256 + row count + file location)
         emit('<div class="prov-chips">')
         emit(f'<span class="prov-chip">sha256 {_e(str(prov.sha256)[:8])}&hellip;</span>')
         emit(f'<span class="prov-chip">{_e(prov.row_count)} rows</span>')
         emit(f'<span class="prov-chip">source {_e(prov.source_id)}</span>')
-        emit("</div>")
+        emit(_DIV_CLOSE)
         emit(f'<div class="prov-path">{_e(prov.sha256)}</div>')
         emit(f'<div class="prov-path">{_e(prov.path)}</div>')
         # Extract Date — author-supplied as-of date, else the run's as-of date.
@@ -843,9 +852,9 @@ def _emit_data_sources(
         # interactive data table of the source rows
         if sample is not None and sample.columns:
             _emit_data_table(emit, sample)
-        emit("</div>")  # /details-body
-        emit("</details>")
-    emit("</section>")
+        emit(_DIV_CLOSE)  # /details-body
+        emit(_DETAILS_CLOSE)
+    emit(_SECTION_CLOSE)
 
 
 def _completeness_accuracy_text(
@@ -884,7 +893,7 @@ def _emit_data_table(emit, sample: DataSample) -> None:
     emit('<div class="dt-controls">')
     emit('<input class="dt-search" type="text" placeholder="Search…" aria-label="Search table">')
     emit(f'<span class="dt-cap">{_e(cap_note)}</span>')
-    emit("</div>")
+    emit(_DIV_CLOSE)
     emit('<table class="dt-table">')
     emit("<thead><tr>")
     for col in sample.columns:
@@ -899,7 +908,7 @@ def _emit_data_table(emit, sample: DataSample) -> None:
     emit("</tbody>")
     emit("</table>")
     emit('<div class="dt-foot"><span class="dt-info"></span><span class="dt-pager"></span></div>')
-    emit("</div>")  # /dt-wrap
+    emit(_DIV_CLOSE)  # /dt-wrap
 
 
 # ---------------------------------------------------------------------------
@@ -907,93 +916,103 @@ def _emit_data_table(emit, sample: DataSample) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _emit_procedure_violations(emit, violations: list[Violation]) -> None:
+    """Per-procedure violations table (adds a "Failed check(s)" column when any)."""
+    has_checks = any(v.details.get("checks") for v in violations)
+    emit("<table>")
+    if has_checks:
+        emit(
+            "<thead><tr>"
+            "<th>Item Key</th><th>Severity</th><th>Description</th>"
+            "<th>Failed check(s)</th>"
+            "</tr></thead>"
+        )
+    else:
+        emit(
+            "<thead><tr><th>Item Key</th><th>Severity</th><th>Description</th></tr></thead>"
+        )
+    emit("<tbody>")
+    for v in violations:
+        sev_cls = _severity_class(str(v.severity))
+        checks_raw: list[str] = v.details.get("checks") or []
+        checks_cell = (
+            f"<td>{_e(', '.join(checks_raw))}</td>" if has_checks else ""
+        )
+        emit(
+            "<tr>"
+            f'<td class="mono">{_e(v.item_key)}</td>'
+            f'<td class="{_e(sev_cls)}">{_e(v.severity)}</td>'
+            f"<td>{_e(v.description)}</td>"
+            f"{checks_cell}"
+            "</tr>"
+        )
+    emit(_TBODY_TABLE_CLOSE)
+
+
+def _emit_procedure(emit, proc, idx: int, multi: bool) -> None:
+    """Render one procedure block (heading, code, metrics, verdict, violations)."""
+    run = proc.result
+    # For N>1: use the threshold-aware determination for the badge so that a
+    # procedure with exceptions that still passes its threshold shows PASS.
+    # For N==1: keep the historical behaviour (passed iff zero exceptions).
+    if multi:
+        det = proc.determination
+        passed = det.passed
+    else:
+        passed = run.failed == 0
+    badge = (
+        '<span class="badge pass">PASS</span>'
+        if passed
+        else '<span class="badge fail">FAIL</span>'
+    )
+    # Heading: show code prefix when present (guard keeps N≤1 byte-identical when empty).
+    if proc.code:
+        emit(f"<h3>{_e(proc.code)} &middot; {_e(proc.title)} {badge}</h3>")
+    else:
+        emit(f"<h3>P{idx}: {_e(proc.title)} {badge}</h3>")
+    # Assertion subtitle — suppressed when empty (byte-identical guard).
+    if proc.assertion:
+        emit(f'<p class="assert">Assertion: {_e(proc.assertion)}</p>')
+    emit(f"<p>{_e(proc.narrative)}</p>")
+
+    # collapsible code block (the single header "Generated" date suffices —
+    # no per-procedure run-id/date line)
+    emit(_DETAILS_OPEN)
+    emit('<summary><span class="tri" aria-hidden="true">&#9656;</span>Code That Ran</summary>')
+    emit(_DETAILS_BODY_OPEN)
+    emit(f"<pre>{_e(proc.test_code)}</pre>")
+    emit(_DIV_CLOSE)
+    emit(_DETAILS_CLOSE)
+
+    # results metric line (full-population is stated once in the header)
+    emit(
+        '<p class="muted">'
+        f'Population <span class="mono">{_e(run.population_size)}</span> &middot; '
+        f'Passed <span class="mono">{_e(run.passed)}</span> &middot; '
+        f'Failed <span class="mono">{_e(run.failed)}</span> &middot; '
+        f'Pass Rate <span class="mono">{_e(run.pass_rate)}%</span></p>'
+    )
+
+    # per-procedure verdict pill — only for N>1 (N==1 is byte-identical to today)
+    if multi:
+        pill_cls = "ok" if det.passed else "bad"
+        threshold_text, result_text = det.conclusion_text()
+        emit(
+            f'<p><span class="pill {pill_cls}">{_e(det.verdict)}</span> '
+            f'<span class="muted">{_e(threshold_text)} {_e(result_text)}</span></p>'
+        )
+
+    # per-procedure violations table (with "Failed check(s)" column when any v has checks)
+    if run.violations:
+        _emit_procedure_violations(emit, run.violations)
+
+
 def _emit_procedures(emit, wp: Workpaper) -> None:
     _section_open(emit, "procedures")
     multi = len(wp.procedures) > 1
     for i, proc in enumerate(wp.procedures, start=1):
-        run = proc.result
-        # For N>1: use the threshold-aware determination for the badge so that a
-        # procedure with exceptions that still passes its threshold shows PASS.
-        # For N==1: keep the historical behaviour (passed iff zero exceptions).
-        if multi:
-            det = proc.determination
-            passed = det.passed
-        else:
-            passed = run.failed == 0
-        badge = (
-            '<span class="badge pass">PASS</span>'
-            if passed
-            else '<span class="badge fail">FAIL</span>'
-        )
-        # Heading: show code prefix when present (guard keeps N≤1 byte-identical when empty).
-        if proc.code:
-            emit(f"<h3>{_e(proc.code)} &middot; {_e(proc.title)} {badge}</h3>")
-        else:
-            emit(f"<h3>P{i}: {_e(proc.title)} {badge}</h3>")
-        # Assertion subtitle — suppressed when empty (byte-identical guard).
-        if proc.assertion:
-            emit(f'<p class="assert">Assertion: {_e(proc.assertion)}</p>')
-        emit(f"<p>{_e(proc.narrative)}</p>")
-
-        # collapsible code block (the single header "Generated" date suffices —
-        # no per-procedure run-id/date line)
-        emit("<details>")
-        emit('<summary><span class="tri" aria-hidden="true">&#9656;</span>Code That Ran</summary>')
-        emit('<div class="details-body">')
-        emit(f"<pre>{_e(proc.test_code)}</pre>")
-        emit("</div>")
-        emit("</details>")
-
-        # results metric line (full-population is stated once in the header)
-        emit(
-            '<p class="muted">'
-            f'Population <span class="mono">{_e(run.population_size)}</span> &middot; '
-            f'Passed <span class="mono">{_e(run.passed)}</span> &middot; '
-            f'Failed <span class="mono">{_e(run.failed)}</span> &middot; '
-            f'Pass Rate <span class="mono">{_e(run.pass_rate)}%</span></p>'
-        )
-
-        # per-procedure verdict pill — only for N>1 (N==1 is byte-identical to today)
-        if multi:
-            pill_cls = "ok" if det.passed else "bad"
-            threshold_text, result_text = det.conclusion_text()
-            emit(
-                f'<p><span class="pill {pill_cls}">{_e(det.verdict)}</span> '
-                f'<span class="muted">{_e(threshold_text)} {_e(result_text)}</span></p>'
-            )
-
-        # per-procedure violations table (with "Failed check(s)" column when any v has checks)
-        if run.violations:
-            has_checks = any(v.details.get("checks") for v in run.violations)
-            emit("<table>")
-            if has_checks:
-                emit(
-                    "<thead><tr>"
-                    "<th>Item Key</th><th>Severity</th><th>Description</th>"
-                    "<th>Failed check(s)</th>"
-                    "</tr></thead>"
-                )
-            else:
-                emit(
-                    "<thead><tr><th>Item Key</th><th>Severity</th><th>Description</th></tr></thead>"
-                )
-            emit("<tbody>")
-            for v in run.violations:
-                sev_cls = _severity_class(str(v.severity))
-                checks_raw: list[str] = v.details.get("checks") or []
-                checks_cell = (
-                    f"<td>{_e(', '.join(checks_raw))}</td>" if has_checks else ""
-                )
-                emit(
-                    "<tr>"
-                    f'<td class="mono">{_e(v.item_key)}</td>'
-                    f'<td class="{_e(sev_cls)}">{_e(v.severity)}</td>'
-                    f"<td>{_e(v.description)}</td>"
-                    f"{checks_cell}"
-                    "</tr>"
-                )
-            emit("</tbody></table>")
-    emit("</section>")
+        _emit_procedure(emit, proc, i, multi)
+    emit(_SECTION_CLOSE)
 
 
 # ---------------------------------------------------------------------------
@@ -1007,13 +1026,13 @@ def _emit_exceptions(emit, violations: list[Violation]) -> None:
         emit(
             '<p class="empty-state">No exceptions &mdash; control operated without deviations.</p>'
         )
-        emit("</section>")
+        emit(_SECTION_CLOSE)
         return
 
     # per-violation collapsible disposition panel (data only) — no summary table
     for i, v in enumerate(violations, start=1):
         sev_cls = _severity_class(str(v.severity))
-        emit("<details>")
+        emit(_DETAILS_OPEN)
         emit(
             "<summary>"
             '<span class="tri" aria-hidden="true">&#9656;</span>'
@@ -1021,16 +1040,16 @@ def _emit_exceptions(emit, violations: list[Violation]) -> None:
             f'<span class="{_e(sev_cls)}">{_e(v.severity)}</span>'
             "</summary>"
         )
-        emit('<div class="details-body">')
+        emit(_DETAILS_BODY_OPEN)
         emit(f"<p>{_e(v.description)}</p>")
         if v.details:
             emit("<table><tbody>")
             for k, val in v.details.items():
                 emit(f'<tr><td>{_e(k)}</td><td class="mono">{_e(val)}</td></tr>')
-            emit("</tbody></table>")
-        emit("</div>")
-        emit("</details>")
-    emit("</section>")
+            emit(_TBODY_TABLE_CLOSE)
+        emit(_DIV_CLOSE)
+        emit(_DETAILS_CLOSE)
+    emit(_SECTION_CLOSE)
 
 
 # ---------------------------------------------------------------------------
@@ -1044,4 +1063,4 @@ def _emit_conclusion(emit, agg: _Agg) -> None:
     result_cls = "concl-result ok" if agg.passed else "concl-result bad"
     emit(f"<p>{_e(threshold_text)}</p>")
     emit(f'<p class="{result_cls}">{_e(result_text)}</p>')
-    emit("</section>")
+    emit(_SECTION_CLOSE)

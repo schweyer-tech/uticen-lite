@@ -1,9 +1,8 @@
-from __future__ import annotations
-
 import logging
 import sqlite3
 from collections.abc import Callable, Generator
 from datetime import UTC, datetime
+from typing import Annotated
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -20,26 +19,31 @@ from uticen_lite.store.run_service import run_control_in_store
 logger = logging.getLogger(__name__)
 
 
+def _run_error(
+    templates: Jinja2Templates,
+    request: Request,
+    conn: sqlite3.Connection,
+    control_id: str,
+    message: str,
+) -> HTMLResponse:
+    """Render the friendly 'not ready / couldn't run' page (HTTP 422)."""
+    try:
+        project = repo.get_project(conn) or {"name": ""}
+    except Exception:  # pragma: no cover - the project read must never itself 500
+        project = {"name": ""}
+    return templates.TemplateResponse(
+        request,
+        "run_error.html",
+        {"project": project, "control_id": control_id, "message": message},
+        status_code=422,
+    )
+
+
 def register(
     app: FastAPI,
     templates: Jinja2Templates,
     get_conn: Callable[..., Generator[sqlite3.Connection, None, None]],
 ) -> None:
-    def _run_error(
-        request: Request, conn: sqlite3.Connection, control_id: str, message: str
-    ) -> HTMLResponse:
-        """Render the friendly 'not ready / couldn't run' page (HTTP 422)."""
-        try:
-            project = repo.get_project(conn) or {"name": ""}
-        except Exception:  # pragma: no cover - the project read must never itself 500
-            project = {"name": ""}
-        return templates.TemplateResponse(
-            request,
-            "run_error.html",
-            {"project": project, "control_id": control_id, "message": message},
-            status_code=422,
-        )
-
     @app.post("/controls/{control_id}/run")
     def run(control_id: str, request: Request) -> Response:
         root = request.app.state.project_root
@@ -50,12 +54,12 @@ def register(
         except (RunnerError, ProjectError, KeyError, IndexError) as exc:
             # A half-authored control (no bound source, no logic) or corrupted state
             # must degrade to a friendly "not ready" page — never a 500 (2026-06-27).
-            return _run_error(request, conn, control_id, str(exc))
+            return _run_error(templates, request, conn, control_id, str(exc))
         except Exception as exc:
             # Backstop: the Run button must NEVER return 500. Log the full traceback
             # server-side so real bugs stay visible, then degrade to the same page.
             logger.exception("Unexpected error running control %r", control_id)
-            return _run_error(request, conn, control_id, str(exc))
+            return _run_error(templates, request, conn, control_id, str(exc))
         finally:
             conn.close()
         return RedirectResponse(
@@ -67,7 +71,7 @@ def register(
         control_id: str,
         run_id: str,
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: Annotated[sqlite3.Connection, Depends(get_conn)],
     ) -> HTMLResponse:
         # A 'never raises' GET wraps its whole body, including the pre-render loads,
         # so a missing run record or a workpaper-read failure degrades to the
@@ -108,4 +112,4 @@ def register(
             logger.exception(
                 "Unexpected error viewing run %r for control %r", run_id, control_id
             )
-            return _run_error(request, conn, control_id, str(exc))
+            return _run_error(templates, request, conn, control_id, str(exc))

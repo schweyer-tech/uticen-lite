@@ -182,7 +182,8 @@ class _OllamaProvider:
         payload = json.dumps(
             {"model": model, "prompt": prompt, "format": "json", "stream": False}
         ).encode("utf-8")
-        req = urllib.request.Request(  # noqa: S310 (host is operator-configured, localhost default)
+        # host is operator-configured, localhost default
+        req = urllib.request.Request(  # noqa: S310
             f"{host.rstrip('/')}/api/generate",
             data=payload,
             headers={"Content-Type": "application/json"},

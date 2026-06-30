@@ -238,6 +238,38 @@ def load_demo(conn: sqlite3.Connection, root: Path) -> tuple[int, int]:
     return counts
 
 
+def _wipe_all_tables(conn: sqlite3.Connection) -> None:
+    """Delete every user table's rows (FK enforcement off during the bulk delete).
+
+    PRAGMA foreign_keys toggles only outside a transaction, so commit first;
+    enumerating from ``sqlite_master`` keeps this correct as migrations add tables.
+    """
+    conn.commit()
+    conn.execute("PRAGMA foreign_keys = OFF")
+    tables = [
+        r[0]
+        for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        ).fetchall()
+    ]
+    for table in tables:
+        conn.execute(f'DELETE FROM "{table}"')
+    conn.commit()
+    conn.execute("PRAGMA foreign_keys = ON")
+
+
+def _clear_stale_files(root: Path) -> None:
+    """Empty ``root/data`` and drop ``root/target`` (missing dirs are ignored)."""
+    data_dir = Path(root) / "data"
+    if data_dir.is_dir():
+        for child in data_dir.iterdir():
+            if child.is_dir() and not child.is_symlink():
+                shutil.rmtree(child, ignore_errors=True)
+            else:
+                child.unlink(missing_ok=True)
+    shutil.rmtree(Path(root) / "target", ignore_errors=True)
+
+
 def reset_to_demo(conn: sqlite3.Connection, root: Path) -> tuple[int, int]:
     """Restore *root*'s engagement to a pristine Northwind demo.
 
@@ -275,31 +307,11 @@ def reset_to_demo(conn: sqlite3.Connection, root: Path) -> tuple[int, int]:
     old_system = existing.get("system") or {}
     preserved = {k: old_system[k] for k in ("ai", "check_updates_on_launch") if k in old_system}
 
-    # 2. Wipe every user table. PRAGMA foreign_keys toggles only outside a
-    #    transaction, so commit first; enumerating from sqlite_master keeps this
-    #    correct as future migrations add tables.
-    conn.commit()
-    conn.execute("PRAGMA foreign_keys = OFF")
-    tables = [
-        r[0]
-        for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
-        ).fetchall()
-    ]
-    for table in tables:
-        conn.execute(f'DELETE FROM "{table}"')
-    conn.commit()
-    conn.execute("PRAGMA foreign_keys = ON")
+    # 2. Wipe every user table.
+    _wipe_all_tables(conn)
 
     # 3. Clear stale files under root (be defensive about missing dirs).
-    data_dir = Path(root) / "data"
-    if data_dir.is_dir():
-        for child in data_dir.iterdir():
-            if child.is_dir() and not child.is_symlink():
-                shutil.rmtree(child, ignore_errors=True)
-            else:
-                child.unlink(missing_ok=True)
-    shutil.rmtree(Path(root) / "target", ignore_errors=True)
+    _clear_stale_files(root)
 
     # 4. Reload the pristine demo.
     counts = load_demo(conn, root)

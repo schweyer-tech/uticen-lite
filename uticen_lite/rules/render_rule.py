@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
 from uticen_lite.rules.spec import Condition, RuleSpec, referenced_columns
 
 _BINARY = {
@@ -46,6 +49,24 @@ def rule_to_text(spec: RuleSpec) -> str:
 # Cross-source specs → self-contained plain-Python test(pop, sources)
 # ---------------------------------------------------------------------------
 
+# op → (col_expr, value) → Python source expression. Single-column operators
+# only; the cross-source operators are emitted directly in :func:`_mask_expr`.
+_SCALAR_EXPR: dict[str, Callable[[str, Any], str]] = {
+    "eq": lambda col, val: f"({col} == {val!r})",
+    "ne": lambda col, val: f"({col} != {val!r})",
+    "gt": lambda col, val: f"({col} > {val!r})",
+    "ge": lambda col, val: f"({col} >= {val!r})",
+    "lt": lambda col, val: f"({col} < {val!r})",
+    "le": lambda col, val: f"({col} <= {val!r})",
+    "is_empty": lambda col, val: f"({col}.isna() | ({col}.astype(str) == ''))",
+    "not_empty": lambda col, val: f"(~({col}.isna() | ({col}.astype(str) == '')))",
+    "in": lambda col, val: f"{col}.isin({(val or [])!r})",
+    "not_in": lambda col, val: f"(~{col}.isin({(val or [])!r}))",
+    "regex": lambda col, val: f"{col}.astype(str).str.match({str(val)!r}).fillna(False)",
+    "is_duplicate": lambda col, val: f"{col}.duplicated(keep=False)",
+}
+
+
 def _mask_expr(cond: Condition, frame: str = "df") -> str:
     """A Python source expression (over *frame*/``sources``) for one condition.
 
@@ -63,33 +84,10 @@ def _mask_expr(cond: Condition, frame: str = "df") -> str:
                  f".dropna().astype(str))")
         present = f"{frame}[{cond.this_key!r}].astype(str).isin({other})"
         return present if op == "exists_in" else f"(~{present})"
-    col = f"{frame}[{cond.column!r}]"
-    val = cond.value
-    if op == "eq":
-        return f"({col} == {val!r})"
-    if op == "ne":
-        return f"({col} != {val!r})"
-    if op == "gt":
-        return f"({col} > {val!r})"
-    if op == "ge":
-        return f"({col} >= {val!r})"
-    if op == "lt":
-        return f"({col} < {val!r})"
-    if op == "le":
-        return f"({col} <= {val!r})"
-    if op == "is_empty":
-        return f"({col}.isna() | ({col}.astype(str) == ''))"
-    if op == "not_empty":
-        return f"(~({col}.isna() | ({col}.astype(str) == '')))"
-    if op == "in":
-        return f"{col}.isin({(val or [])!r})"
-    if op == "not_in":
-        return f"(~{col}.isin({(val or [])!r}))"
-    if op == "regex":
-        return f"{col}.astype(str).str.match({str(val)!r}).fillna(False)"
-    if op == "is_duplicate":
-        return f"{col}.duplicated(keep=False)"
-    raise ValueError(f"unhandled operator {op!r}")  # pragma: no cover
+    handler = _SCALAR_EXPR.get(op)
+    if handler is None:
+        raise ValueError(f"unhandled operator {op!r}")  # pragma: no cover
+    return handler(f"{frame}[{cond.column!r}]", cond.value)
 
 
 def _render_python(spec: RuleSpec) -> str:

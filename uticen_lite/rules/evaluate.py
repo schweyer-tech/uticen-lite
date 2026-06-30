@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 import pandas as pd
@@ -19,45 +20,47 @@ def _safe_format(template: str, row: dict) -> str:
     return template.format_map(_SafeDict(row))
 
 
+# op → (column, value) → boolean mask. Single-column operators only; the
+# cross-source operators (exists_in/not_exists_in) are handled separately.
+_SCALAR_OPS: dict[str, Callable[[pd.Series, Any], pd.Series]] = {
+    "eq": lambda col, value: col == value,
+    "ne": lambda col, value: col != value,
+    "gt": lambda col, value: col > value,
+    "ge": lambda col, value: col >= value,
+    "lt": lambda col, value: col < value,
+    "le": lambda col, value: col <= value,
+    "is_empty": lambda col, value: col.isna() | (col.astype(str) == ""),
+    "not_empty": lambda col, value: ~(col.isna() | (col.astype(str) == "")),
+    "in": lambda col, value: col.isin(value or []),
+    "not_in": lambda col, value: ~col.isin(value or []),
+    "regex": lambda col, value: col.astype(str).str.match(str(value)).fillna(False),
+    "is_duplicate": lambda col, value: col.duplicated(keep=False),
+}
+
+
+def _exists_mask(
+    df: pd.DataFrame, cond: Condition, sources: dict[str, Population] | None, op: str
+) -> pd.Series:
+    """Mask for the cross-source ``exists_in`` / ``not_exists_in`` operators."""
+    other = (sources or {}).get(cond.other_source or "")
+    if other is None:
+        raise ValueError(f"exists_in references unknown source {cond.other_source!r}")
+    other_values = set(other.df[cond.other_key].dropna().astype(str))
+    present = df[cond.this_key].astype(str).isin(other_values)
+    return present if op == "exists_in" else ~present
+
+
 def _condition_mask(
     df: pd.DataFrame, cond: Condition,
     sources: dict[str, Population] | None = None,
 ) -> pd.Series:
     op = cond.op
     if op in ("exists_in", "not_exists_in"):
-        other = (sources or {}).get(cond.other_source or "")
-        if other is None:
-            raise ValueError(f"exists_in references unknown source {cond.other_source!r}")
-        other_values = set(other.df[cond.other_key].dropna().astype(str))
-        present = df[cond.this_key].astype(str).isin(other_values)
-        return present if op == "exists_in" else ~present
-    col = df[cond.column]
-    value = cond.value
-    if op == "eq":
-        return col == value
-    if op == "ne":
-        return col != value
-    if op == "gt":
-        return col > value
-    if op == "ge":
-        return col >= value
-    if op == "lt":
-        return col < value
-    if op == "le":
-        return col <= value
-    if op == "is_empty":
-        return col.isna() | (col.astype(str) == "")
-    if op == "not_empty":
-        return ~(col.isna() | (col.astype(str) == ""))
-    if op == "in":
-        return col.isin(value or [])
-    if op == "not_in":
-        return ~col.isin(value or [])
-    if op == "regex":
-        return col.astype(str).str.match(str(value)).fillna(False)
-    if op == "is_duplicate":
-        return col.duplicated(keep=False)
-    raise ValueError(f"unhandled operator {op!r}")  # pragma: no cover (validated upstream)
+        return _exists_mask(df, cond, sources, op)
+    handler = _SCALAR_OPS.get(op)
+    if handler is None:
+        raise ValueError(f"unhandled operator {op!r}")  # pragma: no cover (validated upstream)
+    return handler(df[cond.column], cond.value)
 
 
 def evaluate_rule(

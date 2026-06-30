@@ -10,8 +10,8 @@
     (function () {
       try {
         var t = localStorage.getItem("cf-theme");
-        if (t) document.documentElement.setAttribute("data-theme", t);
-      } catch (e) {}
+        if (t) document.documentElement.dataset.theme = t;
+      } catch (e) { console.error(e); }
     })();
   </script>
   <link rel="stylesheet" href="/static/app.css">
@@ -61,9 +61,9 @@
       var btn = document.getElementById("theme-toggle");
       if (!btn) return;
       btn.addEventListener("click", function () {
-        var next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
-        document.documentElement.setAttribute("data-theme", next);
-        try { localStorage.setItem("cf-theme", next); } catch (e) {}
+        var next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+        document.documentElement.dataset.theme = next;
+        try { localStorage.setItem("cf-theme", next); } catch (e) { console.error(e); }
       });
     })();
     (function () {
@@ -170,8 +170,8 @@
     })();
     function refreshHeaderIndicator(method, path) {
       var indicator = document.querySelector("#header-update-indicator");
-      if (!indicator || !window.htmx) return;
-      window.htmx.ajax(method, path, {target: indicator, swap: "outerHTML"});
+      if (!indicator || !globalThis.htmx) return;
+      globalThis.htmx.ajax(method, path, {target: indicator, swap: "outerHTML"});
     }
     // NOTE: do NOT refresh the indicator on `htmx:load`. That event fires after
     // EVERY htmx swap — including this indicator's own outerHTML swap — so

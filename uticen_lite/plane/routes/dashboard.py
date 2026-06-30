@@ -1,7 +1,6 @@
-from __future__ import annotations
-
 import sqlite3
 from collections.abc import Callable, Generator
+from typing import Annotated
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse
@@ -21,7 +20,7 @@ def register(
     @app.get("/", response_class=HTMLResponse)
     def dashboard(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: Annotated[sqlite3.Connection, Depends(get_conn)],
     ) -> HTMLResponse:
         project = repo.get_project(conn) or {"name": ""}
         # First run: no engagement name yet → show the onboarding screen instead of

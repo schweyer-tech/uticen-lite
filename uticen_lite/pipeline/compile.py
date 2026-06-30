@@ -316,10 +316,10 @@ def _emit_python(pipeline: Pipeline) -> str:
             continue
         body.extend("    " + ln for ln in _emit_node_lines(node, primary_source))
     if len(terminals) == 1:
-        body.extend("    " + ln for ln in _emit_terminal(terminals[0], pipeline))
+        body.extend("    " + ln for ln in _emit_terminal(terminals[0]))
     else:
         for t in terminals:
-            body.extend("    " + ln for ln in _emit_terminal(t, pipeline, out_var=f"_out_{t.id}"))
+            body.extend("    " + ln for ln in _emit_terminal(t, out_var=f"_out_{t.id}"))
         body.append("    return " + " + ".join(f"_out_{t.id}" for t in terminals))
 
     parts = helpers + ["\n".join(body)]
@@ -437,7 +437,7 @@ def _emit_custom_helper(node: Node) -> str:
     return "\n".join(header + indented)
 
 
-def _emit_terminal(node: Node, pipeline: Pipeline, out_var: str = "_out") -> list[str]:
+def _emit_terminal(node: Node, out_var: str = "_out") -> list[str]:
     """Emit the terminal node → the violations list.
 
     Two cases: a Custom Python ``test``-flavor terminal returns its node fn's

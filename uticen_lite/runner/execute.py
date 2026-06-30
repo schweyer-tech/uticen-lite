@@ -63,7 +63,8 @@ def _cell_str(value: object) -> str:
         return ""
     # pandas NaN / NaT compare unequal to themselves. Detected via self-inequality
     # (not pd.isna) to keep this module pandas-free / Pyodide-safe — see module docstring.
-    if value != value:  # noqa: PLR0124  # NOSONAR - deliberate NaN/NaT sentinel check
+    # Deliberate NaN/NaT sentinel check, not a typo.
+    if value != value:  # noqa: PLR0124  # NOSONAR
         return ""
     return str(value)
 
@@ -117,6 +118,72 @@ def _accepts_sources(test_fn: object) -> bool:
     return len(positional) >= 2 or has_var_positional
 
 
+def _load_sources(
+    control: ControlDef, sources: dict[str, SourceBinding], root: Path
+) -> tuple[list[Population], list[SourceProvenance], dict[str, Population]]:
+    """Load every bound source → (populations, provenance, by-id map)."""
+    populations: list[Population] = []
+    prov_records: list[SourceProvenance] = []
+    sources_by_id: dict[str, Population] = {}
+
+    for binding in control.sources:
+        try:
+            src_binding = sources[binding.id]
+            adapter = source_for(src_binding, root)
+            pop = adapter.load()
+            raw_prov: dict[str, Any] = adapter.provenance()
+        except Exception as exc:
+            # A missing file, an unknown binding, or any adapter parse failure must
+            # surface as a friendly RunnerError naming the control and source (0013).
+            raise RunnerError(
+                f"Control '{control.id}': couldn't load source '{binding.id}': {exc}"
+            ) from exc
+        prov_records.append(
+            SourceProvenance(
+                source_id=src_binding.id,
+                path=raw_prov["path"],
+                sha256=raw_prov["sha256"],
+                row_count=raw_prov["row_count"],
+            )
+        )
+        populations.append(pop)
+        sources_by_id[binding.id] = pop
+
+    return populations, prov_records, sources_by_id
+
+
+def _compute_raw_result(
+    control: ControlDef, primary: Population, sources_by_id: dict[str, Population]
+) -> Any:
+    """Evaluate the rule spec or run the author callable → the raw violations value."""
+    if control.rule_spec is not None:
+        from uticen_lite.rules.evaluate import evaluate_rule
+        from uticen_lite.rules.spec import parse_rule_spec
+
+        try:
+            return evaluate_rule(
+                parse_rule_spec(control.rule_spec), primary, sources_by_id
+            )
+        except Exception as exc:
+            # Authoring mistakes (unknown cross-source, a comparison op on a text
+            # column, a bad regex, a missing column) must degrade, never 500 (0013).
+            tb_summary = _clean_traceback_summary(exc)
+            raise RunnerError(
+                f"Control '{control.id}': rule evaluation failed:\n{tb_summary}"
+            ) from exc
+
+    test_fn = load_test_callable(control)
+    try:
+        if _accepts_sources(test_fn):
+            return test_fn(primary, sources_by_id)
+        return test_fn(primary)
+    except Exception as exc:
+        tb_summary = _clean_traceback_summary(exc)
+        raise RunnerError(
+            f"Control '{control.id}': test() raised an exception:\n{tb_summary}"
+        ) from exc
+
+
 def run_control(
     control: ControlDef,
     sources: dict[str, SourceBinding],
@@ -159,32 +226,7 @@ def run_control(
           :meth:`~uticen_lite.model.violation.Violation.from_raw` validation.
     """
     # ── 1. Load every bound source ────────────────────────────────────────────
-    populations: list[Population] = []
-    prov_records: list[SourceProvenance] = []
-    sources_by_id: dict[str, Population] = {}
-
-    for binding in control.sources:
-        try:
-            src_binding = sources[binding.id]
-            adapter = source_for(src_binding, root)
-            pop = adapter.load()
-            raw_prov: dict[str, Any] = adapter.provenance()
-        except Exception as exc:
-            # A missing file, an unknown binding, or any adapter parse failure must
-            # surface as a friendly RunnerError naming the control and source (0013).
-            raise RunnerError(
-                f"Control '{control.id}': couldn't load source '{binding.id}': {exc}"
-            ) from exc
-        prov_records.append(
-            SourceProvenance(
-                source_id=src_binding.id,
-                path=raw_prov["path"],
-                sha256=raw_prov["sha256"],
-                row_count=raw_prov["row_count"],
-            )
-        )
-        populations.append(pop)
-        sources_by_id[binding.id] = pop
+    populations, prov_records, sources_by_id = _load_sources(control, sources, root)
 
     # ── 2. Select the primary population (first bound source) ─────────────────
     if not populations:
@@ -195,35 +237,7 @@ def run_control(
     primary: Population = populations[0]
 
     # ── 3. Load and execute the author callable OR evaluate the rule spec ────
-    raw_result: Any
-    if control.rule_spec is not None:
-        from uticen_lite.rules.evaluate import evaluate_rule
-        from uticen_lite.rules.spec import parse_rule_spec
-
-        try:
-            raw_result = evaluate_rule(
-                parse_rule_spec(control.rule_spec), primary, sources_by_id
-            )
-        except Exception as exc:
-            # Authoring mistakes (unknown cross-source, a comparison op on a text
-            # column, a bad regex, a missing column) must degrade, never 500 (0013).
-            tb_summary = _clean_traceback_summary(exc)
-            raise RunnerError(
-                f"Control '{control.id}': rule evaluation failed:\n{tb_summary}"
-            ) from exc
-    else:
-        test_fn = load_test_callable(control)
-
-        try:
-            if _accepts_sources(test_fn):
-                raw_result = test_fn(primary, sources_by_id)
-            else:
-                raw_result = test_fn(primary)
-        except Exception as exc:
-            tb_summary = _clean_traceback_summary(exc)
-            raise RunnerError(
-                f"Control '{control.id}': test() raised an exception:\n{tb_summary}"
-            ) from exc
+    raw_result: Any = _compute_raw_result(control, primary, sources_by_id)
 
     # ── 4. Validate return type ───────────────────────────────────────────────
     if not isinstance(raw_result, list):
