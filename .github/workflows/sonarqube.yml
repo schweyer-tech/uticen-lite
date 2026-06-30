@@ -28,7 +28,23 @@ jobs:
       - name: Run tests with coverage
         run: |
           export PATH="/opt/homebrew/bin:$PATH"
-          python3 -m venv .sonar-venv
+          # The package floor is >=3.11, but the runner's bare `python3` is the
+          # macOS system 3.9. Pick the first interpreter that satisfies the floor
+          # (homebrew installs versioned binaries like python3.12). Fail loudly
+          # if none is present so the cause is obvious (install via `brew`).
+          PY=""
+          for c in python3.13 python3.12 python3.11 python3.14 python3; do
+            if command -v "$c" >/dev/null 2>&1 \
+               && "$c" -c 'import sys; sys.exit(0 if sys.version_info[:2] >= (3, 11) else 1)' 2>/dev/null; then
+              PY="$c"; break
+            fi
+          done
+          if [ -z "$PY" ]; then
+            echo "::error::No Python >=3.11 found on runner (need e.g. 'brew install python@3.12')"
+            exit 1
+          fi
+          echo "Using $PY ($("$PY" --version 2>&1))"
+          "$PY" -m venv .sonar-venv
           ./.sonar-venv/bin/pip install -q --upgrade pip
           ./.sonar-venv/bin/pip install -q -e ".[adapters,dev]"
           ./.sonar-venv/bin/pytest -q --cov=uticen_lite --cov-report=xml
