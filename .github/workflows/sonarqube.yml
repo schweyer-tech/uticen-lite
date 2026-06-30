@@ -20,6 +20,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Best-effort provision of Python 3.12 into the runner tool cache. The
+      # self-hosted scan runner ships only macOS system Python (3.9), below the
+      # package's >=3.11 floor. continue-on-error so that if the runner can't
+      # use setup-python, the interpreter probe below still finds any locally
+      # installed python3.1x; only if neither yields >=3.11 does the job fail.
+      - name: Set up Python (best effort)
+        continue-on-error: true
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
       # Produce coverage.xml so the scan can report line coverage (Sonar reads
       # it via sonar.python.coverage.reportPaths). An isolated venv keeps the
       # self-hosted runner's global site-packages untouched; the editable
@@ -28,12 +39,12 @@ jobs:
       - name: Run tests with coverage
         run: |
           export PATH="/opt/homebrew/bin:$PATH"
-          # The package floor is >=3.11, but the runner's bare `python3` is the
-          # macOS system 3.9. Pick the first interpreter that satisfies the floor
-          # (homebrew installs versioned binaries like python3.12). Fail loudly
-          # if none is present so the cause is obvious (install via `brew`).
+          # Prefer the `python` provisioned by setup-python above; otherwise fall
+          # back to any locally installed versioned interpreter that meets the
+          # >=3.11 floor (the runner's bare `python3` is the macOS system 3.9).
+          # Fail loudly if none is present so the cause is obvious.
           PY=""
-          for c in python3.13 python3.12 python3.11 python3.14 python3; do
+          for c in python python3.13 python3.12 python3.11 python3.14 python3; do
             if command -v "$c" >/dev/null 2>&1 \
                && "$c" -c 'import sys; sys.exit(0 if sys.version_info[:2] >= (3, 11) else 1)' 2>/dev/null; then
               PY="$c"; break
