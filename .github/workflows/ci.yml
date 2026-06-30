@@ -30,16 +30,18 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv pip install --system -e ".[adapters,dev]"
+        run: |
+          uv venv
+          uv pip install -e ".[adapters,dev]"
 
       - name: Lint with ruff
-        run: ruff check .
+        run: uv run --no-sync ruff check .
 
       - name: Type-check with mypy
-        run: mypy uticen_lite
+        run: uv run --no-sync mypy uticen_lite
 
       - name: Run tests
-        run: pytest -q
+        run: uv run --no-sync pytest -q
 
   # Detect whether this change touches the control-plane web surface (or the
   # contract / bundle / schema it depends on). The browser e2e job below is
@@ -84,10 +86,12 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv pip install --system -e ".[plane,e2e]"
+        run: |
+          uv venv
+          uv pip install -e ".[plane,e2e]"
 
       - name: Install Playwright browser
-        run: python -m playwright install --with-deps chromium
+        run: uv run --no-sync python -m playwright install --with-deps chromium
 
       - name: Run browser smoke test
-        run: pytest tests/e2e -m browser
+        run: uv run --no-sync pytest tests/e2e -m browser
