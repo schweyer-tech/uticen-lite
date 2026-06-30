@@ -1,4 +1,5 @@
 """Full-population step frames feed the badges and the inspector route."""
+
 from __future__ import annotations
 
 import io
@@ -13,6 +14,7 @@ from uticen_lite.plane.routes import pipeline as P
 # Fixture helpers (follow the pattern in test_pipeline_editor.py)
 # ---------------------------------------------------------------------------
 
+
 def _make_source(client, sid, csv_bytes: bytes) -> None:
     client.post(
         "/sources",
@@ -24,18 +26,12 @@ def _make_source(client, sid, csv_bytes: bytes) -> None:
 
 def _conn(client):
     from uticen_lite.store.db import connect
+
     return connect(client.app.state.project_root)
 
 
 # A small CSV with a known number of data rows (5 rows, not counting the header).
-_INVOICES_CSV = (
-    b"invoice_id,amount\n"
-    b"INV001,100\n"
-    b"INV002,200\n"
-    b"INV003,300\n"
-    b"INV004,400\n"
-    b"INV005,500\n"
-)
+_INVOICES_CSV = b"invoice_id,amount\nINV001,100\nINV002,200\nINV003,300\nINV004,400\nINV005,500\n"
 _EXPECTED_INVOICE_ROWS = 5
 
 
@@ -50,6 +46,7 @@ def seeded_client(client):
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 def test_load_full_frames_is_uncapped(seeded_client):
     """_load_full_frames returns the WHOLE file — no .head() cap."""
@@ -76,9 +73,7 @@ def test_source_versions_returns_nonempty_token(seeded_client):
     finally:
         conn.close()
 
-    assert versions.get("invoices"), (
-        "_source_versions returned empty/missing token for 'invoices'"
-    )
+    assert versions.get("invoices"), "_source_versions returned empty/missing token for 'invoices'"
     # The token should encode enough to detect file changes (contains the stored path).
     token = versions["invoices"]
     assert isinstance(token, str) and len(token) > 0
@@ -88,16 +83,26 @@ def test_source_versions_returns_nonempty_token(seeded_client):
 # Helpers for step-inspector tests
 # ---------------------------------------------------------------------------
 
+
 def _make_control(client, cid="C1"):
-    client.post("/controls", data={
-        "id": cid, "title": "Step Inspector Test", "objective": "o", "narrative": "n",
-    }, follow_redirects=False)
+    client.post(
+        "/controls",
+        data={
+            "id": cid,
+            "title": "Step Inspector Test",
+            "objective": "o",
+            "narrative": "n",
+        },
+        follow_redirects=False,
+    )
 
 
 def _save_pipeline(client, cid, graph):
-    return client.post(f"/controls/{cid}/logic/builder",
-                       data={"pipeline_json": json.dumps(graph)},
-                       follow_redirects=False)
+    return client.post(
+        f"/controls/{cid}/logic/builder",
+        data={"pipeline_json": json.dumps(graph)},
+        follow_redirects=False,
+    )
 
 
 def _seeded(client):
@@ -108,16 +113,32 @@ def _seeded(client):
     _make_source(client, "invoices", _INVOICES_CSV)
     cid = "CI1"
     _make_control(client, cid)
-    graph = {"nodes": [
-        {"id": "src1", "type": "import", "source_id": "invoices",
-         "narrative": "", "config": {}, "inputs": []},
-        {"id": "flt", "type": "filter", "inputs": ["src1"],
-         "narrative": "Keep all rows",
-         "config": {"logic": "all", "conditions": []}},
-        {"id": "tst", "type": "test", "inputs": ["flt"],
-         "narrative": "",
-         "config": {"logic": "all", "conditions": []}},
-    ]}
+    graph = {
+        "nodes": [
+            {
+                "id": "src1",
+                "type": "import",
+                "source_id": "invoices",
+                "narrative": "",
+                "config": {},
+                "inputs": [],
+            },
+            {
+                "id": "flt",
+                "type": "filter",
+                "inputs": ["src1"],
+                "narrative": "Keep all rows",
+                "config": {"logic": "all", "conditions": []},
+            },
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["flt"],
+                "narrative": "",
+                "config": {"logic": "all", "conditions": []},
+            },
+        ]
+    }
     _save_pipeline(client, cid, graph)
     return client, cid
 
@@ -126,11 +147,12 @@ def _seeded(client):
 # Step inspector route tests
 # ---------------------------------------------------------------------------
 
+
 def test_step_data_route_paginates(client):
     c, control_id = _seeded(client)
     r = c.get(f"/controls/{control_id}/logic/step/flt/data")
     assert r.status_code == 200
-    assert "records" in r.text and "of" in r.text          # "records X–Y of Z"
+    assert "records" in r.text and "of" in r.text  # "records X–Y of Z"
     # It is now a full standalone page (opened in a new tab), not an HTMX drawer
     # partial: it carries the back-to-builder link and drops the #step-drawer target.
     assert "Back to builder" in r.text
@@ -141,9 +163,9 @@ def test_step_data_route_paginates(client):
 def test_step_data_unknown_node_degrades(client):
     c, control_id = _seeded(client)
     r = c.get(f"/controls/{control_id}/logic/step/does-not-exist/data")
-    assert r.status_code == 200                              # never 500
+    assert r.status_code == 200  # never 500
     assert "isn't computable" in r.text or "not computable" in r.text
-    assert "Back to builder" in r.text                       # still the full page
+    assert "Back to builder" in r.text  # still the full page
 
 
 def test_builder_count_links_open_in_new_tab(client):
@@ -172,7 +194,7 @@ def test_per_step_xlsx_downloads(client):
     r = c.get(f"/controls/{control_id}/logic/step/flt/export.xlsx")
     assert r.status_code == 200
     assert r.headers["content-type"].startswith(_XLSX)
-    pd.read_excel(io.BytesIO(r.content), engine="openpyxl")   # valid workbook
+    pd.read_excel(io.BytesIO(r.content), engine="openpyxl")  # valid workbook
 
 
 def test_workbook_xlsx_has_a_sheet_per_step(client):

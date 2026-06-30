@@ -12,11 +12,20 @@ def _db(tmp_path):
 
 def test_rule_control_roundtrip(tmp_path):
     conn = _db(tmp_path)
-    spec = {"logic": "all", "conditions": [{"column": "x", "op": "eq", "value": 1}],
-            "severity": "high"}
+    spec = {
+        "logic": "all",
+        "conditions": [{"column": "x", "op": "eq", "value": 1}],
+        "severity": "high",
+    }
     repo.upsert_control(
-        conn, id="c1", title="SoD", objective="o", narrative="n",
-        framework_refs={"nist": ["AC-5"]}, test_kind="rule", rule_spec=spec,
+        conn,
+        id="c1",
+        title="SoD",
+        objective="o",
+        narrative="n",
+        framework_refs={"nist": ["AC-5"]},
+        test_kind="rule",
+        rule_spec=spec,
         failure_threshold_count=0,
     )
     repo.set_control_sources(conn, "c1", ["users"])
@@ -31,8 +40,13 @@ def test_rule_control_roundtrip(tmp_path):
 def test_python_control_roundtrip(tmp_path):
     conn = _db(tmp_path)
     repo.upsert_control(
-        conn, id="c2", title="t", objective="o", narrative="n",
-        framework_refs={}, test_kind="python",
+        conn,
+        id="c2",
+        title="t",
+        objective="o",
+        narrative="n",
+        framework_refs={},
+        test_kind="python",
         test_code="def test(pop):\n    return []",
     )
     c = repo.get_control(conn, "c2")
@@ -44,7 +58,15 @@ def test_python_control_roundtrip(tmp_path):
 def test_set_control_sources_orders_by_index(tmp_path):
     conn = _db(tmp_path)
     repo.upsert_source(conn, id="b", format="csv", path="data/b.csv", key_config={})
-    repo.upsert_control(conn, id="c3", title="t", objective="o", narrative="n",
-                        framework_refs={}, test_kind="python", test_code="x")
+    repo.upsert_control(
+        conn,
+        id="c3",
+        title="t",
+        objective="o",
+        narrative="n",
+        framework_refs={},
+        test_kind="python",
+        test_code="x",
+    )
     repo.set_control_sources(conn, "c3", ["b", "users"])
     assert repo.get_control(conn, "c3")["source_ids"] == ["b", "users"]

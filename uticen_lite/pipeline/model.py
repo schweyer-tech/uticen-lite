@@ -227,8 +227,15 @@ def _parse_node(rn: dict) -> Node:
             raise PipelineError(f"import node {node_id!r} requires a source_id")
         if inputs:
             raise PipelineError(f"import node {node_id!r} must have no inputs")
-        return Node(id=node_id, type="import", narrative=narrative, title=title,
-                    config=config, inputs=[], source_id=str(source_id))
+        return Node(
+            id=node_id,
+            type="import",
+            narrative=narrative,
+            title=title,
+            config=config,
+            inputs=[],
+            source_id=str(source_id),
+        )
 
     if node_type == "join":
         if len(inputs) != 2:
@@ -242,17 +249,21 @@ def _parse_node(rn: dict) -> Node:
     elif node_type == "custom_python":
         flavor = config.get("flavor")
         if flavor not in CUSTOM_FLAVORS:
-            raise PipelineError(
-                f"custom_python node {node_id!r} has unknown flavor {flavor!r}"
-            )
+            raise PipelineError(f"custom_python node {node_id!r} has unknown flavor {flavor!r}")
         if not config.get("code"):
             raise PipelineError(f"custom_python node {node_id!r} requires code")
 
     if node_type != "import" and not inputs:
         raise PipelineError(f"node {node_id!r} of type {node_type!r} requires inputs")
 
-    return Node(id=node_id, type=node_type, narrative=narrative, title=title,
-                config=config, inputs=list(inputs))
+    return Node(
+        id=node_id,
+        type=node_type,
+        narrative=narrative,
+        title=title,
+        config=config,
+        inputs=list(inputs),
+    )
 
 
 def _validate_inputs(nodes: list[Node], known_ids: set[str]) -> None:

@@ -34,7 +34,7 @@ def register(
     @app.get("/settings/updates", response_class=HTMLResponse)
     def updates_home(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         method = detect_install()
         return templates.TemplateResponse(
@@ -66,14 +66,12 @@ def register(
         method = detect_install()
         info = check_for_update(method)
         request.app.state.update_check = info  # cache for the dashboard badge
-        return templates.TemplateResponse(
-            request, "partials/update_result.html", {"info": info}
-        )
+        return templates.TemplateResponse(request, "partials/update_result.html", {"info": info})
 
     @app.get("/updates/badge", response_class=HTMLResponse)
     def update_badge(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         # OFF → zero egress, no badge.
         if not repo.get_check_updates_on_launch(conn):
@@ -84,14 +82,12 @@ def register(
             request.app.state.update_check = info
         if not info.available:
             return HTMLResponse("")
-        return templates.TemplateResponse(
-            request, "partials/update_badge.html", {"info": info}
-        )
+        return templates.TemplateResponse(request, "partials/update_badge.html", {"info": info})
 
     @app.get("/updates/indicator", response_class=HTMLResponse)
     def update_indicator(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         # Header indicator: OFF → no indicator; ON → show status + click-to-upgrade
         if not repo.get_check_updates_on_launch(conn):
@@ -109,7 +105,7 @@ def register(
     @app.post("/updates/indicator/check", response_class=HTMLResponse)
     def refresh_update_indicator(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         if not repo.get_check_updates_on_launch(conn):
             return HTMLResponse("")

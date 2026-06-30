@@ -34,18 +34,22 @@ def test(pop):  # noqa: ANN001, ANN201
         self_reviewed = not reviewer_missing and reviewed_by == prepared_by
 
         if self_reviewed:  # P1 · Segregation of duties
-            violations.append({
-                "item_key": str(row["entry_id"]),
-                "description": "Entry reviewed by preparer (self-authorization)",
-                "severity": "high",
-                "details": {"prepared_by": prepared_by, "reviewed_by": reviewed_by},
-            })
+            violations.append(
+                {
+                    "item_key": str(row["entry_id"]),
+                    "description": "Entry reviewed by preparer (self-authorization)",
+                    "severity": "high",
+                    "details": {"prepared_by": prepared_by, "reviewed_by": reviewed_by},
+                }
+            )
         elif reviewer_missing:  # P2 · Reviewer assigned
-            violations.append({
-                "item_key": str(row["entry_id"]),
-                "description": "No independent reviewer assigned to entry {entry_id}",
-                "severity": "high",
-                "details": {"prepared_by": prepared_by},
-            })
+            violations.append(
+                {
+                    "item_key": str(row["entry_id"]),
+                    "description": "No independent reviewer assigned to entry {entry_id}",
+                    "severity": "high",
+                    "details": {"prepared_by": prepared_by},
+                }
+            )
 
     return violations

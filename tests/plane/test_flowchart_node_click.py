@@ -8,6 +8,7 @@ internal server error or this: <screenshot>." A specific natural trigger could
 not be reproduced across the demo + malformed graphs, so the request boundary is
 hardened to honor the documented contract.
 """
+
 import io
 import json
 
@@ -23,19 +24,38 @@ def _seed_pipeline_control(client):
     )
     client.post(
         "/controls",
-        data={"id": "sod", "title": "SoD", "objective": "o", "narrative": "n",
-              "source_ids": ["users"], "failure_threshold_count": "0"},
+        data={
+            "id": "sod",
+            "title": "SoD",
+            "objective": "o",
+            "narrative": "n",
+            "source_ids": ["users"],
+            "failure_threshold_count": "0",
+        },
         follow_redirects=False,
     )
-    graph = {"nodes": [
-        {"id": "imp", "type": "import", "source_id": "users"},
-        {"id": "tst", "type": "test", "inputs": ["imp"],
-         "config": {"logic": "all", "severity": "high", "item_key_column": "user_id",
+    graph = {
+        "nodes": [
+            {"id": "imp", "type": "import", "source_id": "users"},
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["imp"],
+                "config": {
+                    "logic": "all",
+                    "severity": "high",
+                    "item_key_column": "user_id",
                     "description_template": "User {user_id}",
-                    "conditions": [{"column": "can_create", "op": "eq", "value": True}]}},
-    ]}
-    client.post("/controls/sod/logic/builder",
-                data={"pipeline_json": json.dumps(graph)}, follow_redirects=False)
+                    "conditions": [{"column": "can_create", "op": "eq", "value": True}],
+                },
+            },
+        ]
+    }
+    client.post(
+        "/controls/sod/logic/builder",
+        data={"pipeline_json": json.dumps(graph)},
+        follow_redirects=False,
+    )
 
 
 def test_node_click_renders_for_a_normal_pipeline(client):
@@ -80,10 +100,12 @@ def test_materialize_full_never_raises(client, monkeypatch):
 
     monkeypatch.setattr(M, "materialize_steps", boom)
     from uticen_lite.store.db import connect
+
     root = client.app.state.project_root
     conn = connect(root)
     try:
         from uticen_lite.store import repo
+
         pipeline = P._pipeline_for_view(repo.get_control(conn, "sod"))
         assert pipeline is not None
         assert P._materialize_full(conn, root, pipeline) == {}

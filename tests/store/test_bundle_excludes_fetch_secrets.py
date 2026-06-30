@@ -34,6 +34,7 @@ SHEET_NAME = "SecretSheetName-Q4"
 
 # --- shared helpers -----------------------------------------------------------
 
+
 def _engagement(tmp_path: Path):
     (tmp_path / "data").mkdir()
     (tmp_path / "target").mkdir()
@@ -45,16 +46,25 @@ def _engagement(tmp_path: Path):
 
 def _seed_source_with_fetch(conn) -> None:
     repo.upsert_source(
-        conn, id="api", format="xlsx", path="data/api.xlsx",
+        conn,
+        id="api",
+        format="xlsx",
+        path="data/api.xlsx",
         key_config={"mode": "single", "columns": ["user_id"]},
         sheet=SHEET_NAME,
     )
-    repo.set_columns(conn, "api", [
-        {"original_name": "user_id", "display_name": "user_id", "is_key": True},
-        {"original_name": "role", "display_name": "role"},
-    ])
+    repo.set_columns(
+        conn,
+        "api",
+        [
+            {"original_name": "user_id", "display_name": "user_id", "is_key": True},
+            {"original_name": "role", "display_name": "role"},
+        ],
+    )
     repo.upsert_source_fetch(
-        conn, source_id="api", url=SOURCE_URL,
+        conn,
+        source_id="api",
+        url=SOURCE_URL,
         headers={"Authorization": SECRET_TOKEN},
         record_path="data.users",
         last_fetched_at="20260622T000000Z",
@@ -63,8 +73,13 @@ def _seed_source_with_fetch(conn) -> None:
 
 def _seed_rule_control_and_run(conn) -> None:
     repo.upsert_control(
-        conn, id="c1", title="Role check", objective="o", narrative="n",
-        framework_refs={"nist": []}, test_kind="rule",
+        conn,
+        id="c1",
+        title="Role check",
+        objective="o",
+        narrative="n",
+        framework_refs={"nist": []},
+        test_kind="rule",
         rule_spec={
             "logic": "all",
             "conditions": [{"column": "role", "op": "not_empty"}],
@@ -78,17 +93,25 @@ def _seed_rule_control_and_run(conn) -> None:
         control_id="c1",
         executed_at="2026-06-22T00:00:00+00:00",
         population_size=1,
-        violations=[Violation.from_raw(
-            {"item_key": "U1", "description": "x", "severity": "low", "details": {}},
-        )],
-        provenance=[SourceProvenance(
-            source_id="api", path="data/api.xlsx", sha256="", row_count=1,
-        )],
+        violations=[
+            Violation.from_raw(
+                {"item_key": "U1", "description": "x", "severity": "low", "details": {}},
+            )
+        ],
+        provenance=[
+            SourceProvenance(
+                source_id="api",
+                path="data/api.xlsx",
+                sha256="",
+                row_count=1,
+            )
+        ],
     )
     repo.insert_run(conn, run)
 
 
 # --- the guard test -----------------------------------------------------------
+
 
 def test_bundle_excludes_fetch_secrets(tmp_path: Path) -> None:
     """Export bundle must contain NO trace of URL, auth headers, or sheet name."""
@@ -111,7 +134,10 @@ def test_bundle_excludes_fetch_secrets(tmp_path: Path) -> None:
 
         # Export the bundle.
         out = build_bundle(
-            conn, tmp_path, tmp_path / "out.zip", "2026-06-22T00:00:00+00:00",
+            conn,
+            tmp_path,
+            tmp_path / "out.zip",
+            "2026-06-22T00:00:00+00:00",
         )
         assert out.exists(), "build_bundle must produce a zip"
 
@@ -124,7 +150,7 @@ def test_bundle_excludes_fetch_secrets(tmp_path: Path) -> None:
         # None of the sensitive literals may appear anywhere in the bundle.
         needles = (
             SECRET_TOKEN,
-            "SUPERSECRET",   # substring guard — catches partial leaks
+            "SUPERSECRET",  # substring guard — catches partial leaks
             SOURCE_URL,
             "internal.example.test",  # hostname guard
             SHEET_NAME,

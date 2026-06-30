@@ -7,6 +7,7 @@ Also covers the round-trip-correctness decision: a LEGACY control (no stored
 procedures) must pre-select each Test's EFFECTIVE owning (auto) procedure — not
 "unassigned" — so a plain re-save preserves the mapping instead of dropping it.
 """
+
 import io
 import json
 
@@ -16,34 +17,61 @@ from uticen_lite.store.db import connect
 
 def _seed(client):
     csv = b"user_id,can_create\nU1,true\nU2,\n"
-    client.post("/sources", data={"source_id": "users", "format": "csv"},
-                files={"file": ("users.csv", io.BytesIO(csv), "text/csv")},
-                follow_redirects=False)
-    client.post("/controls", data={"id": "c1", "title": "C1", "objective": "o",
-                "narrative": "n", "source_ids": ["users"], "failure_threshold_count": "0"},
-                follow_redirects=False)
+    client.post(
+        "/sources",
+        data={"source_id": "users", "format": "csv"},
+        files={"file": ("users.csv", io.BytesIO(csv), "text/csv")},
+        follow_redirects=False,
+    )
+    client.post(
+        "/controls",
+        data={
+            "id": "c1",
+            "title": "C1",
+            "objective": "o",
+            "narrative": "n",
+            "source_ids": ["users"],
+            "failure_threshold_count": "0",
+        },
+        follow_redirects=False,
+    )
 
 
 def _graph_with_procedure():
     return {
         "nodes": [
             {"id": "src", "type": "import", "source_id": "users"},
-            {"id": "tst", "type": "test", "inputs": ["src"],
-             "config": {"logic": "all", "severity": "high",
-                        "item_key_column": "user_id",
-                        "procedure_id": "p1",
-                        "conditions": [{"column": "can_create", "op": "not_empty"}]}},
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["src"],
+                "config": {
+                    "logic": "all",
+                    "severity": "high",
+                    "item_key_column": "user_id",
+                    "procedure_id": "p1",
+                    "conditions": [{"column": "can_create", "op": "not_empty"}],
+                },
+            },
         ],
         "procedures": [
-            {"id": "p1", "code": "P1", "name": "Manual JE Review",
-             "assertion": "Segregation of Duties", "position": 0},
+            {
+                "id": "p1",
+                "code": "P1",
+                "name": "Manual JE Review",
+                "assertion": "Segregation of Duties",
+                "position": 0,
+            },
         ],
     }
 
 
 def _save(client, graph):
-    return client.post("/controls/c1/logic/builder",
-                       data={"pipeline_json": json.dumps(graph)}, follow_redirects=False)
+    return client.post(
+        "/controls/c1/logic/builder",
+        data={"pipeline_json": json.dumps(graph)},
+        follow_redirects=False,
+    )
 
 
 def test_procedures_persist_to_the_store(client, engagement):

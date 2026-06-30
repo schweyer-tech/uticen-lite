@@ -4,9 +4,7 @@ from uticen_lite.upgrade.detect import InstallMethod
 
 
 def test_upgrade_check_reports_and_exits_zero(monkeypatch, capsys):
-    monkeypatch.setattr(
-        "uticen_lite.cli.upgrade_cmd.detect_install", lambda: InstallMethod.PIP
-    )
+    monkeypatch.setattr("uticen_lite.cli.upgrade_cmd.detect_install", lambda: InstallMethod.PIP)
     monkeypatch.setattr(
         "uticen_lite.cli.upgrade_cmd.check_for_update",
         lambda method: UpdateInfo(method, "0.1.0", "0.2.0", True, "Version 0.2.0 is available."),
@@ -19,9 +17,7 @@ def test_upgrade_check_reports_and_exits_zero(monkeypatch, capsys):
 
 
 def test_upgrade_check_when_up_to_date(monkeypatch, capsys):
-    monkeypatch.setattr(
-        "uticen_lite.cli.upgrade_cmd.detect_install", lambda: InstallMethod.PIP
-    )
+    monkeypatch.setattr("uticen_lite.cli.upgrade_cmd.detect_install", lambda: InstallMethod.PIP)
     monkeypatch.setattr(
         "uticen_lite.cli.upgrade_cmd.check_for_update",
         lambda method: UpdateInfo(method, "0.2.0", "0.2.0", False, "You're on the latest version."),
@@ -33,9 +29,7 @@ def test_upgrade_check_when_up_to_date(monkeypatch, capsys):
 
 def test_upgrade_yes_runs_command(monkeypatch, capsys):
     ran = []
-    monkeypatch.setattr(
-        "uticen_lite.cli.upgrade_cmd.detect_install", lambda: InstallMethod.PIP
-    )
+    monkeypatch.setattr("uticen_lite.cli.upgrade_cmd.detect_install", lambda: InstallMethod.PIP)
     monkeypatch.setattr(
         "uticen_lite.cli.upgrade_cmd.check_for_update",
         lambda method: UpdateInfo(method, "0.1.0", "0.2.0", True, "Version 0.2.0 is available."),
@@ -58,9 +52,7 @@ def test_upgrade_yes_runs_command(monkeypatch, capsys):
 
 
 def test_upgrade_unknown_method_is_handled(monkeypatch, capsys):
-    monkeypatch.setattr(
-        "uticen_lite.cli.upgrade_cmd.detect_install", lambda: InstallMethod.UNKNOWN
-    )
+    monkeypatch.setattr("uticen_lite.cli.upgrade_cmd.detect_install", lambda: InstallMethod.UNKNOWN)
     monkeypatch.setattr(
         "uticen_lite.cli.upgrade_cmd.check_for_update",
         lambda method: UpdateInfo(

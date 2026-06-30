@@ -43,10 +43,17 @@ from uticen_lite.store.db import connect
 # rules/spec.OPERATORS; the column-vs-column / arithmetic operators are the #1
 # Phase-2 grammar follow-up and are intentionally NOT here.
 OP_CHOICES: list[tuple[str, str]] = [
-    ("eq", "eq (=)"), ("ne", "ne (≠)"), ("gt", "gt (>)"), ("ge", "ge (≥)"),
-    ("lt", "lt (<)"), ("le", "le (≤)"), ("is_empty", "is_empty"),
-    ("not_empty", "not_empty"), ("in", "in (pipe-separated)"),
-    ("not_in", "not_in (pipe-separated)"), ("regex", "regex"),
+    ("eq", "eq (=)"),
+    ("ne", "ne (≠)"),
+    ("gt", "gt (>)"),
+    ("ge", "ge (≥)"),
+    ("lt", "lt (<)"),
+    ("le", "le (≤)"),
+    ("is_empty", "is_empty"),
+    ("not_empty", "not_empty"),
+    ("in", "in (pipe-separated)"),
+    ("not_in", "not_in (pipe-separated)"),
+    ("regex", "regex"),
     ("is_duplicate", "is_duplicate"),
     ("exists_in", "exists in another source"),
     ("not_exists_in", "not in another source"),
@@ -77,7 +84,9 @@ def procedure_color(position: int) -> str:
 
 def _now_iso() -> str:
     from datetime import UTC, datetime
+
     return datetime.now(UTC).isoformat()
+
 
 # Process-wide, LRU-bounded cache of materialised step frames (single-user, localhost).
 # Keyed inside materialize_steps by each node's ancestor-closure + source versions.
@@ -88,6 +97,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # View-model helpers
 # ---------------------------------------------------------------------------
+
 
 def _graph_of(control: dict | None) -> dict[str, Any]:
     """The stored graph for a control, or an empty graph for a fresh pipeline."""
@@ -218,8 +228,7 @@ def _diagram(
         code_by_pid = {p.id: (p.code or f"P{i + 1}") for i, p in enumerate(eff)}
         name_by_pid = {p.id: p.name for p in eff}
         legend = [
-            {"code": code_by_pid[p.id], "name": p.name, "color": color_by_pid[p.id]}
-            for p in eff
+            {"code": code_by_pid[p.id], "name": p.name, "color": color_by_pid[p.id]} for p in eff
         ]
         for nid, pids in derived_membership(pipeline).items():
             if pids:
@@ -248,19 +257,31 @@ def _diagram(
         "boxes": [_real_box(n, i, lanes[n.id]) for i, n in enumerate(order)],
         "edges": [
             {
-                "from_row": index[src], "to_row": index[n.id],
-                "from_lane": lanes[src], "to_lane": lanes[n.id],
+                "from_row": index[src],
+                "to_row": index[n.id],
+                "from_lane": lanes[src],
+                "to_lane": lanes[n.id],
             }
             for n in order
             for src in n.inputs
         ],
-        "rows": len(order), "lanes": lane_count, "procedures": legend, "bands": [],
+        "rows": len(order),
+        "lanes": lane_count,
+        "procedures": legend,
+        "bands": [],
     }
 
     try:
         return _band_diagram(
-            pipeline, order, lanes, collapsed, legend, _real_box,
-            color_by_pid, code_by_pid, name_by_pid,
+            pipeline,
+            order,
+            lanes,
+            collapsed,
+            legend,
+            _real_box,
+            color_by_pid,
+            code_by_pid,
+            name_by_pid,
         )
     except Exception:  # noqa: BLE001 — band grouping best-effort; never 500 (0013)
         return fallback
@@ -304,9 +325,7 @@ def _band_diagram(
             sid = "__sum__" + pid
             render_order.append(sid)
             band_of[sid] = pid
-            summary_lane[sid] = min(
-                (lanes[nid] for nid in node_ids if nid in lanes), default=0
-            )
+            summary_lane[sid] = min((lanes[nid] for nid in node_ids if nid in lanes), default=0)
             for nid in node_ids:
                 collapsed_private[nid] = sid
         else:
@@ -326,13 +345,21 @@ def _band_diagram(
         if rid in summary_lane:
             pid = band_of[rid]
             n_steps = len(node_ids_by_pid[pid])
-            boxes.append({
-                "id": rid, "summary": True, "band": pid, "type": "procedure",
-                "label": f"{code_by_pid.get(pid, pid)} · {name_by_pid.get(pid, '')}"
-                         f" — {n_steps} step{'s' if n_steps != 1 else ''}",
-                "count": None, "row": row, "lane": _lane_of(rid),
-                "terminal": False, "proc_color": color_by_pid.get(pid),
-            })
+            boxes.append(
+                {
+                    "id": rid,
+                    "summary": True,
+                    "band": pid,
+                    "type": "procedure",
+                    "label": f"{code_by_pid.get(pid, pid)} · {name_by_pid.get(pid, '')}"
+                    f" — {n_steps} step{'s' if n_steps != 1 else ''}",
+                    "count": None,
+                    "row": row,
+                    "lane": _lane_of(rid),
+                    "terminal": False,
+                    "proc_color": color_by_pid.get(pid),
+                }
+            )
         else:
             boxes.append(real_box(pipeline.node(rid), row, _lane_of(rid)))
 
@@ -350,10 +377,14 @@ def _band_diagram(
             if (src, tgt) in seen_edges:
                 continue
             seen_edges.add((src, tgt))
-            edges.append({
-                "from_row": row_by_render[src], "to_row": row_by_render[tgt],
-                "from_lane": _lane_of(src), "to_lane": _lane_of(tgt),
-            })
+            edges.append(
+                {
+                    "from_row": row_by_render[src],
+                    "to_row": row_by_render[tgt],
+                    "from_lane": _lane_of(src),
+                    "to_lane": _lane_of(tgt),
+                }
+            )
 
     # Bands: Inputs first, then each non-empty procedure band, with its inclusive
     # row range and a toggle target (this band's id added/removed from the set).
@@ -369,27 +400,42 @@ def _band_diagram(
     bands: list[dict[str, Any]] = []
     if rows_by_band.get("__inputs__"):
         rs = rows_by_band["__inputs__"]
-        bands.append({
-            "key": "__inputs__", "label": "Inputs & shared steps", "color": None,
-            "collapsed": False, "row_start": min(rs), "row_end": max(rs),
-            "toggle_collapsed": "",
-        })
+        bands.append(
+            {
+                "key": "__inputs__",
+                "label": "Inputs & shared steps",
+                "color": None,
+                "collapsed": False,
+                "row_start": min(rs),
+                "row_end": max(rs),
+                "toggle_collapsed": "",
+            }
+        )
     for band in proc_bands:
         pid = band["id"]
         prows = rows_by_band.get(pid)
         if not prows:
             continue
-        bands.append({
-            "key": pid,
-            "label": f"{code_by_pid.get(pid, pid)} · {name_by_pid.get(pid, '')}",
-            "color": color_by_pid.get(pid), "collapsed": pid in collapsed,
-            "row_start": min(prows), "row_end": max(prows), "toggle_collapsed": _toggle(pid),
-        })
+        bands.append(
+            {
+                "key": pid,
+                "label": f"{code_by_pid.get(pid, pid)} · {name_by_pid.get(pid, '')}",
+                "color": color_by_pid.get(pid),
+                "collapsed": pid in collapsed,
+                "row_start": min(prows),
+                "row_end": max(prows),
+                "toggle_collapsed": _toggle(pid),
+            }
+        )
 
     lane_count = (max((b["lane"] for b in boxes), default=0) + 1) if boxes else 1
     return {
-        "boxes": boxes, "edges": edges, "rows": len(render_order),
-        "lanes": lane_count, "procedures": legend, "bands": bands,
+        "boxes": boxes,
+        "edges": edges,
+        "rows": len(render_order),
+        "lanes": lane_count,
+        "procedures": legend,
+        "bands": bands,
     }
 
 
@@ -452,6 +498,7 @@ def _node_label(node: Any) -> str:
 # Full-population frames → source versions → materialised steps → row-counts
 # ---------------------------------------------------------------------------
 
+
 def _load_source_populations(
     conn: sqlite3.Connection, root: Any, source_ids: list[str]
 ) -> dict[str, Population]:
@@ -481,23 +528,16 @@ def _load_source_populations(
     return out
 
 
-def _load_full_frames(
-    conn: sqlite3.Connection, root: Any, source_ids: list[str]
-) -> dict[str, Any]:
+def _load_full_frames(conn: sqlite3.Connection, root: Any, source_ids: list[str]) -> dict[str, Any]:
     """Load the FULL coerced DataFrame for each bound source (by source_id).
 
     Thin wrapper over :func:`_load_source_populations` (keeps the live badges /
     inspector unchanged) — the trace needs the Population, the badges only the df.
     """
-    return {
-        sid: pop.df
-        for sid, pop in _load_source_populations(conn, root, source_ids).items()
-    }
+    return {sid: pop.df for sid, pop in _load_source_populations(conn, root, source_ids).items()}
 
 
-def _source_versions(
-    conn: sqlite3.Connection, root: Any, source_ids: list[str]
-) -> dict[str, str]:
+def _source_versions(conn: sqlite3.Connection, root: Any, source_ids: list[str]) -> dict[str, str]:
     """A cache-busting version token per source (current file path + mtime + size)."""
     out: dict[str, str] = {}
     for sid in source_ids:
@@ -513,9 +553,7 @@ def _source_versions(
     return out
 
 
-def _materialize_full(
-    conn: sqlite3.Connection, root: Any, pipeline: Pipeline
-) -> dict[str, Any]:
+def _materialize_full(conn: sqlite3.Connection, root: Any, pipeline: Pipeline) -> dict[str, Any]:
     """Best-effort ``{node_id: DataFrame}`` over the full population (cached).
 
     Returns ``{}`` when a source is unbound/missing or the probe fails — never raises
@@ -528,16 +566,12 @@ def _materialize_full(
         sids = pipeline.import_source_ids()
         frames = _load_full_frames(conn, root, sids)
         versions = _source_versions(conn, root, sids)
-        return materialize_steps(
-            pipeline, frames, source_versions=versions, cache=_STEP_CACHE
-        )
+        return materialize_steps(pipeline, frames, source_versions=versions, cache=_STEP_CACHE)
     except Exception:  # noqa: BLE001 — preview only; never raise into the request (0013)
         return {}
 
 
-def _row_counts(
-    conn: sqlite3.Connection, root: Any, pipeline: Pipeline
-) -> dict[str, int]:
+def _row_counts(conn: sqlite3.Connection, root: Any, pipeline: Pipeline) -> dict[str, int]:
     """Best-effort full-population row-counts (``len`` over the materialised frames)."""
     return {nid: len(df) for nid, df in _materialize_full(conn, root, pipeline).items()}
 
@@ -546,6 +580,7 @@ def pd_isna(v: Any) -> bool:
     """NaN/NaT-safe truthiness for display (avoids importing pandas at module top)."""
     try:
         import pandas as pd
+
         return bool(pd.isna(v))
     except (TypeError, ValueError):
         return False
@@ -559,8 +594,9 @@ def _pipeline_for_view(control: dict | None) -> Pipeline | None:
     """
     if control is None or is_raw_python(control):
         return None
-    graph = derive_builder_graph(control, list(control.get("source_ids") or [])) \
-        or _graph_of(control)
+    graph = derive_builder_graph(control, list(control.get("source_ids") or [])) or _graph_of(
+        control
+    )
     if not graph.get("nodes"):
         return None
     try:
@@ -572,6 +608,7 @@ def _pipeline_for_view(control: dict | None) -> Pipeline | None:
 # ---------------------------------------------------------------------------
 # Generated-Python glass-box
 # ---------------------------------------------------------------------------
+
 
 def _generated_python(pipeline: Pipeline) -> str:
     """A runnable ``test(pop, sources)`` source for the glass-box + the offramp.
@@ -595,6 +632,7 @@ def _generated_python(pipeline: Pipeline) -> str:
 # ---------------------------------------------------------------------------
 # AI-apply helpers (F3: auto-apply drafted rule_spec into the Test node)
 # ---------------------------------------------------------------------------
+
 
 def _merge_draft_into_graph(
     graph: dict[str, Any],
@@ -624,10 +662,21 @@ def _merge_draft_into_graph(
         # merge into that scaffold's Test node.
         scaffold = derive_builder_graph({"source_ids": source_ids}, source_ids) or {
             "nodes": [
-                {"id": "src", "type": "import", "source_id": source_ids[0] if source_ids else None,
-                 "narrative": "", "config": {}, "inputs": []},
-                {"id": "tst", "type": "test", "inputs": ["src"], "narrative": "",
-                 "config": {"logic": "all", "conditions": []}},
+                {
+                    "id": "src",
+                    "type": "import",
+                    "source_id": source_ids[0] if source_ids else None,
+                    "narrative": "",
+                    "config": {},
+                    "inputs": [],
+                },
+                {
+                    "id": "tst",
+                    "type": "test",
+                    "inputs": ["src"],
+                    "narrative": "",
+                    "config": {"logic": "all", "conditions": []},
+                },
             ]
         }
         nodes = list(copy.deepcopy(scaffold.get("nodes") or []))
@@ -638,10 +687,15 @@ def _merge_draft_into_graph(
 
     if test_idx is None:
         # Pathological: still no test node — append one.
-        nodes.append({
-            "id": "tst", "type": "test", "inputs": [], "narrative": "",
-            "config": {"logic": "all", "conditions": []},
-        })
+        nodes.append(
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": [],
+                "narrative": "",
+                "config": {"logic": "all", "conditions": []},
+            }
+        )
         test_idx = len(nodes) - 1
 
     cfg = dict(nodes[test_idx].get("config") or {})
@@ -659,9 +713,7 @@ def _merge_draft_into_graph(
     return {"nodes": nodes}
 
 
-def _ai_apply_error(
-    templates: Jinja2Templates, request: Request, message: str
-) -> HTMLResponse:
+def _ai_apply_error(templates: Jinja2Templates, request: Request, message: str) -> HTMLResponse:
     """Return an OOB error fragment that HTMX swaps into ``#ai-draft-panel``.
 
     The swap is out-of-band so the ``#pipe-cards`` target is left intact.
@@ -671,9 +723,9 @@ def _ai_apply_error(
     html = (
         f'<div id="ai-draft-panel" hx-swap-oob="innerHTML">'
         f'<div class="ai-notice" role="alert" style="padding:10px 14px;margin-top:10px;'
-        f'font-size:13px;color:var(--status-critical);background:var(--status-critical-muted);'
+        f"font-size:13px;color:var(--status-critical);background:var(--status-critical-muted);"
         f'border:1px solid var(--status-critical);border-radius:var(--radius-input);">'
-        f'{message}</div></div>'
+        f"{message}</div></div>"
     )
     return HTMLResponse(html, status_code=200)
 
@@ -681,6 +733,7 @@ def _ai_apply_error(
 # ---------------------------------------------------------------------------
 # Render the editor
 # ---------------------------------------------------------------------------
+
 
 def _procedure_context(pipeline: Pipeline | None) -> dict[str, Any]:
     """Procedure view-model for the Builder section headers, per-Test selector and chips.
@@ -698,9 +751,7 @@ def _procedure_context(pipeline: Pipeline | None) -> dict[str, Any]:
     Best-effort: an incomplete / unparseable graph yields empty data, never a 500
     (learning 0013).
     """
-    empty: dict[str, Any] = {
-        "procedures": [], "node_procedures": {}, "selected_procedure_for": {}
-    }
+    empty: dict[str, Any] = {"procedures": [], "node_procedures": {}, "selected_procedure_for": {}}
     if pipeline is None:
         return empty
     try:
@@ -773,8 +824,13 @@ def _card_bands(
         grouped = group_nodes_by_band(cards_pipeline)
         proc_by_id = {p["id"]: p for p in proc_ctx.get("procedures", [])}
         _proc_defaults: dict[str, Any] = {
-            "code": "", "name": "", "assertion": "", "narrative": "",
-            "failure_threshold_pct": None, "failure_threshold_count": None, "color": "#888",
+            "code": "",
+            "name": "",
+            "assertion": "",
+            "narrative": "",
+            "failure_threshold_pct": None,
+            "failure_threshold_count": None,
+            "color": "#888",
         }
         procedures = [
             {
@@ -791,8 +847,12 @@ def _card_bands(
 
 
 def _editor_context(
-    request: Request, conn: sqlite3.Connection, root: Any, control_id: str,
-    *, save_errors: list[str] | None = None,
+    request: Request,
+    conn: sqlite3.Connection,
+    root: Any,
+    control_id: str,
+    *,
+    save_errors: list[str] | None = None,
     node_errors: dict[str, list[str]] | None = None,
     for_builder: bool = False,
 ) -> dict[str, Any]:
@@ -853,8 +913,10 @@ def _editor_context(
             builder_counts = _row_counts(conn, root, builder_parsed)
             builder_stream_cols = _stream_columns(builder_parsed, source_columns)
         ordered_nodes = (
-            [_card_vm(n, builder_parsed, builder_stream_cols, builder_counts, node_errors or {})
-             for n in builder_parsed.topological()]
+            [
+                _card_vm(n, builder_parsed, builder_stream_cols, builder_counts, node_errors or {})
+                for n in builder_parsed.topological()
+            ]
             if builder_parsed is not None
             else [_raw_card_vm(n, node_errors or {}) for n in builder_graph.get("nodes", [])]
         )
@@ -867,8 +929,10 @@ def _editor_context(
         # Order the raw node dicts topologically for the cards (falls back to
         # as-stored when the graph can't be parsed yet).
         ordered_nodes = (
-            [_card_vm(n, parsed, stream_columns, counts, node_errors or {})
-             for n in parsed.topological()]
+            [
+                _card_vm(n, parsed, stream_columns, counts, node_errors or {})
+                for n in parsed.topological()
+            ]
             if parsed is not None
             else [_raw_card_vm(n, node_errors or {}) for n in graph.get("nodes", [])]
         )
@@ -902,8 +966,11 @@ def _editor_context(
 
 
 def _card_vm(
-    node: Any, pipeline: Pipeline, stream_columns: dict[str, list[dict]],
-    counts: dict[str, int], node_errors: dict[str, list[str]],
+    node: Any,
+    pipeline: Pipeline,
+    stream_columns: dict[str, list[dict]],
+    counts: dict[str, int],
+    node_errors: dict[str, list[str]],
 ) -> dict[str, Any]:
     """View-model for one node card (parsed graph)."""
     terminal_ids = {t.id for t in pipeline.terminals}
@@ -952,7 +1019,7 @@ def _node_errors_from(save_errors: list[str]) -> dict[str, list[str]]:
     per_node: dict[str, list[str]] = {}
     for err in save_errors:
         if err.startswith("node '") and "': " in err:
-            nid = err[len("node '"):].split("'", 1)[0]
+            nid = err[len("node '") :].split("'", 1)[0]
             msg = err.split("': ", 1)[1]
             per_node.setdefault(nid, []).append(msg)
     return per_node
@@ -961,6 +1028,7 @@ def _node_errors_from(save_errors: list[str]) -> dict[str, list[str]]:
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
 
 def register(
     app: FastAPI,
@@ -987,15 +1055,17 @@ def register(
         node_id: str,
         request: Request,
         page: int = 1,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         root = request.app.state.project_root
         control = repo.get_control(conn, control_id)
         ctx: dict[str, Any] = {
             "project": repo.get_project(conn) or {"name": ""},
             "control": control,
-            "control_id": control_id, "node_id": node_id,
-            "frame_available": False, "reason": "This step is not computable yet.",
+            "control_id": control_id,
+            "node_id": node_id,
+            "frame_available": False,
+            "reason": "This step is not computable yet.",
         }
         # The inspector is best-effort over a derived/in-progress graph: any
         # unexpected failure (parse, materialize, paging) degrades to a friendly
@@ -1016,15 +1086,22 @@ def register(
                     page_count = max(1, (total + _STEP_PAGE - 1) // _STEP_PAGE)
                     page = min(page, page_count)
                     start = (page - 1) * _STEP_PAGE
-                    window = frame.iloc[start:start + _STEP_PAGE]
-                    ctx.update({
-                        "frame_available": True,
-                        "header": [str(c) for c in frame.columns],
-                        "rows": [[("" if pd_isna(v) else str(v)) for v in row]
-                                 for row in window.itertuples(index=False, name=None)],
-                        "total": total, "page": page, "page_count": page_count,
-                        "start1": start + 1, "end1": start + len(window),
-                    })
+                    window = frame.iloc[start : start + _STEP_PAGE]
+                    ctx.update(
+                        {
+                            "frame_available": True,
+                            "header": [str(c) for c in frame.columns],
+                            "rows": [
+                                [("" if pd_isna(v) else str(v)) for v in row]
+                                for row in window.itertuples(index=False, name=None)
+                            ],
+                            "total": total,
+                            "page": page,
+                            "page_count": page_count,
+                            "start1": start + 1,
+                            "end1": start + len(window),
+                        }
+                    )
                 elif not pipeline.import_source_ids() or node is not None:
                     ctx["reason"] = "Bind a data source (and complete this step) to inspect it."
         except Exception:  # noqa: BLE001 — never 500 the inspector (learning 0013)
@@ -1039,7 +1116,7 @@ def register(
         control_id: str,
         node_id: str,
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> Response:
         from uticen_lite.adapters import xlsx_export
         from uticen_lite.plane.ingest import AdaptersUnavailable
@@ -1061,16 +1138,16 @@ def register(
         except AdaptersUnavailable as exc:
             return PlainTextResponse(str(exc), status_code=503)
         return Response(
-            content=data, media_type=_XLSX_MEDIA,
-            headers={"content-disposition":
-                     f'attachment; filename="{control_id}-{node_id}.xlsx"'},
+            content=data,
+            media_type=_XLSX_MEDIA,
+            headers={"content-disposition": f'attachment; filename="{control_id}-{node_id}.xlsx"'},
         )
 
     @app.get("/controls/{control_id}/logic/export-steps.xlsx", response_model=None)
     def steps_export(
         control_id: str,
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> Response:
         from uticen_lite.adapters import xlsx_export
         from uticen_lite.plane.ingest import AdaptersUnavailable
@@ -1083,8 +1160,7 @@ def register(
         frames = _materialize_full(conn, root, pipeline)
         if not frames:
             return PlainTextResponse("Bind a data source first.", status_code=409)
-        steps = [(_node_label(n), frames[n.id])
-                 for n in pipeline.topological() if n.id in frames]
+        steps = [(_node_label(n), frames[n.id]) for n in pipeline.topological() if n.id in frames]
         meta = {
             "control": control_id,
             "title": str((control or {}).get("title") or ""),
@@ -1095,9 +1171,9 @@ def register(
         except AdaptersUnavailable as exc:
             return PlainTextResponse(str(exc), status_code=503)
         return Response(
-            content=data, media_type=_XLSX_MEDIA,
-            headers={"content-disposition":
-                     f'attachment; filename="{control_id}-steps.xlsx"'},
+            content=data,
+            media_type=_XLSX_MEDIA,
+            headers={"content-disposition": f'attachment; filename="{control_id}-steps.xlsx"'},
         )
 
     # --- Logic sub-route GETs ------------------------------------------------
@@ -1106,7 +1182,7 @@ def register(
     def logic_builder(
         control_id: str,
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         root = request.app.state.project_root
         ctx = _editor_context(request, conn, root, control_id, for_builder=True)
@@ -1118,7 +1194,7 @@ def register(
     def logic_ai(
         control_id: str,
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         root = request.app.state.project_root
         ctx = _editor_context(request, conn, root, control_id)
@@ -1131,7 +1207,7 @@ def register(
         control_id: str,
         request: Request,
         collapsed: str = "",
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         root = request.app.state.project_root
         ctx = _editor_context(request, conn, root, control_id)
@@ -1156,7 +1232,7 @@ def register(
         control_id: str,
         request: Request,
         key: str = "",
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         from uticen_lite.pipeline.trace import trace_record
 
@@ -1195,9 +1271,7 @@ def register(
             primary = sources.get(import_ids[0]) if import_ids else None
             if primary is not None and primary.key_columns:
                 kc = primary.key_columns[0]
-                ctx["examples"] = (
-                    primary.df[kc].astype(str).drop_duplicates().head(5).tolist()
-                )
+                ctx["examples"] = primary.df[kc].astype(str).drop_duplicates().head(5).tolist()
             if not sources:
                 ctx["message"] = "Bind a data source to trace a record."
                 return templates.TemplateResponse(request, "logic_trace.html", ctx)
@@ -1222,7 +1296,7 @@ def register(
     def logic_python(
         control_id: str,
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         root = request.app.state.project_root
         ctx = _editor_context(request, conn, root, control_id)
@@ -1307,8 +1381,10 @@ def register(
                         err_counts = _row_counts(conn, root, err_parsed)
                         err_stream_cols = _stream_columns(err_parsed, source_columns)
                     err_nodes = (
-                        [_card_vm(n, err_parsed, err_stream_cols, err_counts, node_errors)
-                         for n in err_parsed.topological()]
+                        [
+                            _card_vm(n, err_parsed, err_stream_cols, err_counts, node_errors)
+                            for n in err_parsed.topological()
+                        ]
                         if err_parsed is not None
                         else [_raw_card_vm(n, node_errors) for n in graph.get("nodes", [])]
                     )
@@ -1331,8 +1407,12 @@ def register(
                 # Explicit Save: re-render the full page so the author sees
                 # the save-errors banner and inline node errors.
                 ctx = _editor_context(
-                    request, conn, root, control_id,
-                    save_errors=errors, node_errors=node_errors,
+                    request,
+                    conn,
+                    root,
+                    control_id,
+                    save_errors=errors,
+                    node_errors=node_errors,
                     for_builder=True,
                 )
                 # The just-rejected graph isn't persisted; render the SUBMITTED
@@ -1359,8 +1439,10 @@ def register(
                     builder_counts = _row_counts(conn, root, builder_parsed)
                     builder_stream_cols = _stream_columns(builder_parsed, source_columns)
                 ordered_nodes = (
-                    [_card_vm(n, builder_parsed, builder_stream_cols, builder_counts, {})
-                     for n in builder_parsed.topological()]
+                    [
+                        _card_vm(n, builder_parsed, builder_stream_cols, builder_counts, {})
+                        for n in builder_parsed.topological()
+                    ]
                     if builder_parsed is not None
                     else [_raw_card_vm(n, {}) for n in graph.get("nodes", [])]
                 )
@@ -1395,15 +1477,11 @@ def register(
         try:
             control = repo.get_control(conn, control_id)
             if control is None or not control.get("pipeline"):
-                return RedirectResponse(
-                    f"/controls/{control_id}/logic/python", status_code=303
-                )
+                return RedirectResponse(f"/controls/{control_id}/logic/python", status_code=303)
             try:
                 parsed = parse_pipeline(control["pipeline"])
             except PipelineError:
-                return RedirectResponse(
-                    f"/controls/{control_id}/logic/python", status_code=303
-                )
+                return RedirectResponse(f"/controls/{control_id}/logic/python", status_code=303)
             # The offramp always graduates to runnable Python — for the pure
             # case this is the rule_spec rendered as an equivalent test().
             code = _generated_python(parsed)
@@ -1458,7 +1536,8 @@ def register(
             cfg = _ai_config(conn)
             if cfg is None:
                 return _ai_apply_error(
-                    templates, request,
+                    templates,
+                    request,
                     "AI is not configured. Pick a provider in Settings.",
                 )
 
@@ -1466,7 +1545,8 @@ def register(
 
             if not provider_key_present(cfg["provider"]):
                 return _ai_apply_error(
-                    templates, request,
+                    templates,
+                    request,
                     "AI is not enabled — the selected provider's API key is not "
                     "set in this environment.",
                 )
@@ -1475,14 +1555,17 @@ def register(
             source_ids = list((control or {}).get("source_ids") or [])
             if not source_ids:
                 return _ai_apply_error(
-                    templates, request,
+                    templates,
+                    request,
                     "Bind a data source to this control first.",
                 )
 
             sample = _build_sample(conn, root, source_ids[0])
             if sample is None:
                 return _ai_apply_error(
-                    templates, request, "Bind a data file to the source first.",
+                    templates,
+                    request,
+                    "Bind a data file to the source first.",
                 )
 
             objective = str((control or {}).get("objective") or "")
@@ -1501,21 +1584,21 @@ def register(
                 )
             except RuleSpecError as exc:
                 return _ai_apply_error(
-                    templates, request,
+                    templates,
+                    request,
                     f"The drafted rule was malformed: {exc}",
                 )
             except Exception as exc:  # noqa: BLE001
                 msg = (
-                    str(exc) if isinstance(exc, DraftError)
+                    str(exc)
+                    if isinstance(exc, DraftError)
                     else "The AI provider could not produce a usable rule. "
-                         "Try again or build the rule by hand."
+                    "Try again or build the rule by hand."
                 )
                 return _ai_apply_error(templates, request, msg)
 
             # ── merge draft into the terminal Test node ──────────────────────
-            merged_graph = _merge_draft_into_graph(
-                graph, draft, source_ids
-            )
+            merged_graph = _merge_draft_into_graph(graph, draft, source_ids)
 
             # ── render the pipe-cards partial ────────────────────────────────
             source_columns = _source_columns(conn)
@@ -1532,8 +1615,10 @@ def register(
                 builder_stream_cols = _stream_columns(builder_parsed, source_columns)
 
             ordered_nodes = (
-                [_card_vm(n, builder_parsed, builder_stream_cols, builder_counts, {})
-                 for n in builder_parsed.topological()]
+                [
+                    _card_vm(n, builder_parsed, builder_stream_cols, builder_counts, {})
+                    for n in builder_parsed.topological()
+                ]
                 if builder_parsed is not None
                 else [_raw_card_vm(n, {}) for n in merged_graph.get("nodes", [])]
             )
@@ -1553,9 +1638,7 @@ def register(
                     "bands": _card_bands(builder_parsed, ordered_nodes, proc_ctx),
                 },
                 # The JS picks up the merged graph from this HX-Trigger event.
-                headers={"HX-Trigger": json.dumps(
-                    {"aiDraftApplied": json.dumps(merged_graph)}
-                )},
+                headers={"HX-Trigger": json.dumps({"aiDraftApplied": json.dumps(merged_graph)})},
             )
         finally:
             conn.close()
@@ -1564,6 +1647,4 @@ def register(
 
     @app.get("/controls/{control_id}/pipeline")
     def pipeline_redirect(control_id: str) -> RedirectResponse:
-        return RedirectResponse(
-            f"/controls/{control_id}/logic/builder", status_code=301
-        )
+        return RedirectResponse(f"/controls/{control_id}/logic/builder", status_code=301)

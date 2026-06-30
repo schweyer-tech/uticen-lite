@@ -100,6 +100,7 @@ def _node_label(node: Node) -> str:
 def _display(value: Any) -> Any:
     """NaN/NaT-safe display value."""
     import pandas as pd
+
     try:
         if pd.isna(value):
             return ""
@@ -124,8 +125,11 @@ def _xsrc_note(cond: Any, passed: bool) -> str:
 
 
 def _condition_rows(
-    input_frame: Any, key_column: str, key: str,
-    spec: RuleSpec, sources: dict[str, Population],
+    input_frame: Any,
+    key_column: str,
+    key: str,
+    spec: RuleSpec,
+    sources: dict[str, Population],
 ) -> list[ConditionRow]:
     """Per-condition pass/fail for the matched row in *input_frame*.
 
@@ -141,7 +145,8 @@ def _condition_rows(
     for cond in spec.conditions:
         actual = (
             _display(input_frame.iloc[pos][cond.column])
-            if cond.column in input_frame.columns else ""
+            if cond.column in input_frame.columns
+            else ""
         )
         try:
             mask = _condition_mask(input_frame, cond, sources)
@@ -167,14 +172,16 @@ def trace_record(
     key_column = primary.key_columns[0] if primary and primary.key_columns else None
 
     result = TraceResult(
-        key=key, key_column=key_column, source_id=source_id,
-        found=False, shared_count=0,
+        key=key,
+        key_column=key_column,
+        source_id=source_id,
+        found=False,
+        shared_count=0,
     )
 
     if key_column is None:
         result.message = (
-            "This control's source has no key column, so a record can't be "
-            "traced by key."
+            "This control's source has no key column, so a record can't be traced by key."
         )
         return result
 
@@ -202,7 +209,8 @@ def trace_record(
         if present is None:
             status = "indeterminate"
             reason = (
-                "Not computed yet." if frame is None
+                "Not computed yet."
+                if frame is None
                 else "The key column isn't carried past this step."
             )
         elif present:
@@ -221,7 +229,11 @@ def trace_record(
         flagged = _present(frames.get(t.id), key_column, key)
         logic = str(t.config.get("logic", "all"))
         step = TestStep(
-            id=t.id, label=_node_label(t), reached=reached, flagged=flagged, logic=logic,
+            id=t.id,
+            label=_node_label(t),
+            reached=reached,
+            flagged=flagged,
+            logic=logic,
         )
         if t.type != "test":
             step.note = "This Test is authored in custom Python — no per-condition detail."
@@ -229,8 +241,7 @@ def trace_record(
             continue
         if reached is None:
             step.note = (
-                "Couldn't locate this record at the Test input "
-                "(the key column isn't carried here)."
+                "Couldn't locate this record at the Test input (the key column isn't carried here)."
             )
             result.tests.append(step)
             continue

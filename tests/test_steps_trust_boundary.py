@@ -61,11 +61,7 @@ _SENTINEL = "RAWLEAK_SENTINEL_7Q"
 # Source CSV: ``extra_note`` carries the sentinel; the pipeline only tests
 # ``user_id`` / ``can_create``, so the sentinel value is NEVER referenced by
 # the compiled test_code or the run result.
-_CSV = (
-    f"user_id,can_create,extra_note\n"
-    f"U1,true,{_SENTINEL}\n"
-    f"U2,false,{_SENTINEL}\n"
-).encode()
+_CSV = (f"user_id,can_create,extra_note\nU1,true,{_SENTINEL}\nU2,false,{_SENTINEL}\n").encode()
 
 
 def _seed_and_export(client):
@@ -119,9 +115,7 @@ def _seed_and_export(client):
                     "severity": "high",
                     "item_key_column": "user_id",
                     "description_template": "User {user_id}",
-                    "conditions": [
-                        {"column": "can_create", "op": "eq", "value": "true"}
-                    ],
+                    "conditions": [{"column": "can_create", "op": "eq", "value": "true"}],
                 },
             },
         ]

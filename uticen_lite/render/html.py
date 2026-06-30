@@ -981,9 +981,7 @@ def _emit_procedures(emit, wp: Workpaper) -> None:
             for v in run.violations:
                 sev_cls = _severity_class(str(v.severity))
                 checks_raw: list[str] = v.details.get("checks") or []
-                checks_cell = (
-                    f"<td>{_e(', '.join(checks_raw))}</td>" if has_checks else ""
-                )
+                checks_cell = f"<td>{_e(', '.join(checks_raw))}</td>" if has_checks else ""
                 emit(
                     "<tr>"
                     f'<td class="mono">{_e(v.item_key)}</td>'

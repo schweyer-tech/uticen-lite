@@ -29,11 +29,14 @@ def _make_source(client, sid="payments"):
         f"/sources/{sid}",
         data={
             "key_columns": "payment_id",
-            "display_name__payment_id": "Payment ID", "data_type__payment_id": "text",
+            "display_name__payment_id": "Payment ID",
+            "data_type__payment_id": "text",
             "include__payment_id": "1",
-            "display_name__amount": "Amount", "data_type__amount": "number",
+            "display_name__amount": "Amount",
+            "data_type__amount": "number",
             "include__amount": "1",
-            "display_name__approved_by": "Approved By", "data_type__approved_by": "text",
+            "display_name__approved_by": "Approved By",
+            "data_type__approved_by": "text",
             "include__approved_by": "1",
         },
         follow_redirects=False,
@@ -42,7 +45,8 @@ def _make_source(client, sid="payments"):
 
 def _configure_ai(client, provider="anthropic", model="claude-opus-4-8"):
     resp = client.post(
-        "/settings/ai", data={"provider": provider, "model": model},
+        "/settings/ai",
+        data={"provider": provider, "model": model},
         follow_redirects=False,
     )
     assert resp.status_code in (200, 302, 303)
@@ -55,9 +59,7 @@ def _patch_fake_backend(monkeypatch, spec):
         def draft_rule_spec(self, objective, source_schema, data_sample, *, model):
             return spec
 
-    monkeypatch.setattr(
-        "uticen_lite.ai.draft.get_provider", lambda provider: _Fake()
-    )
+    monkeypatch.setattr("uticen_lite.ai.draft.get_provider", lambda provider: _Fake())
 
 
 # --------------------------------------------------------------------------- #
@@ -101,14 +103,17 @@ def test_draft_success_renders_prefilled_builder(client, monkeypatch):
     _make_source(client)
     _configure_ai(client)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-    _patch_fake_backend(monkeypatch, {
-        "logic": "all",
-        "severity": "high",
-        "conditions": [
-            {"column": "amount", "op": "gt", "value": 100},
-            {"column": "approved_by", "op": "is_empty"},
-        ],
-    })
+    _patch_fake_backend(
+        monkeypatch,
+        {
+            "logic": "all",
+            "severity": "high",
+            "conditions": [
+                {"column": "amount", "op": "gt", "value": 100},
+                {"column": "approved_by", "op": "is_empty"},
+            ],
+        },
+    )
     resp = client.post(
         "/controls/ai/draft",
         data={"objective": "Flag large unapproved payments", "source_ids": ["payments"]},
@@ -123,9 +128,13 @@ def test_draft_bad_dict_returns_error_partial_and_saves_nothing(client, monkeypa
     _make_source(client)
     _configure_ai(client)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-    _patch_fake_backend(monkeypatch, {
-        "logic": "all", "conditions": [{"column": "amount", "op": "not_a_real_op"}],
-    })
+    _patch_fake_backend(
+        monkeypatch,
+        {
+            "logic": "all",
+            "conditions": [{"column": "amount", "op": "not_a_real_op"}],
+        },
+    )
     resp = client.post(
         "/controls/ai/draft",
         data={"objective": "anything", "source_ids": ["payments"]},
@@ -201,8 +210,13 @@ def _make_control(client, source_id="payments") -> str:
     """Create a minimal control bound to *source_id* and return its id."""
     resp = client.post(
         "/controls",
-        data={"id": "AI-01", "title": "AI test ctrl", "objective": "Flag big payments",
-              "narrative": "n", "source_ids": source_id},
+        data={
+            "id": "AI-01",
+            "title": "AI test ctrl",
+            "objective": "Flag big payments",
+            "narrative": "n",
+            "source_ids": source_id,
+        },
         follow_redirects=False,
     )
     assert resp.status_code in (200, 302, 303)
@@ -245,17 +259,21 @@ def test_ai_apply_populates_test_node_conditions(client, monkeypatch):
     cid = _make_control(client)
     _configure_ai(client)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-    _patch_fake_backend(monkeypatch, {
-        "logic": "all",
-        "severity": "high",
-        "conditions": [
-            {"column": "amount", "op": "gt", "value": 100},
-            {"column": "approved_by", "op": "is_empty"},
-        ],
-    })
+    _patch_fake_backend(
+        monkeypatch,
+        {
+            "logic": "all",
+            "severity": "high",
+            "conditions": [
+                {"column": "amount", "op": "gt", "value": 100},
+                {"column": "approved_by", "op": "is_empty"},
+            ],
+        },
+    )
 
     # Submit the current (empty) graph from the builder.
     import json as _json
+
     empty_graph = _json.dumps({"nodes": []})
     resp = client.post(
         f"/controls/{cid}/logic/ai-apply",

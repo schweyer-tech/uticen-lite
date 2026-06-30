@@ -81,7 +81,8 @@ def _emit_materialize_body(pipeline: Pipeline, recompute: set[str]) -> str:
             lines.append(f"    {f} = _node_fns[{node.id!r}]({_frame(node.inputs[0])})")
         else:
             lines.extend(
-                f"    {ln}" for ln in _emit_node_lines(node, primary_source=None)
+                f"    {ln}"
+                for ln in _emit_node_lines(node, primary_source=None)
                 if not ln.startswith("#")
             )
         lines.append(f"    _out[{node.id!r}] = {f}")
@@ -120,7 +121,7 @@ def materialize_steps(
         assert cache is not None  # guarded by use_cache; narrows type for mypy
         recompute = {n.id for n in pipeline.nodes if keys[n.id] not in cache}
         seed = {n.id: cache[keys[n.id]] for n in pipeline.nodes if keys[n.id] in cache}
-        for n in pipeline.nodes:           # mark reused entries as recently used
+        for n in pipeline.nodes:  # mark reused entries as recently used
             if keys[n.id] in cache:
                 cache.move_to_end(keys[n.id])
     else:
@@ -133,16 +134,13 @@ def materialize_steps(
     from uticen_lite.pipeline.compile import _emit_custom_helper
 
     namespace: dict[str, Any] = {}
-    helper_parts = [
-        _emit_custom_helper(n) for n in pipeline.nodes if n.type == "custom_python"
-    ]
+    helper_parts = [_emit_custom_helper(n) for n in pipeline.nodes if n.type == "custom_python"]
     body = _emit_materialize_body(pipeline, recompute)
     src = "\n\n\n".join([*helper_parts, body])
     try:
         exec(src, namespace)  # noqa: S102 — author code, guardrailed by lint
         node_fns = {
-            n.id: namespace[f"_node_{n.id}"]
-            for n in pipeline.nodes if n.type == "custom_python"
+            n.id: namespace[f"_node_{n.id}"] for n in pipeline.nodes if n.type == "custom_python"
         }
         raw = namespace["_materialize"](frames, node_fns, seed)
     except Exception as exc:  # noqa: BLE001 — surface as a typed, contained error
@@ -153,7 +151,7 @@ def materialize_steps(
     for nid, val in raw.items():
         node = pipeline.node(nid)
         if nid in recompute and nid in terminal_ids and node.type == "custom_python":
-            val = pd.DataFrame(val)        # custom-test terminal returns a list
+            val = pd.DataFrame(val)  # custom-test terminal returns a list
         out[nid] = val
     if use_cache:
         assert cache is not None  # guarded by use_cache; narrows type for mypy
@@ -182,8 +180,11 @@ def _ancestor_closure(pipeline: Pipeline, node: Node) -> list[Node]:
 def _canonical_node(node: Node) -> dict[str, Any]:
     """The data-affecting fields of a node (narrative and title are cosmetic — excluded)."""
     return {
-        "id": node.id, "type": node.type, "config": node.config,
-        "inputs": list(node.inputs), "source_id": node.source_id,
+        "id": node.id,
+        "type": node.type,
+        "config": node.config,
+        "inputs": list(node.inputs),
+        "source_id": node.source_id,
     }
 
 
@@ -195,10 +196,7 @@ def _step_keys(pipeline: Pipeline, source_versions: dict[str, str]) -> dict[str,
     keys: dict[str, str] = {}
     for node in pipeline.nodes:
         closure = _ancestor_closure(pipeline, node)
-        src_ids = sorted({
-            n.source_id for n in closure
-            if n.type == "import" and n.source_id
-        })
+        src_ids = sorted({n.source_id for n in closure if n.type == "import" and n.source_id})
         payload = {
             "nodes": [_canonical_node(n) for n in closure],
             "sources": {sid: source_versions.get(sid, "") for sid in src_ids},

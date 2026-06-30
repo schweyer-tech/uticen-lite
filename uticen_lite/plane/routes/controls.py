@@ -114,13 +114,15 @@ def _rule_spec_from_form(form: Any) -> dict[str, Any]:
             this_key = this_keys[i].strip()
             if not this_key:
                 continue
-            conditions.append({
-                "op": op,
-                "column": this_key,
-                "other_source": other_sources[i].strip(),
-                "this_key": this_key,
-                "other_key": other_keys[i].strip(),
-            })
+            conditions.append(
+                {
+                    "op": op,
+                    "column": this_key,
+                    "other_source": other_sources[i].strip(),
+                    "this_key": this_key,
+                    "other_key": other_keys[i].strip(),
+                }
+            )
             continue
         resolved = _resolve_column(col, freetexts[i])
         if not resolved:
@@ -164,19 +166,23 @@ def _conditions_view_from_form(form: Any) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for i, (col, op) in enumerate(zip(columns, ops)):
         if op in ("exists_in", "not_exists_in"):
-            rows.append({
-                "op": op,
-                "column": _resolve_column(col, freetexts[i]) or this_keys[i].strip(),
-                "other_source": other_sources[i].strip(),
-                "this_key": this_keys[i].strip(),
-                "other_key": other_keys[i].strip(),
-            })
+            rows.append(
+                {
+                    "op": op,
+                    "column": _resolve_column(col, freetexts[i]) or this_keys[i].strip(),
+                    "other_source": other_sources[i].strip(),
+                    "this_key": this_keys[i].strip(),
+                    "other_key": other_keys[i].strip(),
+                }
+            )
             continue
-        rows.append({
-            "op": op or "eq",
-            "column": _resolve_column(col, freetexts[i]),
-            "value": values[i],
-        })
+        rows.append(
+            {
+                "op": op or "eq",
+                "column": _resolve_column(col, freetexts[i]),
+                "value": values[i],
+            }
+        )
     return rows
 
 
@@ -297,6 +303,7 @@ def _required_source_ids(existing: dict) -> list[str]:
     try:
         if existing.get("pipeline"):
             from uticen_lite.pipeline.model import parse_pipeline
+
             parsed = parse_pipeline(existing["pipeline"])
             import_ids = parsed.import_source_ids()
             extra = [sid for sid in _other_source_ids(parsed) if sid not in import_ids]
@@ -461,18 +468,19 @@ def register(
     def condition_row(
         request: Request,
         source_id: str = "",
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         cols = _primary_columns(conn, [source_id]) if source_id else []
         return templates.TemplateResponse(
-            request, "partials/rule_condition.html",
+            request,
+            "partials/rule_condition.html",
             {"columns": cols, "all_sources": repo.list_sources(conn)},
         )
 
     @app.get("/controls/_conditions", response_class=HTMLResponse)
     def conditions_refresh(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         """Re-render the condition rows for the currently-checked sources (U1).
 
@@ -498,7 +506,7 @@ def register(
     @app.get("/controls/new", response_class=HTMLResponse)
     def new_control(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         from uticen_lite.plane.routes.ai import _ai_configured
 
@@ -519,8 +527,8 @@ def register(
     def update_control_sources(
         control_id: str,
         request: Request,
-        action: str = Form(...),
-        source_id: str = Form(...),
+        action: str = Form(...),  # noqa: FAST002
+        source_id: str = Form(...),  # noqa: FAST002
     ) -> HTMLResponse:
         """Add/remove a single source binding and re-render the bound-sources
         fragment in place (HTMX swap), so the page never reloads or scrolls to
@@ -557,7 +565,7 @@ def register(
     def control_history(
         control_id: str,
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         control = repo.get_control(conn, control_id)
         runs = repo.list_runs_for(conn, control_id)  # newest-first (0004)
@@ -580,7 +588,7 @@ def register(
     def edit_control(
         control_id: str,
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         from uticen_lite.plane.routes.ai import _ai_configured
 
@@ -599,7 +607,9 @@ def register(
         )
 
     def _rerender_with_error(
-        request: Request, conn: sqlite3.Connection, control_id: str | None,
+        request: Request,
+        conn: sqlite3.Connection,
+        control_id: str | None,
         errors: list[str],
     ) -> HTMLResponse:
         """Re-render the edit form with an inline error banner (HTTP 422).

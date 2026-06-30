@@ -30,8 +30,14 @@ from pathlib import Path
 OWM_URL = "https://api.openweathermap.org/data/2.5/weather"
 CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "datacenter_weather.csv"
 HEADER = [
-    "site_id", "city", "country", "latitude", "longitude",
-    "temperature_c", "wind_kmh", "observed_at",
+    "site_id",
+    "city",
+    "country",
+    "latitude",
+    "longitude",
+    "temperature_c",
+    "wind_kmh",
+    "observed_at",
 ]
 
 
@@ -69,12 +75,21 @@ def main() -> None:
 
     rows: list[list[str]] = []
     for site in sites:
-        temp_c, wind_kmh, observed_at = _reading(_fetch_one(
-            site["latitude"], site["longitude"], api_key))
-        rows.append([
-            site["site_id"], site["city"], site["country"],
-            site["latitude"], site["longitude"], temp_c, wind_kmh, observed_at,
-        ])
+        temp_c, wind_kmh, observed_at = _reading(
+            _fetch_one(site["latitude"], site["longitude"], api_key)
+        )
+        rows.append(
+            [
+                site["site_id"],
+                site["city"],
+                site["country"],
+                site["latitude"],
+                site["longitude"],
+                temp_c,
+                wind_kmh,
+                observed_at,
+            ]
+        )
         print(f"  {site['site_id']:7} {site['city']:12} {temp_c}°C  {wind_kmh} km/h")
 
     with CSV_PATH.open("w", newline="", encoding="utf-8") as fh:

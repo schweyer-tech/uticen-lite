@@ -3,6 +3,7 @@
 Pure (no DB/IO). The graph it returns is the same shape parse_pipeline()/the Builder
 template consume. Derived graphs compile back to the control's existing rule_spec, so a
 derive→save round-trip is bundle-identical (cardinal rule 0001, learning 0010)."""
+
 from __future__ import annotations
 
 from typing import Any

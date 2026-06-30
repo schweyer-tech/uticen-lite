@@ -27,6 +27,7 @@ def test_pyproject_declares_ai_extra():
 
 def test_main_entrypoint_importable():
     from uticen_lite.plane.__main__ import main
+
     assert callable(main)
 
 
@@ -59,12 +60,16 @@ def test_ai_modules_ship_in_wheel(tmp_path):
         pytest.skip("build not installed")
     subprocess.run(
         [sys.executable, "-m", "build", "--wheel", "--outdir", str(tmp_path)],
-        check=True, capture_output=True, text=True,
+        check=True,
+        capture_output=True,
+        text=True,
     )
     wheels = list(tmp_path.glob("*.whl"))
     assert wheels, "no wheel built"
     names = set(zipfile.ZipFile(wheels[0]).namelist())
-    for mod in ("uticen_lite/ai/__init__.py",
-                "uticen_lite/ai/draft.py",
-                "uticen_lite/ai/providers.py"):
+    for mod in (
+        "uticen_lite/ai/__init__.py",
+        "uticen_lite/ai/draft.py",
+        "uticen_lite/ai/providers.py",
+    ):
         assert mod in names, f"{mod} missing from wheel"

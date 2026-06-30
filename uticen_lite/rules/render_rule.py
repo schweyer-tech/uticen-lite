@@ -3,11 +3,15 @@ from __future__ import annotations
 from uticen_lite.rules.spec import Condition, RuleSpec, referenced_columns
 
 _BINARY = {
-    "eq": "=", "ne": "!=", "gt": ">", "ge": ">=", "lt": "<", "le": "<=",
+    "eq": "=",
+    "ne": "!=",
+    "gt": ">",
+    "ge": ">=",
+    "lt": "<",
+    "le": "<=",
 }
 _SET = {"in": "in", "not_in": "not in"}
-_UNARY = {"is_empty": "is empty", "not_empty": "is not empty",
-          "is_duplicate": "is duplicated"}
+_UNARY = {"is_empty": "is empty", "not_empty": "is not empty", "is_duplicate": "is duplicated"}
 _CROSS_SOURCE_OPS = frozenset({"exists_in", "not_exists_in"})
 
 
@@ -46,6 +50,7 @@ def rule_to_text(spec: RuleSpec) -> str:
 # Cross-source specs → self-contained plain-Python test(pop, sources)
 # ---------------------------------------------------------------------------
 
+
 def _mask_expr(cond: Condition, frame: str = "df") -> str:
     """A Python source expression (over *frame*/``sources``) for one condition.
 
@@ -59,8 +64,7 @@ def _mask_expr(cond: Condition, frame: str = "df") -> str:
     """
     op = cond.op
     if op in _CROSS_SOURCE_OPS:
-        other = (f"set(sources[{cond.other_source!r}].df[{cond.other_key!r}]"
-                 f".dropna().astype(str))")
+        other = f"set(sources[{cond.other_source!r}].df[{cond.other_key!r}].dropna().astype(str))"
         present = f"{frame}[{cond.this_key!r}].astype(str).isin({other})"
         return present if op == "exists_in" else f"(~{present})"
     col = f"{frame}[{cond.column!r}]"

@@ -151,14 +151,16 @@ def _procedure_info_by_control(conn: sqlite3.Connection) -> dict[str, list[dict]
                 test_code=proc.result.test_code if proc.result.test_kind == "python" else None,
                 rule_spec=proc.result.rule_spec if proc.result.test_kind == "rule" else None,
             )
-            proc_info.append({
-                "procedure_id": proc.procedure_id,
-                "code": proc.code,
-                "assertion": proc.assertion,
-                "title": proc.title,
-                "narrative": proc.narrative,
-                "test_code": resolve_test_code(transient),
-            })
+            proc_info.append(
+                {
+                    "procedure_id": proc.procedure_id,
+                    "code": proc.code,
+                    "assertion": proc.assertion,
+                    "title": proc.title,
+                    "narrative": proc.narrative,
+                    "test_code": resolve_test_code(transient),
+                }
+            )
         out[raw["id"]] = proc_info
     return out
 
@@ -194,7 +196,9 @@ def build_bundle(
         raise ValueError("no runs to export")
     proc_info_map = _procedure_info_by_control(conn)
     manifest = assemble_bundle(
-        project, runs_by_control, generated_at,
+        project,
+        runs_by_control,
+        generated_at,
         procedure_run_map=procedure_run_map,
         procedure_info_by_control=proc_info_map,
     )

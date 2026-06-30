@@ -41,9 +41,7 @@ def _fake_provider(spec: dict):
 
 
 def _patch_provider(monkeypatch, spec: dict) -> None:
-    monkeypatch.setattr(
-        "uticen_lite.ai.draft.get_provider", lambda provider: _fake_provider(spec)
-    )
+    monkeypatch.setattr("uticen_lite.ai.draft.get_provider", lambda provider: _fake_provider(spec))
 
 
 def test_valid_draft_roundtrips_and_runs(monkeypatch):
@@ -77,8 +75,11 @@ def test_spec_that_flags_a_sample_row_runs(monkeypatch):
     _patch_provider(monkeypatch, spec)
     # Should not raise — the gate proves it executes on the sample.
     out = draft_and_validate(
-        objective="o", source_schema={"columns": _SCHEMA}, data_sample=_SAMPLE,
-        provider="anthropic", model="claude-opus-4-8",
+        objective="o",
+        source_schema={"columns": _SCHEMA},
+        data_sample=_SAMPLE,
+        provider="anthropic",
+        model="claude-opus-4-8",
     )
     assert out == spec
 
@@ -88,8 +89,11 @@ def test_bad_op_surfaces_rulespecerror(monkeypatch):
     _patch_provider(monkeypatch, bad)
     with pytest.raises(RuleSpecError):
         draft_and_validate(
-            objective="o", source_schema={"columns": _SCHEMA}, data_sample=_SAMPLE,
-            provider="anthropic", model="claude-opus-4-8",
+            objective="o",
+            source_schema={"columns": _SCHEMA},
+            data_sample=_SAMPLE,
+            provider="anthropic",
+            model="claude-opus-4-8",
         )
 
 
@@ -98,8 +102,11 @@ def test_hallucinated_column_raises_drafterror(monkeypatch):
     _patch_provider(monkeypatch, bad)
     with pytest.raises(DraftError) as exc:
         draft_and_validate(
-            objective="o", source_schema={"columns": _SCHEMA}, data_sample=_SAMPLE,
-            provider="anthropic", model="claude-opus-4-8",
+            objective="o",
+            source_schema={"columns": _SCHEMA},
+            data_sample=_SAMPLE,
+            provider="anthropic",
+            model="claude-opus-4-8",
         )
     assert "ghost_col" in str(exc.value)
 
@@ -110,8 +117,11 @@ def test_spec_that_raises_in_evaluate_raises_drafterror(monkeypatch):
     _patch_provider(monkeypatch, bad)
     with pytest.raises(DraftError):
         draft_and_validate(
-            objective="o", source_schema={"columns": _SCHEMA}, data_sample=_SAMPLE,
-            provider="anthropic", model="claude-opus-4-8",
+            objective="o",
+            source_schema={"columns": _SCHEMA},
+            data_sample=_SAMPLE,
+            provider="anthropic",
+            model="claude-opus-4-8",
         )
 
 

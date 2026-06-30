@@ -13,12 +13,14 @@ def _proc() -> Procedure:
         executed_at="t",
         population_size=650,
         violations=[
-            Violation.from_raw({
-                "item_key": "A",
-                "description": "x",
-                "severity": "high",
-                "details": {"checks": ["no approval", "preparer=approver"]},
-            }),
+            Violation.from_raw(
+                {
+                    "item_key": "A",
+                    "description": "x",
+                    "severity": "high",
+                    "details": {"checks": ["no approval", "preparer=approver"]},
+                }
+            ),
         ],
     )
     return Procedure(
@@ -89,9 +91,7 @@ def test_assemble_procedures_threads_code_assertion():
     """Workpaper.assemble_procedures must copy code/assertion from ProcedureSpec into Procedure."""
     from unittest.mock import MagicMock
 
-    run = RunRecord(
-        control_id="gl1", executed_at="t", population_size=10, violations=[]
-    )
+    run = RunRecord(control_id="gl1", executed_at="t", population_size=10, violations=[])
     spec = ProcedureSpec(
         code="P1",
         title="Manual JE Review",
@@ -118,9 +118,7 @@ def test_code_assertion_empty_no_extra_html_lines():
     """When code/assertion are empty, N==1 HTML must be byte-identical (no new lines)."""
     from uticen_lite.render.html import render_html
 
-    run = RunRecord(
-        control_id="c1", executed_at="t", population_size=10, violations=[]
-    )
+    run = RunRecord(control_id="c1", executed_at="t", population_size=10, violations=[])
     proc = Procedure(
         code="",
         title="My Test",
@@ -130,8 +128,13 @@ def test_code_assertion_empty_no_extra_html_lines():
         result=run,
     )
     wp = Workpaper(
-        control_id="c1", title="T", objective="o", narrative="n",
-        framework_refs={}, procedures=[proc], generated_at="t",
+        control_id="c1",
+        title="T",
+        objective="o",
+        narrative="n",
+        framework_refs={},
+        procedures=[proc],
+        generated_at="t",
     )
     html = render_html(wp)
     assert 'class="assert"' not in html
@@ -147,11 +150,9 @@ def test_lone_auto_code_empty_heading_is_legacy_form():
     from uticen_lite.render.html import render_html
     from uticen_lite.render.markdown import render_markdown
 
-    run = RunRecord(
-        control_id="c1", executed_at="t", population_size=10, violations=[]
-    )
+    run = RunRecord(control_id="c1", executed_at="t", population_size=10, violations=[])
     proc = Procedure(
-        code="",          # lone auto procedure — code always empty
+        code="",  # lone auto procedure — code always empty
         title="Cash Cutoff",
         assertion="",
         narrative="n",
@@ -159,8 +160,13 @@ def test_lone_auto_code_empty_heading_is_legacy_form():
         result=run,
     )
     wp = Workpaper(
-        control_id="c1", title="T", objective="o", narrative="n",
-        framework_refs={}, procedures=[proc], generated_at="t",
+        control_id="c1",
+        title="T",
+        objective="o",
+        narrative="n",
+        framework_refs={},
+        procedures=[proc],
+        generated_at="t",
     )
 
     # HTML: legacy "P1: title" heading, not the "P1 &middot; title" code-prefix form.

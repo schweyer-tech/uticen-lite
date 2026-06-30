@@ -488,20 +488,33 @@ def test_workpaper_reflects_latest_run_not_oldest(test_py_file: pathlib.Path) ->
         path="gl.csv",
         key_config={"mode": "single", "columns": ["entry_id"]},
     )
-    repo.set_columns(conn, "gl", [
-        {"original_name": "entry_id", "display_name": "Entry ID", "is_key": True, "include": True},
-    ])
+    repo.set_columns(
+        conn,
+        "gl",
+        [
+            {
+                "original_name": "entry_id",
+                "display_name": "Entry ID",
+                "is_key": True,
+                "include": True,
+            },
+        ],
+    )
     repo.upsert_control(
-        conn, id="cash_cutoff", title="Cash Cutoff", objective="o", narrative="n",
-        framework_refs={"nist": [], "extra": {}}, test_kind="python",
+        conn,
+        id="cash_cutoff",
+        title="Cash Cutoff",
+        objective="o",
+        narrative="n",
+        framework_refs={"nist": [], "extra": {}},
+        test_kind="python",
         test_code="# test",
     )
     repo.set_control_sources(conn, "cash_cutoff", ["gl"])
 
     # Insert OLDER run (5 violations)
     older_violations = [
-        Violation(item_key=f"K{i}", description="stale", severity="medium")
-        for i in range(5)
+        Violation(item_key=f"K{i}", description="stale", severity="medium") for i in range(5)
     ]
     older = RunRecord(
         control_id="cash_cutoff",

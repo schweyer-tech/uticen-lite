@@ -39,16 +39,28 @@ def _ran_control(client):
         },
         follow_redirects=False,
     )
-    graph = {"nodes": [
-        {"id": "imp", "type": "import", "source_id": "users"},
-        {"id": "tst", "type": "test", "inputs": ["imp"],
-         "config": {"logic": "all", "severity": "high", "item_key_column": "user_id",
+    graph = {
+        "nodes": [
+            {"id": "imp", "type": "import", "source_id": "users"},
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["imp"],
+                "config": {
+                    "logic": "all",
+                    "severity": "high",
+                    "item_key_column": "user_id",
                     "description_template": "User {user_id}",
-                    "conditions": [{"column": "can_create", "op": "eq", "value": True}]}},
-    ]}
-    client.post("/controls/sod/logic/builder",
-                data={"pipeline_json": json.dumps(graph)},
-                follow_redirects=False)
+                    "conditions": [{"column": "can_create", "op": "eq", "value": True}],
+                },
+            },
+        ]
+    }
+    client.post(
+        "/controls/sod/logic/builder",
+        data={"pipeline_json": json.dumps(graph)},
+        follow_redirects=False,
+    )
     client.post("/controls/sod/run", follow_redirects=False)
 
 
@@ -70,32 +82,60 @@ def _ran_cross_source_control(client):
     # access has users U1, U2, U3; hr_roster only has U1, U3 → U2 has no HR record.
     access = b"user_id\nU1\nU2\nU3\n"
     hr = b"employee_id\nU1\nU3\n"
-    client.post("/sources", data={"source_id": "access", "format": "csv"},
-                files={"file": ("access.csv", io.BytesIO(access), "text/csv")},
-                follow_redirects=False)
-    client.post("/sources", data={"source_id": "hr_roster", "format": "csv"},
-                files={"file": ("hr_roster.csv", io.BytesIO(hr), "text/csv")},
-                follow_redirects=False)
-    client.post("/controls", data={
-        "id": "term", "title": "Terminated access", "objective": "o", "narrative": "n",
-        "source_ids": ["access", "hr_roster"],
-        "failure_threshold_count": "0",
-    }, follow_redirects=False)
+    client.post(
+        "/sources",
+        data={"source_id": "access", "format": "csv"},
+        files={"file": ("access.csv", io.BytesIO(access), "text/csv")},
+        follow_redirects=False,
+    )
+    client.post(
+        "/sources",
+        data={"source_id": "hr_roster", "format": "csv"},
+        files={"file": ("hr_roster.csv", io.BytesIO(hr), "text/csv")},
+        follow_redirects=False,
+    )
+    client.post(
+        "/controls",
+        data={
+            "id": "term",
+            "title": "Terminated access",
+            "objective": "o",
+            "narrative": "n",
+            "source_ids": ["access", "hr_roster"],
+            "failure_threshold_count": "0",
+        },
+        follow_redirects=False,
+    )
     # Use a not_exists join to find access users absent from hr_roster (terminated).
-    graph = {"nodes": [
-        {"id": "imp_a", "type": "import", "source_id": "access"},
-        {"id": "imp_hr", "type": "import", "source_id": "hr_roster"},
-        {"id": "jn", "type": "join", "inputs": ["imp_a", "imp_hr"],
-         "config": {"left_key": "user_id", "right_key": "employee_id",
-                    "mode": "not_exists"}},
-        {"id": "tst", "type": "test", "inputs": ["jn"],
-         "config": {"logic": "any", "severity": "high", "item_key_column": "user_id",
+    graph = {
+        "nodes": [
+            {"id": "imp_a", "type": "import", "source_id": "access"},
+            {"id": "imp_hr", "type": "import", "source_id": "hr_roster"},
+            {
+                "id": "jn",
+                "type": "join",
+                "inputs": ["imp_a", "imp_hr"],
+                "config": {"left_key": "user_id", "right_key": "employee_id", "mode": "not_exists"},
+            },
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["jn"],
+                "config": {
+                    "logic": "any",
+                    "severity": "high",
+                    "item_key_column": "user_id",
                     "description_template": "User {user_id} retains access",
-                    "conditions": [{"column": "user_id", "op": "not_empty"}]}},
-    ]}
-    client.post("/controls/term/logic/builder",
-                data={"pipeline_json": json.dumps(graph)},
-                follow_redirects=False)
+                    "conditions": [{"column": "user_id", "op": "not_empty"}],
+                },
+            },
+        ]
+    }
+    client.post(
+        "/controls/term/logic/builder",
+        data={"pipeline_json": json.dumps(graph)},
+        follow_redirects=False,
+    )
     client.post("/controls/term/run", follow_redirects=False)
 
 
@@ -119,37 +159,81 @@ def _ran_pipeline_control(client):
     Filter → Join(inner against employees filtered to terminated) → Test."""
     access = b"account_id,employee_id,is_active\nA1,E1,true\nA2,E2,true\nA3,E3,true\n"
     emp = b"employee_id,status\nE1,terminated\nE2,active\nE3,terminated\n"
-    client.post("/sources", data={"source_id": "access_accounts", "format": "csv"},
-                files={"file": ("access_accounts.csv", io.BytesIO(access), "text/csv")},
-                follow_redirects=False)
-    client.post("/sources", data={"source_id": "employees", "format": "csv"},
-                files={"file": ("employees.csv", io.BytesIO(emp), "text/csv")},
-                follow_redirects=False)
-    client.post("/controls", data={
-        "id": "term_pipe", "title": "Terminated access (visual)",
-        "objective": "o", "narrative": "n",
-        "failure_threshold_count": "0",
-    }, follow_redirects=False)
-    graph = {"nodes": [
-        {"id": "acc", "type": "import", "source_id": "access_accounts",
-         "narrative": "All access accounts"},
-        {"id": "active", "type": "filter", "inputs": ["acc"],
-         "config": {"logic": "all",
-                    "conditions": [{"column": "is_active", "op": "eq", "value": "true"}]}},
-        {"id": "emp", "type": "import", "source_id": "employees"},
-        {"id": "term", "type": "filter", "inputs": ["emp"],
-         "config": {"logic": "all",
-                    "conditions": [{"column": "status", "op": "eq", "value": "terminated"}]}},
-        {"id": "join", "type": "join", "inputs": ["active", "term"],
-         "config": {"left_key": "employee_id", "right_key": "employee_id", "mode": "inner"}},
-        {"id": "tst", "type": "test", "inputs": ["join"],
-         "config": {"logic": "any", "severity": "critical", "item_key_column": "account_id",
+    client.post(
+        "/sources",
+        data={"source_id": "access_accounts", "format": "csv"},
+        files={"file": ("access_accounts.csv", io.BytesIO(access), "text/csv")},
+        follow_redirects=False,
+    )
+    client.post(
+        "/sources",
+        data={"source_id": "employees", "format": "csv"},
+        files={"file": ("employees.csv", io.BytesIO(emp), "text/csv")},
+        follow_redirects=False,
+    )
+    client.post(
+        "/controls",
+        data={
+            "id": "term_pipe",
+            "title": "Terminated access (visual)",
+            "objective": "o",
+            "narrative": "n",
+            "failure_threshold_count": "0",
+        },
+        follow_redirects=False,
+    )
+    graph = {
+        "nodes": [
+            {
+                "id": "acc",
+                "type": "import",
+                "source_id": "access_accounts",
+                "narrative": "All access accounts",
+            },
+            {
+                "id": "active",
+                "type": "filter",
+                "inputs": ["acc"],
+                "config": {
+                    "logic": "all",
+                    "conditions": [{"column": "is_active", "op": "eq", "value": "true"}],
+                },
+            },
+            {"id": "emp", "type": "import", "source_id": "employees"},
+            {
+                "id": "term",
+                "type": "filter",
+                "inputs": ["emp"],
+                "config": {
+                    "logic": "all",
+                    "conditions": [{"column": "status", "op": "eq", "value": "terminated"}],
+                },
+            },
+            {
+                "id": "join",
+                "type": "join",
+                "inputs": ["active", "term"],
+                "config": {"left_key": "employee_id", "right_key": "employee_id", "mode": "inner"},
+            },
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["join"],
+                "config": {
+                    "logic": "any",
+                    "severity": "critical",
+                    "item_key_column": "account_id",
                     "description_template": "Account {account_id} belongs to a terminated employee",
-                    "conditions": [{"column": "account_id", "op": "not_empty"}]}},
-    ]}
-    client.post("/controls/term_pipe/logic/builder",
-                data={"pipeline_json": json.dumps(graph)},
-                follow_redirects=False)
+                    "conditions": [{"column": "account_id", "op": "not_empty"}],
+                },
+            },
+        ]
+    }
+    client.post(
+        "/controls/term_pipe/logic/builder",
+        data={"pipeline_json": json.dumps(graph)},
+        follow_redirects=False,
+    )
     client.post("/controls/term_pipe/run", follow_redirects=False)
 
 

@@ -86,10 +86,7 @@ def tests_for_procedure(pipeline: Pipeline, procedure_id: str) -> list[Node]:
     """
     defined_ids = {p.id for p in pipeline.procedures}
     if procedure_id in defined_ids:
-        return [
-            t for t in pipeline.terminals
-            if _assigned_procedure_id(t) == procedure_id
-        ]
+        return [t for t in pipeline.terminals if _assigned_procedure_id(t) == procedure_id]
     # Auto procedure: the terminal whose id is the procedure id.
     return [t for t in pipeline.terminals if t.id == procedure_id]
 

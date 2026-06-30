@@ -195,9 +195,7 @@ def load_test_callable(control: ControlDef) -> Callable[..., list[Any]]:
             ) from exc
         fn = namespace.get("test")
         if not callable(fn):
-            raise ProjectError(
-                f"control {control.id}: inline test code defines no callable 'test'"
-            )
+            raise ProjectError(f"control {control.id}: inline test code defines no callable 'test'")
         return fn  # type: ignore[no-any-return]
 
     test_file = Path(control.test_path)

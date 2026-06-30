@@ -15,9 +15,7 @@ def test_pipx_command():
 
 
 def test_git_command_is_two_steps():
-    cmds = build_upgrade_command(
-        InstallMethod.GIT_EDITABLE, python="/py", source_dir="/repo"
-    )
+    cmds = build_upgrade_command(InstallMethod.GIT_EDITABLE, python="/py", source_dir="/repo")
     assert cmds == [
         ["git", "-C", "/repo", "pull", "--ff-only"],
         ["/py", "-m", "pip", "install", "-e", "/repo"],

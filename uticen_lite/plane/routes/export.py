@@ -23,7 +23,7 @@ def register(
     @app.get("/export", response_class=HTMLResponse)
     def export_page(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         project = repo.get_project(conn) or {"name": ""}
         return templates.TemplateResponse(request, "export.html", {"project": project})

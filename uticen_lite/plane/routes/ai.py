@@ -71,8 +71,7 @@ def _build_sample(conn: sqlite3.Connection, root: Path, source_id: str) -> dict[
     cols = [c for c in pop.columns if c.include]
     original_names = [c.original_name for c in cols]
     schema = [
-        {"original_name": c.original_name, "display_name": c.display_name,
-         "data_type": c.data_type}
+        {"original_name": c.original_name, "display_name": c.display_name, "data_type": c.data_type}
         for c in cols
     ]
     rows: list[list[str]] = []
@@ -95,7 +94,7 @@ def register(
     @app.get("/settings/ai", response_class=HTMLResponse)
     def ai_settings(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         from uticen_lite.ai.providers import available_providers
 
@@ -147,14 +146,16 @@ def register(
 
             cfg = _ai_config(conn)
             if cfg is None:
-                return _error(templates, request,
-                              "AI is not configured. Pick a provider in Settings.")
+                return _error(
+                    templates, request, "AI is not configured. Pick a provider in Settings."
+                )
 
             from uticen_lite.ai.providers import provider_key_present
 
             if not provider_key_present(cfg["provider"]):
                 return _error(
-                    templates, request,
+                    templates,
+                    request,
                     "AI is not enabled — the selected provider's API key is not set "
                     "in this environment.",
                 )
@@ -178,14 +179,17 @@ def register(
                     model=cfg["model"],
                 )
             except RuleSpecError as exc:
-                return _error(templates, request,
-                              f"The drafted rule was malformed: {exc}")
+                return _error(templates, request, f"The drafted rule was malformed: {exc}")
             except Exception as exc:  # DraftError + any backend/transport failure
                 from uticen_lite.ai.draft import DraftError
 
-                msg = str(exc) if isinstance(exc, DraftError) else (
-                    "The AI provider could not produce a usable rule. Try again or "
-                    "build the rule by hand."
+                msg = (
+                    str(exc)
+                    if isinstance(exc, DraftError)
+                    else (
+                        "The AI provider could not produce a usable rule. Try again or "
+                        "build the rule by hand."
+                    )
                 )
                 return _error(templates, request, msg)
 
@@ -208,6 +212,4 @@ def register(
 
 
 def _error(templates: Jinja2Templates, request: Request, message: str) -> HTMLResponse:
-    return templates.TemplateResponse(
-        request, "partials/ai_draft_error.html", {"message": message}
-    )
+    return templates.TemplateResponse(request, "partials/ai_draft_error.html", {"message": message})

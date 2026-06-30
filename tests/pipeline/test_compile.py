@@ -31,8 +31,7 @@ _EXAMPLE = Path(__file__).resolve().parents[2] / "examples" / "northwind-trading
 
 
 def _pop(df: pd.DataFrame, key: str) -> Population:
-    cols = [ColumnMeta(original_name=c, display_name=c, is_key=(c == key))
-            for c in df.columns]
+    cols = [ColumnMeta(original_name=c, display_name=c, is_key=(c == key)) for c in df.columns]
     return Population(df=df, columns=cols, source_id="s")
 
 
@@ -47,18 +46,32 @@ def _exec_test(code: str):
 # Pure single-source → rule_spec
 # ---------------------------------------------------------------------------
 
+
 def test_pure_single_source_compiles_to_rule_spec():
     raw = {
         "nodes": [
             {"id": "imp", "type": "import", "source_id": "access_accounts"},
-            {"id": "flt", "type": "filter", "inputs": ["imp"],
-             "config": {"logic": "all",
-                        "conditions": [{"column": "is_active", "op": "eq", "value": True}]}},
-            {"id": "tst", "type": "test", "inputs": ["flt"],
-             "config": {"logic": "all", "severity": "high",
-                        "conditions": [{"column": "is_privileged", "op": "eq", "value": True}],
-                        "item_key_column": "account_id",
-                        "description_template": "Account {account_id} privileged"}},
+            {
+                "id": "flt",
+                "type": "filter",
+                "inputs": ["imp"],
+                "config": {
+                    "logic": "all",
+                    "conditions": [{"column": "is_active", "op": "eq", "value": True}],
+                },
+            },
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["flt"],
+                "config": {
+                    "logic": "all",
+                    "severity": "high",
+                    "conditions": [{"column": "is_privileged", "op": "eq", "value": True}],
+                    "item_key_column": "account_id",
+                    "description_template": "Account {account_id} privileged",
+                },
+            },
         ]
     }
     result = compile_pipeline(parse_pipeline(raw))
@@ -77,21 +90,36 @@ def test_pure_single_source_compiles_to_rule_spec():
 
 
 def test_pure_single_source_matches_evaluate_rule():
-    df = pd.DataFrame({
-        "account_id": ["A1", "A2", "A3"],
-        "is_active": [True, True, False],
-        "is_privileged": [True, False, True],
-    })
+    df = pd.DataFrame(
+        {
+            "account_id": ["A1", "A2", "A3"],
+            "is_active": [True, True, False],
+            "is_privileged": [True, False, True],
+        }
+    )
     raw = {
         "nodes": [
             {"id": "imp", "type": "import", "source_id": "access_accounts"},
-            {"id": "flt", "type": "filter", "inputs": ["imp"],
-             "config": {"logic": "all",
-                        "conditions": [{"column": "is_active", "op": "eq", "value": True}]}},
-            {"id": "tst", "type": "test", "inputs": ["flt"],
-             "config": {"logic": "all", "severity": "high",
-                        "conditions": [{"column": "is_privileged", "op": "eq", "value": True}],
-                        "item_key_column": "account_id"}},
+            {
+                "id": "flt",
+                "type": "filter",
+                "inputs": ["imp"],
+                "config": {
+                    "logic": "all",
+                    "conditions": [{"column": "is_active", "op": "eq", "value": True}],
+                },
+            },
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["flt"],
+                "config": {
+                    "logic": "all",
+                    "severity": "high",
+                    "conditions": [{"column": "is_privileged", "op": "eq", "value": True}],
+                    "item_key_column": "account_id",
+                },
+            },
         ]
     }
     result = compile_pipeline(parse_pipeline(raw))
@@ -115,12 +143,25 @@ def _filter_any_pipeline() -> dict:
     return {
         "nodes": [
             {"id": "imp", "type": "import", "source_id": "s"},
-            {"id": "flt", "type": "filter", "inputs": ["imp"],
-             "config": {"logic": "any",
-                        "conditions": [{"column": "dept", "op": "eq", "value": "IT"}]}},
-            {"id": "tst", "type": "test", "inputs": ["flt"],
-             "config": {"logic": "any", "item_key_column": "id",
-                        "conditions": [{"column": "amount", "op": "gt", "value": 100}]}},
+            {
+                "id": "flt",
+                "type": "filter",
+                "inputs": ["imp"],
+                "config": {
+                    "logic": "any",
+                    "conditions": [{"column": "dept", "op": "eq", "value": "IT"}],
+                },
+            },
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["flt"],
+                "config": {
+                    "logic": "any",
+                    "item_key_column": "id",
+                    "conditions": [{"column": "amount", "op": "gt", "value": 100}],
+                },
+            },
         ]
     }
 
@@ -135,11 +176,13 @@ def test_filter_with_any_logic_does_not_flatten_to_rule():
 
 def test_filter_any_python_path_uses_staged_semantics():
     # filter to dept==IT → only id 1 (amount 10) survives; then amount>100 → none.
-    df = pd.DataFrame({
-        "id": ["1", "2", "3"],
-        "dept": ["IT", "Sales", "Sales"],
-        "amount": [10, 200, 5],
-    })
+    df = pd.DataFrame(
+        {
+            "id": ["1", "2", "3"],
+            "dept": ["IT", "Sales", "Sales"],
+            "amount": [10, 200, 5],
+        }
+    )
     result = compile_pipeline(parse_pipeline(_filter_any_pipeline()))
     out = _exec_test(result.test_code)(_pop(df, "id"), {"s": _pop(df, "id")})
     assert [v["item_key"] for v in out] == []
@@ -161,9 +204,16 @@ def test_filter_free_any_import_test_still_flattens_to_rule():
     raw = {
         "nodes": [
             {"id": "imp", "type": "import", "source_id": "s"},
-            {"id": "tst", "type": "test", "inputs": ["imp"],
-             "config": {"logic": "any", "item_key_column": "id",
-                        "conditions": [{"column": "amount", "op": "gt", "value": 100}]}},
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["imp"],
+                "config": {
+                    "logic": "any",
+                    "item_key_column": "id",
+                    "conditions": [{"column": "amount", "op": "gt", "value": 100}],
+                },
+            },
         ]
     }
     result = compile_pipeline(parse_pipeline(raw))
@@ -175,28 +225,40 @@ def test_filter_any_rule_path_would_disagree_with_python_path():
     pipeline. We assert the staged Python path == evaluate_rule of the CORRECT
     staged spec, and that it differs from the naive flattened spec — so the two
     compile targets can never disagree for one authored graph."""
-    df = pd.DataFrame({
-        "id": ["1", "2", "3"],
-        "dept": ["IT", "Sales", "Sales"],
-        "amount": [10, 200, 5],
-    })
-    pipe = parse_pipeline(_filter_any_pipeline())
-    python_out = _exec_test(compile_pipeline(pipe).test_code)(
-        _pop(df, "id"), {"s": _pop(df, "id")}
+    df = pd.DataFrame(
+        {
+            "id": ["1", "2", "3"],
+            "dept": ["IT", "Sales", "Sales"],
+            "amount": [10, 200, 5],
+        }
     )
+    pipe = parse_pipeline(_filter_any_pipeline())
+    python_out = _exec_test(compile_pipeline(pipe).test_code)(_pop(df, "id"), {"s": _pop(df, "id")})
     # Correct staged semantics: narrow to dept==IT first, then assert amount>100.
     staged = df[df["dept"] == "IT"]
     correct = evaluate_rule(
-        parse_rule_spec({"logic": "any", "item_key_column": "id",
-                         "conditions": [{"column": "amount", "op": "gt", "value": 100}]}),
+        parse_rule_spec(
+            {
+                "logic": "any",
+                "item_key_column": "id",
+                "conditions": [{"column": "amount", "op": "gt", "value": 100}],
+            }
+        ),
         _pop(staged, "id"),
     )
     assert [v["item_key"] for v in python_out] == [v["item_key"] for v in correct] == []
     # The naive flattened any-spec (what the old pure path emitted) flags ['1','2'].
     naive = evaluate_rule(
-        parse_rule_spec({"logic": "any", "item_key_column": "id", "conditions": [
-            {"column": "dept", "op": "eq", "value": "IT"},
-            {"column": "amount", "op": "gt", "value": 100}]}),
+        parse_rule_spec(
+            {
+                "logic": "any",
+                "item_key_column": "id",
+                "conditions": [
+                    {"column": "dept", "op": "eq", "value": "IT"},
+                    {"column": "amount", "op": "gt", "value": 100},
+                ],
+            }
+        ),
         _pop(df, "id"),
     )
     assert [v["item_key"] for v in naive] == ["1", "2"]  # the bug the fix avoids
@@ -206,36 +268,72 @@ def test_filter_any_rule_path_would_disagree_with_python_path():
 # Compile-equivalence: terminated-access (fully-visual cross-source exemplar)
 # ---------------------------------------------------------------------------
 
+
 def _terminated_access_pipeline() -> dict:
     """Import(access_accounts) → Filter[is_active==true] → Join(employee_id,
     mode=inner, against employees filtered to status==terminated) → Test."""
     return {
         "nodes": [
-            {"id": "acc", "type": "import", "source_id": "access_accounts",
-             "narrative": "All system access accounts"},
-            {"id": "active", "type": "filter", "inputs": ["acc"],
-             "narrative": "Keep only currently-active accounts",
-             "config": {"logic": "all",
-                        "conditions": [{"column": "is_active", "op": "eq", "value": True}]}},
-            {"id": "emp", "type": "import", "source_id": "employees",
-             "narrative": "HR employee roster"},
-            {"id": "term", "type": "filter", "inputs": ["emp"],
-             "narrative": "Keep only terminated employees",
-             "config": {"logic": "all",
-                        "conditions": [{"column": "status", "op": "eq",
-                                        "value": "terminated"}]}},
-            {"id": "join", "type": "join", "inputs": ["active", "term"],
-             "narrative": "Active accounts whose employee is terminated",
-             "config": {"left_key": "employee_id", "right_key": "employee_id",
-                        "mode": "inner", "bring_columns": ["status"]}},
-            {"id": "tst", "type": "test", "inputs": ["join"],
-             "narrative": "Flag every surviving account",
-             "config": {"logic": "any", "severity": "critical",
-                        "item_key_column": "account_id",
-                        "conditions": [{"column": "account_id", "op": "not_empty"}],
-                        "description_template": (
-                            "Account '{account_id}' is active but linked employee "
-                            "'{employee_id}' has terminated status")}},
+            {
+                "id": "acc",
+                "type": "import",
+                "source_id": "access_accounts",
+                "narrative": "All system access accounts",
+            },
+            {
+                "id": "active",
+                "type": "filter",
+                "inputs": ["acc"],
+                "narrative": "Keep only currently-active accounts",
+                "config": {
+                    "logic": "all",
+                    "conditions": [{"column": "is_active", "op": "eq", "value": True}],
+                },
+            },
+            {
+                "id": "emp",
+                "type": "import",
+                "source_id": "employees",
+                "narrative": "HR employee roster",
+            },
+            {
+                "id": "term",
+                "type": "filter",
+                "inputs": ["emp"],
+                "narrative": "Keep only terminated employees",
+                "config": {
+                    "logic": "all",
+                    "conditions": [{"column": "status", "op": "eq", "value": "terminated"}],
+                },
+            },
+            {
+                "id": "join",
+                "type": "join",
+                "inputs": ["active", "term"],
+                "narrative": "Active accounts whose employee is terminated",
+                "config": {
+                    "left_key": "employee_id",
+                    "right_key": "employee_id",
+                    "mode": "inner",
+                    "bring_columns": ["status"],
+                },
+            },
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["join"],
+                "narrative": "Flag every surviving account",
+                "config": {
+                    "logic": "any",
+                    "severity": "critical",
+                    "item_key_column": "account_id",
+                    "conditions": [{"column": "account_id", "op": "not_empty"}],
+                    "description_template": (
+                        "Account '{account_id}' is active but linked employee "
+                        "'{employee_id}' has terminated status"
+                    ),
+                },
+            },
         ]
     }
 
@@ -281,21 +379,41 @@ def test_terminated_access_narratives_become_comments():
 # Hybrid pipeline with a Custom Python (rows→rows) node
 # ---------------------------------------------------------------------------
 
+
 def _hybrid_pipeline() -> dict:
     return {
         "nodes": [
-            {"id": "imp", "type": "import", "source_id": "journal_entries",
-             "narrative": "All journal entries"},
-            {"id": "cust", "type": "custom_python", "inputs": ["imp"],
-             "narrative": "Keep only large manual entries",
-             "config": {"flavor": "transform", "code": (
-                 "rows = rows[rows['entry_type'].astype(str).str.lower() == 'manual']\n"
-                 "rows = rows[rows['amount'].astype(float).abs() >= 50000]")}},
-            {"id": "tst", "type": "test", "inputs": ["cust"],
-             "narrative": "Flag self-reviewed entries",
-             "config": {"logic": "any", "severity": "high",
-                        "item_key_column": "entry_id",
-                        "conditions": [{"column": "reviewed_by", "op": "is_empty"}]}},
+            {
+                "id": "imp",
+                "type": "import",
+                "source_id": "journal_entries",
+                "narrative": "All journal entries",
+            },
+            {
+                "id": "cust",
+                "type": "custom_python",
+                "inputs": ["imp"],
+                "narrative": "Keep only large manual entries",
+                "config": {
+                    "flavor": "transform",
+                    "code": (
+                        "rows = rows[rows['entry_type'].astype(str).str.lower() == 'manual']\n"
+                        "rows = rows[rows['amount'].astype(float).abs() >= 50000]"
+                    ),
+                },
+            },
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["cust"],
+                "narrative": "Flag self-reviewed entries",
+                "config": {
+                    "logic": "any",
+                    "severity": "high",
+                    "item_key_column": "entry_id",
+                    "conditions": [{"column": "reviewed_by", "op": "is_empty"}],
+                },
+            },
         ]
     }
 
@@ -325,12 +443,14 @@ def test_custom_node_function_cannot_see_sources():
 
 
 def test_hybrid_runs_and_flags_expected_entries():
-    df = pd.DataFrame({
-        "entry_id": ["E1", "E2", "E3", "E4"],
-        "entry_type": ["manual", "manual", "auto", "manual"],
-        "amount": [60000, 10000, 99999, 75000],
-        "reviewed_by": ["", "boss", "boss", "boss"],
-    })
+    df = pd.DataFrame(
+        {
+            "entry_id": ["E1", "E2", "E3", "E4"],
+            "entry_type": ["manual", "manual", "auto", "manual"],
+            "amount": [60000, 10000, 99999, 75000],
+            "reviewed_by": ["", "boss", "boss", "boss"],
+        }
+    )
     result = compile_pipeline(parse_pipeline(_hybrid_pipeline()))
     test_fn = _exec_test(result.test_code)
     out = test_fn(_pop(df, "entry_id"), {})
@@ -342,6 +462,7 @@ def test_hybrid_runs_and_flags_expected_entries():
 # Join modes: exists / not_exists / left / bring_columns
 # ---------------------------------------------------------------------------
 
+
 def _join_pipeline(mode: str, bring: list[str] | None = None) -> dict:
     join_cfg = {"left_key": "user_id", "right_key": "employee_id", "mode": mode}
     if bring is not None:
@@ -351,18 +472,25 @@ def _join_pipeline(mode: str, bring: list[str] | None = None) -> dict:
             {"id": "a", "type": "import", "source_id": "accounts"},
             {"id": "b", "type": "import", "source_id": "hr"},
             {"id": "j", "type": "join", "inputs": ["a", "b"], "config": join_cfg},
-            {"id": "t", "type": "test", "inputs": ["j"],
-             "config": {"logic": "any", "item_key_column": "user_id",
-                        "conditions": [{"column": "user_id", "op": "not_empty"}]}},
+            {
+                "id": "t",
+                "type": "test",
+                "inputs": ["j"],
+                "config": {
+                    "logic": "any",
+                    "item_key_column": "user_id",
+                    "conditions": [{"column": "user_id", "op": "not_empty"}],
+                },
+            },
         ]
     }
 
 
 def _join_frames():
-    a = _pop(pd.DataFrame({"user_id": ["U1", "U2", "U3"], "dept": ["IT", "Sales", "IT"]}),
-             "user_id")
-    b = _pop(pd.DataFrame({"employee_id": ["U1", "U3"], "name": ["Ann", "Cara"]}),
-             "employee_id")
+    a = _pop(
+        pd.DataFrame({"user_id": ["U1", "U2", "U3"], "dept": ["IT", "Sales", "IT"]}), "user_id"
+    )
+    b = _pop(pd.DataFrame({"employee_id": ["U1", "U3"], "name": ["Ann", "Cara"]}), "employee_id")
     return a, b
 
 
@@ -401,20 +529,29 @@ def test_join_left_keeps_all_left_rows():
 # Custom Python test-flavor as the terminal (duplicate-payments shape)
 # ---------------------------------------------------------------------------
 
+
 def test_custom_test_flavor_node_is_a_valid_terminal():
     raw = {
         "nodes": [
             {"id": "imp", "type": "import", "source_id": "payments"},
-            {"id": "dup", "type": "custom_python", "inputs": ["imp"],
-             "narrative": "Detect duplicate payments",
-             "config": {"flavor": "test", "code": (
-                 "out = []\n"
-                 "for _, r in rows.iterrows():\n"
-                 "    if str(r['amount']) == '100':\n"
-                 "        out.append({'item_key': str(r['payment_id']),\n"
-                 "                    'description': 'dup', 'severity': 'high',\n"
-                 "                    'details': {}})\n"
-                 "return out")}},
+            {
+                "id": "dup",
+                "type": "custom_python",
+                "inputs": ["imp"],
+                "narrative": "Detect duplicate payments",
+                "config": {
+                    "flavor": "test",
+                    "code": (
+                        "out = []\n"
+                        "for _, r in rows.iterrows():\n"
+                        "    if str(r['amount']) == '100':\n"
+                        "        out.append({'item_key': str(r['payment_id']),\n"
+                        "                    'description': 'dup', 'severity': 'high',\n"
+                        "                    'details': {}})\n"
+                        "return out"
+                    ),
+                },
+            },
         ]
     }
     result = compile_pipeline(parse_pipeline(raw))
@@ -431,8 +568,12 @@ def test_custom_test_flavor_terminal_cannot_see_sources():
     raw = {
         "nodes": [
             {"id": "imp", "type": "import", "source_id": "payments"},
-            {"id": "dup", "type": "custom_python", "inputs": ["imp"],
-             "config": {"flavor": "test", "code": "return []"}},
+            {
+                "id": "dup",
+                "type": "custom_python",
+                "inputs": ["imp"],
+                "config": {"flavor": "test", "code": "return []"},
+            },
         ]
     }
     result = compile_pipeline(parse_pipeline(raw))
@@ -445,19 +586,46 @@ def test_custom_test_flavor_terminal_cannot_see_sources():
 # Multi-terminal: per-procedure compile + union test()
 # ---------------------------------------------------------------------------
 
+
 def _forked():
-    return parse_pipeline({"nodes": [
-        {"id": "imp", "type": "import", "source_id": "inv"},
-        {"id": "flt", "type": "filter", "inputs": ["imp"],
-         "config": {"logic": "all",
-                    "conditions": [{"column": "status", "op": "eq", "value": "posted"}]}},
-        {"id": "a", "type": "test", "inputs": ["flt"], "narrative": "approver",
-         "config": {"logic": "all", "item_key_column": "id",
-                    "conditions": [{"column": "approver", "op": "is_empty"}]}},
-        {"id": "b", "type": "test", "inputs": ["flt"], "narrative": "po",
-         "config": {"logic": "all", "item_key_column": "id",
-                    "conditions": [{"column": "po", "op": "is_empty"}]}},
-    ]})
+    return parse_pipeline(
+        {
+            "nodes": [
+                {"id": "imp", "type": "import", "source_id": "inv"},
+                {
+                    "id": "flt",
+                    "type": "filter",
+                    "inputs": ["imp"],
+                    "config": {
+                        "logic": "all",
+                        "conditions": [{"column": "status", "op": "eq", "value": "posted"}],
+                    },
+                },
+                {
+                    "id": "a",
+                    "type": "test",
+                    "inputs": ["flt"],
+                    "narrative": "approver",
+                    "config": {
+                        "logic": "all",
+                        "item_key_column": "id",
+                        "conditions": [{"column": "approver", "op": "is_empty"}],
+                    },
+                },
+                {
+                    "id": "b",
+                    "type": "test",
+                    "inputs": ["flt"],
+                    "narrative": "po",
+                    "config": {
+                        "logic": "all",
+                        "item_key_column": "id",
+                        "conditions": [{"column": "po", "op": "is_empty"}],
+                    },
+                },
+            ]
+        }
+    )
 
 
 def test_compile_one_procedure_per_terminal():
@@ -476,11 +644,13 @@ def test_union_test_code_runs_both_branches_and_concatenates(tmp_path):
     assert union.test_kind == "python"
     ns = {}
     exec(union.test_code, ns)
-    df = pd.DataFrame([
-        {"id": "1", "status": "posted", "approver": "", "po": "PO1"},   # fails a only
-        {"id": "2", "status": "posted", "approver": "X", "po": ""},     # fails b only
-        {"id": "3", "status": "draft",  "approver": "", "po": ""},      # filtered out
-    ])
+    df = pd.DataFrame(
+        [
+            {"id": "1", "status": "posted", "approver": "", "po": "PO1"},  # fails a only
+            {"id": "2", "status": "posted", "approver": "X", "po": ""},  # fails b only
+            {"id": "3", "status": "draft", "approver": "", "po": ""},  # filtered out
+        ]
+    )
     pop = _pop(df, "id")
     out = ns["test"](pop, {"inv": pop})
     keys = sorted(v["item_key"] for v in out)
@@ -490,6 +660,7 @@ def test_union_test_code_runs_both_branches_and_concatenates(tmp_path):
 # ---------------------------------------------------------------------------
 # Regression: blank condition placeholder from "+ Add condition" must not 500
 # ---------------------------------------------------------------------------
+
 
 def test_compile_tolerates_blank_condition_in_filter_node():
     """Blank placeholder row (column='') in a Filter node must be stripped at
@@ -502,20 +673,30 @@ def test_compile_tolerates_blank_condition_in_filter_node():
     500 from the save handler.
     """
     # Non-pure pipeline (two Import nodes) so _emit_python is taken.
-    graph = {"nodes": [
-        {"id": "imp1", "type": "import", "source_id": "accounts",
-         "inputs": [], "config": {}},
-        {"id": "imp2", "type": "import", "source_id": "employees",
-         "inputs": [], "config": {}},
-        {"id": "join", "type": "join", "inputs": ["imp1", "imp2"],
-         "config": {"mode": "inner", "left_key": "emp_id", "right_key": "emp_id"}},
-        {"id": "tst", "type": "test", "inputs": ["join"],
-         "config": {"logic": "all",
+    graph = {
+        "nodes": [
+            {"id": "imp1", "type": "import", "source_id": "accounts", "inputs": [], "config": {}},
+            {"id": "imp2", "type": "import", "source_id": "employees", "inputs": [], "config": {}},
+            {
+                "id": "join",
+                "type": "join",
+                "inputs": ["imp1", "imp2"],
+                "config": {"mode": "inner", "left_key": "emp_id", "right_key": "emp_id"},
+            },
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["join"],
+                "config": {
+                    "logic": "all",
                     "conditions": [
                         {"column": "status", "op": "eq", "value": "ok"},  # valid
-                        {"column": "", "op": "eq", "value": ""},           # blank placeholder
-                    ]}},
-    ]}
+                        {"column": "", "op": "eq", "value": ""},  # blank placeholder
+                    ],
+                },
+            },
+        ]
+    }
     parsed = parse_pipeline(graph)
     result = compile_pipeline(parsed)
     # Must not raise — blank condition silently dropped, valid one retained.
@@ -526,16 +707,23 @@ def test_compile_tolerates_blank_condition_in_filter_node():
 def test_compile_tolerates_blank_condition_in_test_node_pure():
     """Same guard on the pure (rule_spec) path: blank placeholder in a Test node
     must be dropped by _usable_conditions in _build_flat_spec."""
-    graph = {"nodes": [
-        {"id": "imp", "type": "import", "source_id": "accounts",
-         "inputs": [], "config": {}},
-        {"id": "tst", "type": "test", "inputs": ["imp"],
-         "config": {"logic": "all",
+    graph = {
+        "nodes": [
+            {"id": "imp", "type": "import", "source_id": "accounts", "inputs": [], "config": {}},
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["imp"],
+                "config": {
+                    "logic": "all",
                     "conditions": [
                         {"column": "is_active", "op": "eq", "value": True},
                         {"column": "", "op": "eq", "value": ""},  # blank placeholder
-                    ]}},
-    ]}
+                    ],
+                },
+            },
+        ]
+    }
     parsed = parse_pipeline(graph)
     result = compile_pipeline(parsed)
     assert result.test_kind == "rule"

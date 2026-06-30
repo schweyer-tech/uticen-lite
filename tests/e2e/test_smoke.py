@@ -209,9 +209,9 @@ def test_author_run_export_smoke(page: Page, live_server: str, tmp_path: Path) -
     #              section header re-hydrates with its name, and the Test's "Belongs to"
     #              still selects the procedure we created (effective-owner preselect). ---
     page.goto(base + "/controls/sod/logic/builder")
-    expect(
-        page.locator(f'[data-proc-head][data-proc-id="{pid}"] [data-proc-name]')
-    ).to_have_value("Manual JE Review")
+    expect(page.locator(f'[data-proc-head][data-proc-id="{pid}"] [data-proc-name]')).to_have_value(
+        "Manual JE Review"
+    )
     expect(page.locator('[data-node="tst"] [data-procedure]')).to_have_value(pid)
     expect(
         page.locator(f'[data-proc-head][data-proc-id="{pid}"] [data-proc-narrative]')
@@ -284,17 +284,26 @@ def test_builder_collapse_and_section_insert(page: Page, live_server: str) -> No
     expect(page).to_have_url(base + "/controls/coltest")
 
     # Inject a pipeline with procedure p1 + one Test assigned to it.
-    graph_with_proc = json.dumps({
-        "nodes": [
-            {"id": "src", "type": "import", "source_id": "colsrc", "inputs": [], "config": {}},
-            {"id": "tst", "type": "test", "inputs": ["src"], "narrative": "", "config": {
-                "logic": "all", "procedure_id": "p1",
-                "conditions": [{"column": "user_id", "op": "not_empty"}],
-                "item_key_column": "user_id",
-            }},
-        ],
-        "procedures": [{"id": "p1", "code": "P1", "name": "Procedure Alpha", "position": 0}],
-    })
+    graph_with_proc = json.dumps(
+        {
+            "nodes": [
+                {"id": "src", "type": "import", "source_id": "colsrc", "inputs": [], "config": {}},
+                {
+                    "id": "tst",
+                    "type": "test",
+                    "inputs": ["src"],
+                    "narrative": "",
+                    "config": {
+                        "logic": "all",
+                        "procedure_id": "p1",
+                        "conditions": [{"column": "user_id", "op": "not_empty"}],
+                        "item_key_column": "user_id",
+                    },
+                },
+            ],
+            "procedures": [{"id": "p1", "code": "P1", "name": "Procedure Alpha", "position": 0}],
+        }
+    )
     page.evaluate(
         """async (args) => {
             const fd = new FormData();
@@ -325,7 +334,8 @@ def test_builder_collapse_and_section_insert(page: Page, live_server: str) -> No
     # the value "" (i.e. the boolean `open` attribute is absent after collapse).
     expect(section).not_to_have_attribute("open", "")
     page.wait_for_function(
-        "key => window.localStorage.getItem(key) === 'closed'", arg=ls_key,
+        "key => window.localStorage.getItem(key) === 'closed'",
+        arg=ls_key,
     )  # verifies the app's toggle-listener WRITE; fails loudly if it regresses
 
     # ── Step 4c: reload — localStorage persists the collapsed state ──────────
@@ -384,17 +394,26 @@ def test_flowchart_band_collapse_roundtrip(page: Page, live_server: str) -> None
     page.click("button[type=submit]")
     expect(page).to_have_url(base + "/controls/fctest")
 
-    graph_with_proc = json.dumps({
-        "nodes": [
-            {"id": "src", "type": "import", "source_id": "fcsrc", "inputs": [], "config": {}},
-            {"id": "tst", "type": "test", "inputs": ["src"], "narrative": "", "config": {
-                "logic": "all", "procedure_id": "p1",
-                "conditions": [{"column": "user_id", "op": "not_empty"}],
-                "item_key_column": "user_id",
-            }},
-        ],
-        "procedures": [{"id": "p1", "code": "P1", "name": "FC Procedure", "position": 0}],
-    })
+    graph_with_proc = json.dumps(
+        {
+            "nodes": [
+                {"id": "src", "type": "import", "source_id": "fcsrc", "inputs": [], "config": {}},
+                {
+                    "id": "tst",
+                    "type": "test",
+                    "inputs": ["src"],
+                    "narrative": "",
+                    "config": {
+                        "logic": "all",
+                        "procedure_id": "p1",
+                        "conditions": [{"column": "user_id", "op": "not_empty"}],
+                        "item_key_column": "user_id",
+                    },
+                },
+            ],
+            "procedures": [{"id": "p1", "code": "P1", "name": "FC Procedure", "position": 0}],
+        }
+    )
     page.evaluate(
         """async (args) => {
             const fd = new FormData();
@@ -452,17 +471,26 @@ def test_add_procedure_button_builds_the_new_card_shape(page: Page, live_server:
     page.click("button[type=submit]")
     expect(page).to_have_url(base + "/controls/addtest")
 
-    graph_with_proc = json.dumps({
-        "nodes": [
-            {"id": "src", "type": "import", "source_id": "addsrc", "inputs": [], "config": {}},
-            {"id": "tst", "type": "test", "inputs": ["src"], "narrative": "", "config": {
-                "logic": "all", "procedure_id": "p1",
-                "conditions": [{"column": "user_id", "op": "not_empty"}],
-                "item_key_column": "user_id",
-            }},
-        ],
-        "procedures": [{"id": "p1", "code": "P1", "name": "Procedure Alpha", "position": 0}],
-    })
+    graph_with_proc = json.dumps(
+        {
+            "nodes": [
+                {"id": "src", "type": "import", "source_id": "addsrc", "inputs": [], "config": {}},
+                {
+                    "id": "tst",
+                    "type": "test",
+                    "inputs": ["src"],
+                    "narrative": "",
+                    "config": {
+                        "logic": "all",
+                        "procedure_id": "p1",
+                        "conditions": [{"column": "user_id", "op": "not_empty"}],
+                        "item_key_column": "user_id",
+                    },
+                },
+            ],
+            "procedures": [{"id": "p1", "code": "P1", "name": "Procedure Alpha", "position": 0}],
+        }
+    )
     page.evaluate(
         """async (args) => {
             const fd = new FormData();
@@ -480,9 +508,16 @@ def test_add_procedure_button_builds_the_new_card_shape(page: Page, live_server:
     new = page.locator("details[data-proc-section]").last
     expect(new.locator(".band-caret")).to_have_count(1)
     expect(new.locator("[data-proc-head]")).to_have_count(1)
-    for sel in ("[data-proc-code]", "[data-proc-name]", "[data-proc-assert]",
-                "[data-proc-pct]", "[data-proc-count]", "[data-proc-narrative]",
-                "[data-proc-name-edit]", "[data-proc-del]"):
+    for sel in (
+        "[data-proc-code]",
+        "[data-proc-name]",
+        "[data-proc-assert]",
+        "[data-proc-pct]",
+        "[data-proc-count]",
+        "[data-proc-narrative]",
+        "[data-proc-name-edit]",
+        "[data-proc-del]",
+    ):
         expect(new.locator(sel)).to_have_count(1)
     expect(new.get_by_text("Tolerance", exact=True)).to_be_visible()
     assert page.locator("details[data-proc-section]").count() == before + 1

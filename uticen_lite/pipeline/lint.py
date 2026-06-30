@@ -47,16 +47,42 @@ _ALLOWED_IMPORTS = frozenset({"re", "datetime", "decimal", HELPER_MODULE})
 # (``getattr(obj, 'read_csv')``, ``getattr(rows, '__class__')``), defeating both
 # _DENIED_ATTRS and the dunder guard.
 _DENIED_NAMES = frozenset(
-    {"open", "eval", "exec", "compile", "__import__", "globals", "vars", "locals",
-     "input", "breakpoint", "__builtins__", "__builtin__",
-     "getattr", "setattr", "delattr"}
+    {
+        "open",
+        "eval",
+        "exec",
+        "compile",
+        "__import__",
+        "globals",
+        "vars",
+        "locals",
+        "input",
+        "breakpoint",
+        "__builtins__",
+        "__builtin__",
+        "getattr",
+        "setattr",
+        "delattr",
+    }
 )
 # Attribute names that read external data (e.g. ``pd.read_csv(...)``). Matched on
 # the *attribute*, so ``df.read_csv`` is caught regardless of the receiver name.
 _DENIED_ATTRS = frozenset(
-    {"read_csv", "read_excel", "read_parquet", "read_json", "read_sql",
-     "read_table", "read_html", "read_pickle", "to_csv", "to_excel", "to_parquet",
-     "system", "popen"}
+    {
+        "read_csv",
+        "read_excel",
+        "read_parquet",
+        "read_json",
+        "read_sql",
+        "read_table",
+        "read_html",
+        "read_pickle",
+        "to_csv",
+        "to_excel",
+        "to_parquet",
+        "system",
+        "popen",
+    }
 )
 
 OFFRAMP_MESSAGE = (

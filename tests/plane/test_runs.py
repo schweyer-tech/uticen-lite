@@ -4,27 +4,49 @@ import json
 
 def _rule_control(client):
     csv = b"user_id,can_create,can_approve\nU1,true,true\nU2,true,false\n"
-    client.post("/sources", data={"source_id": "users", "format": "csv"},
-                files={"file": ("users.csv", io.BytesIO(csv), "text/csv")},
-                follow_redirects=False)
-    client.post("/controls", data={
-        "id": "sod", "title": "SoD", "objective": "o", "narrative": "n",
-        "source_ids": ["users"],
-        "failure_threshold_count": "0",
-    }, follow_redirects=False)
-    graph = {"nodes": [
-        {"id": "imp", "type": "import", "source_id": "users"},
-        {"id": "tst", "type": "test", "inputs": ["imp"],
-         "config": {"logic": "all", "severity": "high", "item_key_column": "user_id",
+    client.post(
+        "/sources",
+        data={"source_id": "users", "format": "csv"},
+        files={"file": ("users.csv", io.BytesIO(csv), "text/csv")},
+        follow_redirects=False,
+    )
+    client.post(
+        "/controls",
+        data={
+            "id": "sod",
+            "title": "SoD",
+            "objective": "o",
+            "narrative": "n",
+            "source_ids": ["users"],
+            "failure_threshold_count": "0",
+        },
+        follow_redirects=False,
+    )
+    graph = {
+        "nodes": [
+            {"id": "imp", "type": "import", "source_id": "users"},
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["imp"],
+                "config": {
+                    "logic": "all",
+                    "severity": "high",
+                    "item_key_column": "user_id",
                     "description_template": "User {user_id}",
                     "conditions": [
                         {"column": "can_create", "op": "eq", "value": True},
                         {"column": "can_approve", "op": "eq", "value": True},
-                    ]}},
-    ]}
-    client.post("/controls/sod/logic/builder",
-                data={"pipeline_json": json.dumps(graph)},
-                follow_redirects=False)
+                    ],
+                },
+            },
+        ]
+    }
+    client.post(
+        "/controls/sod/logic/builder",
+        data={"pipeline_json": json.dumps(graph)},
+        follow_redirects=False,
+    )
 
 
 def test_run_then_view(client):
@@ -34,8 +56,8 @@ def test_run_then_view(client):
     run_url = resp.headers["location"]
     view = client.get(run_url)
     assert view.status_code == 200
-    assert "U1" in view.text                 # the one violation
-    assert "1" in view.text                  # failed count present
+    assert "U1" in view.text  # the one violation
+    assert "1" in view.text  # failed count present
 
 
 def _pct_control(client):
@@ -46,27 +68,49 @@ def _pct_control(client):
     run view derives its verdict from the threshold, not from `failed == 0`.
     """
     csv = b"user_id,can_create,can_approve\nU1,true,true\nU2,true,false\n"
-    client.post("/sources", data={"source_id": "users", "format": "csv"},
-                files={"file": ("users.csv", io.BytesIO(csv), "text/csv")},
-                follow_redirects=False)
-    client.post("/controls", data={
-        "id": "sod", "title": "SoD", "objective": "o", "narrative": "n",
-        "source_ids": ["users"],
-        "failure_threshold_pct": "50",
-    }, follow_redirects=False)
-    graph = {"nodes": [
-        {"id": "imp", "type": "import", "source_id": "users"},
-        {"id": "tst", "type": "test", "inputs": ["imp"],
-         "config": {"logic": "all", "severity": "high", "item_key_column": "user_id",
+    client.post(
+        "/sources",
+        data={"source_id": "users", "format": "csv"},
+        files={"file": ("users.csv", io.BytesIO(csv), "text/csv")},
+        follow_redirects=False,
+    )
+    client.post(
+        "/controls",
+        data={
+            "id": "sod",
+            "title": "SoD",
+            "objective": "o",
+            "narrative": "n",
+            "source_ids": ["users"],
+            "failure_threshold_pct": "50",
+        },
+        follow_redirects=False,
+    )
+    graph = {
+        "nodes": [
+            {"id": "imp", "type": "import", "source_id": "users"},
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["imp"],
+                "config": {
+                    "logic": "all",
+                    "severity": "high",
+                    "item_key_column": "user_id",
                     "description_template": "User {user_id}",
                     "conditions": [
                         {"column": "can_create", "op": "eq", "value": "true"},
                         {"column": "can_approve", "op": "eq", "value": "true"},
-                    ]}},
-    ]}
-    client.post("/controls/sod/logic/builder",
-                data={"pipeline_json": json.dumps(graph)},
-                follow_redirects=False)
+                    ],
+                },
+            },
+        ]
+    }
+    client.post(
+        "/controls/sod/logic/builder",
+        data={"pipeline_json": json.dumps(graph)},
+        follow_redirects=False,
+    )
 
 
 def test_run_view_verdict_respects_threshold(client):
@@ -104,13 +148,13 @@ def test_history_lists_multiple_runs(client):
     _rule_control(client)
     first_id = _run_id_of(client)
     second_id = _run_id_of(client)
-    assert first_id != second_id            # distinct executed_at → distinct ids
+    assert first_id != second_id  # distinct executed_at → distinct ids
 
     page = client.get("/controls/sod/history")
     assert page.status_code == 200
     # both runs appear, each linking to its own run view
-    assert f'/controls/sod/runs/{first_id}' in page.text
-    assert f'/controls/sod/runs/{second_id}' in page.text
+    assert f"/controls/sod/runs/{first_id}" in page.text
+    assert f"/controls/sod/runs/{second_id}" in page.text
     # result badge present
     assert "% pass" in page.text
     # newest-first: the SECOND (latest) run id appears before the first in the HTML
@@ -118,7 +162,7 @@ def test_history_lists_multiple_runs(client):
 
 
 def test_history_empty_state(client):
-    _rule_control(client)                    # control exists, never run
+    _rule_control(client)  # control exists, never run
     page = client.get("/controls/sod/history")
     assert page.status_code == 200
     assert "Not yet run" in page.text
@@ -152,7 +196,7 @@ def test_trend_svg_has_no_invalid_height_attr(client):
     page = client.get("/controls/sod/history")
     assert 'height="auto"' not in page.text
     # the svg element itself declares no width/height presentation attribute
-    svg_open = page.text[page.text.index("<svg"):page.text.index("<svg") + 400]
+    svg_open = page.text[page.text.index("<svg") : page.text.index("<svg") + 400]
     assert "height=" not in svg_open
     assert "width=" not in svg_open
 
@@ -161,7 +205,7 @@ def test_trend_colors_route_through_tokens(client):
     """Learning 0005: every trend color is a var(--token) in the stylesheet."""
     css = client.get("/static/app.css").text
     # the trend block exists and drives its colors through tokens, no raw hex
-    block = css[css.index(".trend-figure"):css.index(".trend-figure") + 1400]
+    block = css[css.index(".trend-figure") : css.index(".trend-figure") + 1400]
     assert "var(--accent-primary)" in block
     assert "var(--status-warning)" in block
     assert "var(--status-critical)" in block

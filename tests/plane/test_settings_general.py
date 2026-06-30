@@ -34,9 +34,7 @@ def test_nav_settings_points_at_landing_not_ai(client):
 
 
 def test_rename_persists_to_project_record(client):
-    resp = client.post(
-        "/settings/rename", data={"name": "Globex — FY27"}, follow_redirects=False
-    )
+    resp = client.post("/settings/rename", data={"name": "Globex — FY27"}, follow_redirects=False)
     assert resp.status_code == 303
     conn = connect(client.app.state.project_root)
     project = repo.get_project(conn)

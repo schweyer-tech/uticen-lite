@@ -30,6 +30,7 @@ def test_extract_table_xlsx_rows_and_sheets():
 def test_extract_table_missing_adapters_is_friendly(monkeypatch):
     def boom(*a, **k):
         raise ImportError("Missing optional dependency 'openpyxl'")
+
     monkeypatch.setattr("uticen_lite.adapters.inspect.sheet_names", boom)
     monkeypatch.setattr("uticen_lite.adapters.inspect.read_dataframe", boom)
     with pytest.raises(ingest.AdaptersUnavailable) as exc:
@@ -40,6 +41,7 @@ def test_extract_table_missing_adapters_is_friendly(monkeypatch):
 # ---------------------------------------------------------------------------
 # Fix 2 unit tests: corrupt files raise TableParseError
 # ---------------------------------------------------------------------------
+
 
 def test_corrupt_xlsx_raises_table_parse_error():
     """Passing invalid xlsx bytes must raise TableParseError, not an unhandled exception."""

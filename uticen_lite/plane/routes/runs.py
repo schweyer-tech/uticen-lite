@@ -58,16 +58,14 @@ def register(
             return _run_error(request, conn, control_id, str(exc))
         finally:
             conn.close()
-        return RedirectResponse(
-            f"/controls/{control_id}/runs/{rec.run_id}", status_code=303
-        )
+        return RedirectResponse(f"/controls/{control_id}/runs/{rec.run_id}", status_code=303)
 
     @app.get("/controls/{control_id}/runs/{run_id}", response_class=HTMLResponse)
     def run_view(
         control_id: str,
         run_id: str,
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         # A 'never raises' GET wraps its whole body, including the pre-render loads,
         # so a missing run record or a workpaper-read failure degrades to the
@@ -78,9 +76,7 @@ def register(
             if run is None:
                 raise KeyError(f"no run {run_id!r}")
             wp_path = root / "target" / "workpapers" / f"{control_id}.html"
-            workpaper_html = (
-                wp_path.read_text(encoding="utf-8") if wp_path.exists() else ""
-            )
+            workpaper_html = wp_path.read_text(encoding="utf-8") if wp_path.exists() else ""
             # Derive the verdict from the SAME threshold the embedded workpaper uses,
             # never from `failed == 0` — otherwise a run within tolerance is branded a
             # deficiency here while the workpaper calls it effective (audit finding A1).
@@ -105,7 +101,5 @@ def register(
                 },
             )
         except Exception as exc:
-            logger.exception(
-                "Unexpected error viewing run %r for control %r", run_id, control_id
-            )
+            logger.exception("Unexpected error viewing run %r for control %r", run_id, control_id)
             return _run_error(request, conn, control_id, str(exc))

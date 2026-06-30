@@ -33,8 +33,12 @@ def _list_by_getter(
 
 # ---- project ---------------------------------------------------------------
 def upsert_project(
-    conn: sqlite3.Connection, *, name: str, framework: str | None = None,
-    system: dict | None = None, created_at: str = "",
+    conn: sqlite3.Connection,
+    *,
+    name: str,
+    framework: str | None = None,
+    system: dict | None = None,
+    created_at: str = "",
 ) -> None:
     conn.execute(
         """INSERT INTO project (id, name, framework, system, created_at)
@@ -84,10 +88,18 @@ def set_check_updates_on_launch(conn: sqlite3.Connection, value: bool) -> None:
 
 # ---- sources + columns -----------------------------------------------------
 def upsert_source(
-    conn: sqlite3.Connection, *, id: str, format: str, path: str,
-    key_config: dict, title: str | None = None, description: str | None = None,
-    completeness_accuracy: str | None = None, extract_date: str | None = None,
-    created_at: str = "", sheet: str | None = None,
+    conn: sqlite3.Connection,
+    *,
+    id: str,
+    format: str,
+    path: str,
+    key_config: dict,
+    title: str | None = None,
+    description: str | None = None,
+    completeness_accuracy: str | None = None,
+    extract_date: str | None = None,
+    created_at: str = "",
+    sheet: str | None = None,
 ) -> None:
     conn.execute(
         """INSERT INTO sources
@@ -100,8 +112,18 @@ def upsert_source(
              description=excluded.description,
              completeness_accuracy=excluded.completeness_accuracy,
              extract_date=excluded.extract_date, sheet=excluded.sheet""",
-        (id, format, path, json.dumps(key_config), title, description,
-         completeness_accuracy, extract_date, created_at, sheet),
+        (
+            id,
+            format,
+            path,
+            json.dumps(key_config),
+            title,
+            description,
+            completeness_accuracy,
+            extract_date,
+            created_at,
+            sheet,
+        ),
     )
     conn.commit()
 
@@ -114,9 +136,15 @@ def set_columns(conn: sqlite3.Connection, source_id: str, columns: list[dict]) -
               is_key, include, ordinal)
            VALUES (?, ?, ?, ?, ?, ?, ?)""",
         [
-            (source_id, c["original_name"], c["display_name"], c.get("data_type", "text"),
-             int(bool(c.get("is_key"))), int(bool(c.get("include", True))),
-             int(c.get("ordinal", i)))
+            (
+                source_id,
+                c["original_name"],
+                c["display_name"],
+                c.get("data_type", "text"),
+                int(bool(c.get("is_key"))),
+                int(bool(c.get("include", True))),
+                int(c.get("ordinal", i)),
+            )
             for i, c in enumerate(columns)
         ],
     )
@@ -152,8 +180,13 @@ def list_sources(conn: sqlite3.Connection) -> list[dict]:
 
 # ---- source files (per-file data lineage) ----------------------------------
 def _insert_current_file(
-    conn: sqlite3.Connection, *, source_id: str, stored_path: str,
-    original_name: str, as_of_date: str | None, row_count: int | None,
+    conn: sqlite3.Connection,
+    *,
+    source_id: str,
+    stored_path: str,
+    original_name: str,
+    as_of_date: str | None,
+    row_count: int | None,
     uploaded_at: str,
 ) -> None:
     conn.execute(
@@ -166,21 +199,37 @@ def _insert_current_file(
 
 
 def set_initial_file(
-    conn: sqlite3.Connection, *, source_id: str, stored_path: str,
-    original_name: str, as_of_date: str | None, row_count: int | None,
+    conn: sqlite3.Connection,
+    *,
+    source_id: str,
+    stored_path: str,
+    original_name: str,
+    as_of_date: str | None,
+    row_count: int | None,
     uploaded_at: str = "",
 ) -> None:
     """Replace all file rows for a source with one current row (import/create)."""
     conn.execute("DELETE FROM source_files WHERE source_id = ?", (source_id,))
-    _insert_current_file(conn, source_id=source_id, stored_path=stored_path,
-                         original_name=original_name, as_of_date=as_of_date,
-                         row_count=row_count, uploaded_at=uploaded_at)
+    _insert_current_file(
+        conn,
+        source_id=source_id,
+        stored_path=stored_path,
+        original_name=original_name,
+        as_of_date=as_of_date,
+        row_count=row_count,
+        uploaded_at=uploaded_at,
+    )
     conn.commit()
 
 
 def record_current_file(
-    conn: sqlite3.Connection, *, source_id: str, stored_path: str,
-    original_name: str, as_of_date: str | None, row_count: int | None,
+    conn: sqlite3.Connection,
+    *,
+    source_id: str,
+    stored_path: str,
+    original_name: str,
+    as_of_date: str | None,
+    row_count: int | None,
     uploaded_at: str = "",
 ) -> None:
     """Demote any current row, then add a new current row (refresh)."""
@@ -188,15 +237,19 @@ def record_current_file(
         "UPDATE source_files SET is_current = 0 WHERE source_id = ? AND is_current = 1",
         (source_id,),
     )
-    _insert_current_file(conn, source_id=source_id, stored_path=stored_path,
-                         original_name=original_name, as_of_date=as_of_date,
-                         row_count=row_count, uploaded_at=uploaded_at)
+    _insert_current_file(
+        conn,
+        source_id=source_id,
+        stored_path=stored_path,
+        original_name=original_name,
+        as_of_date=as_of_date,
+        row_count=row_count,
+        uploaded_at=uploaded_at,
+    )
     conn.commit()
 
 
-def archive_current_file(
-    conn: sqlite3.Connection, source_id: str, new_stored_path: str
-) -> None:
+def archive_current_file(conn: sqlite3.Connection, source_id: str, new_stored_path: str) -> None:
     conn.execute(
         "UPDATE source_files SET is_current = 0, stored_path = ? "
         "WHERE source_id = ? AND is_current = 1",
@@ -222,22 +275,23 @@ def list_source_files(conn: sqlite3.Connection, source_id: str) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def set_current_file_asof(
-    conn: sqlite3.Connection, source_id: str, as_of_date: str | None
-) -> None:
+def set_current_file_asof(conn: sqlite3.Connection, source_id: str, as_of_date: str | None) -> None:
     conn.execute(
         "UPDATE source_files SET as_of_date = ? WHERE source_id = ? AND is_current = 1",
         (as_of_date, source_id),
     )
-    conn.execute("UPDATE sources SET extract_date = ? WHERE id = ?",
-                 (as_of_date, source_id))
+    conn.execute("UPDATE sources SET extract_date = ? WHERE id = ?", (as_of_date, source_id))
     conn.commit()
 
 
 # ---- source fetch (URL-snapshot provenance; store/UI-only) ------------------
 def upsert_source_fetch(
-    conn: sqlite3.Connection, *, source_id: str, url: str,
-    headers: dict | None = None, record_path: str | None = None,
+    conn: sqlite3.Connection,
+    *,
+    source_id: str,
+    url: str,
+    headers: dict | None = None,
+    record_path: str | None = None,
     last_fetched_at: str | None = None,
 ) -> None:
     """Persist (or overwrite) the URL/headers/record_path for a fetched source.
@@ -258,9 +312,7 @@ def upsert_source_fetch(
 
 
 def get_source_fetch(conn: sqlite3.Connection, source_id: str) -> dict | None:
-    row = conn.execute(
-        "SELECT * FROM source_fetch WHERE source_id = ?", (source_id,)
-    ).fetchone()
+    row = conn.execute("SELECT * FROM source_fetch WHERE source_id = ?", (source_id,)).fetchone()
     if row is None:
         return None
     d = dict(row)
@@ -270,13 +322,22 @@ def get_source_fetch(conn: sqlite3.Connection, source_id: str) -> dict | None:
 
 # ---- controls + bindings ---------------------------------------------------
 def upsert_control(
-    conn: sqlite3.Connection, *, id: str, title: str, objective: str, narrative: str,
-    framework_refs: dict, test_kind: str, rule_spec: dict | None = None,
-    test_code: str | None = None, pipeline: dict | None = None,
+    conn: sqlite3.Connection,
+    *,
+    id: str,
+    title: str,
+    objective: str,
+    narrative: str,
+    framework_refs: dict,
+    test_kind: str,
+    rule_spec: dict | None = None,
+    test_code: str | None = None,
+    pipeline: dict | None = None,
     failure_threshold_pct: float | None = None,
     failure_threshold_count: int | None = None,
     failure_threshold_rationale: str | None = None,
-    created_at: str = "", updated_at: str = "",
+    created_at: str = "",
+    updated_at: str = "",
 ) -> None:
     """Upsert a control.
 
@@ -301,12 +362,22 @@ def upsert_control(
              test_kind=excluded.test_kind, rule_spec=excluded.rule_spec,
              test_code=excluded.test_code, pipeline=excluded.pipeline,
              updated_at=excluded.updated_at""",
-        (id, title, objective, narrative, json.dumps(framework_refs),
-         failure_threshold_pct, failure_threshold_count, failure_threshold_rationale,
-         test_kind,
-         json.dumps(rule_spec) if rule_spec is not None else None,
-         test_code, json.dumps(pipeline) if pipeline is not None else None,
-         created_at, updated_at),
+        (
+            id,
+            title,
+            objective,
+            narrative,
+            json.dumps(framework_refs),
+            failure_threshold_pct,
+            failure_threshold_count,
+            failure_threshold_rationale,
+            test_kind,
+            json.dumps(rule_spec) if rule_spec is not None else None,
+            test_code,
+            json.dumps(pipeline) if pipeline is not None else None,
+            created_at,
+            updated_at,
+        ),
     )
     conn.commit()
 
@@ -411,17 +482,28 @@ def insert_run(conn: sqlite3.Connection, run: RunRecord) -> None:
               total, passed, failed, pass_rate, provenance, created_at,
               procedure_id)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (run.run_id, run.control_id, run.executed_at, run.population_size,
-         run.population_size, run.passed, run.failed, run.pass_rate,
-         json.dumps([p.to_dict() for p in run.provenance]), run.executed_at,
-         run.procedure_id),
+        (
+            run.run_id,
+            run.control_id,
+            run.executed_at,
+            run.population_size,
+            run.population_size,
+            run.passed,
+            run.failed,
+            run.pass_rate,
+            json.dumps([p.to_dict() for p in run.provenance]),
+            run.executed_at,
+            run.procedure_id,
+        ),
     )
     conn.execute("DELETE FROM violations WHERE run_id = ?", (run.run_id,))
     conn.executemany(
         """INSERT INTO violations (run_id, item_key, description, severity, details)
            VALUES (?, ?, ?, ?, ?)""",
-        [(run.run_id, v.item_key, v.description, str(v.severity), json.dumps(v.details))
-         for v in run.violations],
+        [
+            (run.run_id, v.item_key, v.description, str(v.severity), json.dumps(v.details))
+            for v in run.violations
+        ],
     )
     conn.commit()
 
@@ -429,7 +511,8 @@ def insert_run(conn: sqlite3.Connection, run: RunRecord) -> None:
 def _violations_for(conn: sqlite3.Connection, run_id: str) -> list[dict]:
     rows = conn.execute(
         "SELECT item_key, description, severity, details FROM violations "
-        "WHERE run_id = ? ORDER BY id", (run_id,)
+        "WHERE run_id = ? ORDER BY id",
+        (run_id,),
     ).fetchall()
     out = []
     for r in rows:
@@ -452,8 +535,7 @@ def get_run(conn: sqlite3.Connection, run_id: str) -> dict | None:
 def list_runs_for(conn: sqlite3.Connection, control_id: str) -> list[dict]:
     return _list_by_getter(
         conn,
-        "SELECT run_id FROM runs WHERE control_id = ? "
-        "ORDER BY executed_at DESC, created_at DESC",
+        "SELECT run_id FROM runs WHERE control_id = ? ORDER BY executed_at DESC, created_at DESC",
         get_run,
         id_column="run_id",
         params=(control_id,),

@@ -36,7 +36,7 @@ def register(
     @app.get("/settings", response_class=HTMLResponse)
     def settings_home(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         return templates.TemplateResponse(
             request,

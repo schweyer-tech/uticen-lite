@@ -58,11 +58,7 @@ def test_wheel_ships_bundled_demo(built_wheel: Path) -> None:
     names = _names(built_wheel)
     demo = "uticen_lite/_demo/northwind-trading/"
     csvs = [n for n in names if n.startswith(demo + "data/") and n.endswith(".csv")]
-    ctrls = [
-        n
-        for n in names
-        if n.startswith(demo + "controls/") and n.endswith("control.yaml")
-    ]
+    ctrls = [n for n in names if n.startswith(demo + "controls/") and n.endswith("control.yaml")]
     assert len(csvs) == 9
     assert len(ctrls) == 9
     assert demo + "cflow.yaml" in names
@@ -77,9 +73,7 @@ def test_wheel_excludes_example_target_dir(built_wheel: Path) -> None:
 def test_wheel_has_no_compiled_deps_in_record(built_wheel: Path) -> None:
     # Mirror the release.yml Pyodide-safe guard at unit level.
     with zipfile.ZipFile(built_wheel) as z:
-        record = z.read(
-            next(n for n in z.namelist() if n.endswith("/RECORD"))
-        ).decode()
+        record = z.read(next(n for n in z.namelist() if n.endswith("/RECORD"))).decode()
     assert not [line for line in record.splitlines() if "pydantic" in line.lower()]
 
 
@@ -87,9 +81,7 @@ def test_wheel_has_no_compiled_deps_in_record(built_wheel: Path) -> None:
     os.environ.get("CFLOW_WHEEL_VENV_TEST") != "1",
     reason="slow/network: set CFLOW_WHEEL_VENV_TEST=1 to run the clean-venv install proof",
 )
-def test_clean_venv_install_resolves_packaged_demo(
-    built_wheel: Path, tmp_path: Path
-) -> None:
+def test_clean_venv_install_resolves_packaged_demo(built_wheel: Path, tmp_path: Path) -> None:
     # Prove the PACKAGED _demo/ path resolves, not the repo fallback: install the
     # wheel into a fresh venv and resolve demo_source_dir() from a cwd OUTSIDE the repo.
     venv = tmp_path / "venv"

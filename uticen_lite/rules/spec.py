@@ -3,11 +3,24 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-OPERATORS = frozenset({
-    "eq", "ne", "gt", "ge", "lt", "le",
-    "is_empty", "not_empty", "in", "not_in", "regex", "is_duplicate",
-    "exists_in", "not_exists_in",
-})
+OPERATORS = frozenset(
+    {
+        "eq",
+        "ne",
+        "gt",
+        "ge",
+        "lt",
+        "le",
+        "is_empty",
+        "not_empty",
+        "in",
+        "not_in",
+        "regex",
+        "is_duplicate",
+        "exists_in",
+        "not_exists_in",
+    }
+)
 # Cross-source presence operators: a key column joined against another source.
 _CROSS_SOURCE_OPS = frozenset({"exists_in", "not_exists_in"})
 _LOGIC = frozenset({"all", "any"})
@@ -25,8 +38,8 @@ class Condition:
     # Cross-source presence fields (exists_in / not_exists_in). ``None`` for all
     # single-source conditions, so existing specs are unchanged.
     other_source: str | None = None  # id of source B
-    this_key: str | None = None      # key column in the primary population (A)
-    other_key: str | None = None     # key column in source B
+    this_key: str | None = None  # key column in the primary population (A)
+    other_key: str | None = None  # key column in source B
 
 
 @dataclass(frozen=True)
@@ -75,14 +88,22 @@ def _parse_cross_source(c: dict, op: str) -> Condition:
     other_source = c.get("other_source")
     this_key = c.get("this_key")
     other_key = c.get("other_key")
-    for name, val in (("other_source", other_source), ("this_key", this_key),
-                      ("other_key", other_key)):
+    for name, val in (
+        ("other_source", other_source),
+        ("this_key", this_key),
+        ("other_key", other_key),
+    ):
         if not val:
             raise RuleSpecError(f"{op!r} requires a {name}")
     if isinstance(this_key, list) or isinstance(other_key, list):
         raise RuleSpecError(f"{op!r} supports a single key column")
-    return Condition(column=str(this_key), op=op, other_source=str(other_source),
-                     this_key=str(this_key), other_key=str(other_key))
+    return Condition(
+        column=str(this_key),
+        op=op,
+        other_source=str(other_source),
+        this_key=str(this_key),
+        other_key=str(other_key),
+    )
 
 
 def referenced_columns(spec: RuleSpec) -> list[str]:

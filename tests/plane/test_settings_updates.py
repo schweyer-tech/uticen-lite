@@ -74,8 +74,8 @@ def test_header_indicator_up_to_date_shows_tooltip_and_modal_trigger(client, mon
     assert "up-to-date" in resp.text
     assert "indicator-text" not in resp.text
     assert 'title="Up to date: 0.1.0"' in resp.text
-    assert 'data-update-modal-open' in resp.text
-    assert 'update-popover' not in resp.text
+    assert "data-update-modal-open" in resp.text
+    assert "update-popover" not in resp.text
     assert "update-modal-template" in resp.text
     assert 'hx-post="/updates/indicator/check"' not in resp.text
     assert "Check now" not in resp.text
@@ -98,8 +98,8 @@ def test_header_indicator_update_available_shows_update_now_in_modal(client, mon
     assert "update-available" in resp.text
     assert "indicator-text" not in resp.text
     assert 'title="Update available: 0.2.0"' in resp.text
-    assert 'data-update-modal-open' in resp.text
-    assert 'update-popover' not in resp.text
+    assert "data-update-modal-open" in resp.text
+    assert "update-popover" not in resp.text
     assert "update-modal-template" in resp.text
     assert 'hx-post="/updates/indicator/check"' not in resp.text
     assert 'hx-post="/upgrade"' in resp.text

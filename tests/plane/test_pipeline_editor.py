@@ -26,45 +26,87 @@ assert _OFFRAMP_STABLE in OFFRAMP_MESSAGE
 
 # --- fixtures helpers -------------------------------------------------------
 
+
 def _make_source(client, sid, csv):
-    client.post("/sources", data={"source_id": sid, "format": "csv"},
-                files={"file": (f"{sid}.csv", io.BytesIO(csv), "text/csv")},
-                follow_redirects=False)
+    client.post(
+        "/sources",
+        data={"source_id": sid, "format": "csv"},
+        files={"file": (f"{sid}.csv", io.BytesIO(csv), "text/csv")},
+        follow_redirects=False,
+    )
 
 
 def _conn(client):
     from uticen_lite.store.db import connect
+
     return connect(client.app.state.project_root)
 
 
 def _make_control(client, cid="C1"):
     """Create a bare control we can attach a pipeline to."""
-    client.post("/controls", data={
-        "id": cid, "title": "Term Access", "objective": "o", "narrative": "n",
-    }, follow_redirects=False)
+    client.post(
+        "/controls",
+        data={
+            "id": cid,
+            "title": "Term Access",
+            "objective": "o",
+            "narrative": "n",
+        },
+        follow_redirects=False,
+    )
 
 
 def _terminated_access_graph() -> dict:
-    return {"nodes": [
-        {"id": "acc", "type": "import", "source_id": "access_accounts",
-         "narrative": "All access accounts"},
-        {"id": "active", "type": "filter", "inputs": ["acc"],
-         "narrative": "Keep active accounts",
-         "config": {"logic": "all",
-                    "conditions": [{"column": "is_active", "op": "eq", "value": True}]}},
-        {"id": "emp", "type": "import", "source_id": "employees"},
-        {"id": "term", "type": "filter", "inputs": ["emp"],
-         "narrative": "Keep terminated employees",
-         "config": {"logic": "all",
-                    "conditions": [{"column": "status", "op": "eq", "value": "terminated"}]}},
-        {"id": "join", "type": "join", "inputs": ["active", "term"],
-         "narrative": "Active accounts of terminated employees",
-         "config": {"left_key": "employee_id", "right_key": "employee_id", "mode": "inner"}},
-        {"id": "tst", "type": "test", "inputs": ["join"],
-         "config": {"logic": "any", "severity": "critical", "item_key_column": "account_id",
+    return {
+        "nodes": [
+            {
+                "id": "acc",
+                "type": "import",
+                "source_id": "access_accounts",
+                "narrative": "All access accounts",
+            },
+            {
+                "id": "active",
+                "type": "filter",
+                "inputs": ["acc"],
+                "narrative": "Keep active accounts",
+                "config": {
+                    "logic": "all",
+                    "conditions": [{"column": "is_active", "op": "eq", "value": True}],
+                },
+            },
+            {"id": "emp", "type": "import", "source_id": "employees"},
+            {
+                "id": "term",
+                "type": "filter",
+                "inputs": ["emp"],
+                "narrative": "Keep terminated employees",
+                "config": {
+                    "logic": "all",
+                    "conditions": [{"column": "status", "op": "eq", "value": "terminated"}],
+                },
+            },
+            {
+                "id": "join",
+                "type": "join",
+                "inputs": ["active", "term"],
+                "narrative": "Active accounts of terminated employees",
+                "config": {"left_key": "employee_id", "right_key": "employee_id", "mode": "inner"},
+            },
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["join"],
+                "config": {
+                    "logic": "any",
+                    "severity": "critical",
+                    "item_key_column": "account_id",
                     "description_template": "Account {account_id} active for terminated employee",
-                    "conditions": [{"column": "account_id", "op": "not_empty"}]}},
-    ]}
+                    "conditions": [{"column": "account_id", "op": "not_empty"}],
+                },
+            },
+        ]
+    }
 
 
 def _type_column_boolean(client, sid, col):
@@ -72,6 +114,7 @@ def _type_column_boolean(client, sid, col):
     source editor) so it loads as a REAL bool dtype — the Stage-3 gotcha: the
     Filter value for a bool column is python True, surfaced as a typed value."""
     from uticen_lite.store import repo
+
     conn = _conn(client)
     src = repo.get_source(conn, sid)
     cols = [dict(c) for c in src["columns"]]
@@ -85,21 +128,30 @@ def _type_column_boolean(client, sid, col):
 def _seed_terminated_access(client):
     # is_active is typed boolean → loads as a real bool dtype (True/False), so
     # the Filter value=True matches in BOTH the run and the live row-counts.
-    _make_source(client, "access_accounts",
-                 b"account_id,employee_id,is_active,system\n"
-                 b"A1,E1,true,CRM\nA2,E2,true,ERP\nA3,E3,false,CRM\nA4,E4,true,CRM\n")
+    _make_source(
+        client,
+        "access_accounts",
+        b"account_id,employee_id,is_active,system\n"
+        b"A1,E1,true,CRM\nA2,E2,true,ERP\nA3,E3,false,CRM\nA4,E4,true,CRM\n",
+    )
     _type_column_boolean(client, "access_accounts", "is_active")
-    _make_source(client, "employees",
-                 b"employee_id,status\nE1,terminated\nE2,active\nE3,terminated\nE4,terminated\n")
+    _make_source(
+        client,
+        "employees",
+        b"employee_id,status\nE1,terminated\nE2,active\nE3,terminated\nE4,terminated\n",
+    )
 
 
 def _save_pipeline(client, cid, graph):
-    return client.post(f"/controls/{cid}/logic/builder",
-                       data={"pipeline_json": json.dumps(graph)},
-                       follow_redirects=False)
+    return client.post(
+        f"/controls/{cid}/logic/builder",
+        data={"pipeline_json": json.dumps(graph)},
+        follow_redirects=False,
+    )
 
 
 # --- tests ------------------------------------------------------------------
+
 
 def test_pipeline_tab_renders_cards_and_diagram(client):
     _seed_terminated_access(client)
@@ -140,9 +192,9 @@ def test_pipeline_editor_shows_live_row_counts(client):
     _save_pipeline(client, "C1", _terminated_access_graph())
     body = client.get("/controls/C1/pipeline").text
     # 4 accounts → 3 active → join 2 → test 2. The counts narrow at each joint.
-    assert "rows: <strong>4</strong>" in body      # acc import
-    assert "rows: <strong>3</strong>" in body      # active filter
-    assert "rows: <strong>2</strong>" in body      # join / test
+    assert "rows: <strong>4</strong>" in body  # acc import
+    assert "rows: <strong>3</strong>" in body  # active filter
+    assert "rows: <strong>2</strong>" in body  # join / test
 
 
 def test_diagram_lays_join_branches_in_separate_converging_lanes():
@@ -168,23 +220,17 @@ def test_diagram_lays_join_branches_in_separate_converging_lanes():
     # Edges exactly mirror the graph's input→node relationships (no spurious or
     # missing edges), and each carries the right (lane, row) for both endpoints.
     by_id = {n.id: n for n in pipeline.nodes}
-    expected = {
-        (row[src], row[nid])
-        for nid, n in by_id.items()
-        for src in n.inputs
-    }
+    expected = {(row[src], row[nid]) for nid, n in by_id.items() for src in n.inputs}
     actual = {(e["from_row"], e["to_row"]) for e in diagram["edges"]}
     assert actual == expected
     # The Join fan-in converges across lanes: term (lane 1) → join (lane 0).
     term_to_join = next(
-        e for e in diagram["edges"]
-        if e["from_row"] == row["term"] and e["to_row"] == row["join"]
+        e for e in diagram["edges"] if e["from_row"] == row["term"] and e["to_row"] == row["join"]
     )
     assert term_to_join["from_lane"] == 1 and term_to_join["to_lane"] == 0
     # The spine edges stay in-lane (straight vertical), e.g. active → join.
     active_to_join = next(
-        e for e in diagram["edges"]
-        if e["from_row"] == row["active"] and e["to_row"] == row["join"]
+        e for e in diagram["edges"] if e["from_row"] == row["active"] and e["to_row"] == row["join"]
     )
     assert active_to_join["from_lane"] == active_to_join["to_lane"] == 0
 
@@ -195,6 +241,7 @@ def test_authoring_terminated_access_pipeline_runs_with_right_exceptions(client)
     _save_pipeline(client, "C1", _terminated_access_graph())
 
     from uticen_lite.store import repo
+
     conn = _conn(client)
     c = repo.get_control(conn, "C1")
     conn.close()
@@ -227,6 +274,7 @@ def test_pipeline_control_exports_against_schema(client):
     assert resp.headers["content-type"] == "application/zip"
     # The exported bundle never contains the store-only graph vocabulary.
     import zipfile
+
     with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
         names = zf.namelist()
         manifest_name = next(n for n in names if n.endswith("manifest.json"))
@@ -244,6 +292,7 @@ def test_convert_to_python_sets_kind_and_prefills_code(client):
     assert resp.headers["location"] == "/controls/C1/logic/python"
 
     from uticen_lite.store import repo
+
     conn = _conn(client)
     c = repo.get_control(conn, "C1")
     conn.close()
@@ -259,19 +308,29 @@ def test_convert_to_python_sets_kind_and_prefills_code(client):
 def test_convert_pure_pipeline_yields_runnable_test(client):
     """A pure single-source pipeline compiles to a rule_spec, but the offramp
     must still graduate to a RUNNABLE test() (lossless) — not a bare comment."""
-    _make_source(client, "accounts",
-                 b"account_id,is_privileged\nA1,true\nA2,false\n")
+    _make_source(client, "accounts", b"account_id,is_privileged\nA1,true\nA2,false\n")
     _make_control(client, "C3")
-    graph = {"nodes": [
-        {"id": "imp", "type": "import", "source_id": "accounts"},
-        {"id": "tst", "type": "test", "inputs": ["imp"],
-         "config": {"logic": "all", "severity": "high", "item_key_column": "account_id",
+    graph = {
+        "nodes": [
+            {"id": "imp", "type": "import", "source_id": "accounts"},
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["imp"],
+                "config": {
+                    "logic": "all",
+                    "severity": "high",
+                    "item_key_column": "account_id",
                     "description_template": "Privileged {account_id}",
-                    "conditions": [{"column": "is_privileged", "op": "eq", "value": "true"}]}},
-    ]}
+                    "conditions": [{"column": "is_privileged", "op": "eq", "value": "true"}],
+                },
+            },
+        ]
+    }
     _save_pipeline(client, "C3", graph)
 
     from uticen_lite.store import repo
+
     conn = _conn(client)
     c = repo.get_control(conn, "C3")
     conn.close()
@@ -296,15 +355,28 @@ def test_convert_pure_pipeline_yields_runnable_test(client):
 def test_custom_node_with_open_shows_inline_offramp_error(client):
     _make_source(client, "je", b"entry_id,amount\nE1,100\n")
     _make_control(client, "C2")
-    graph = {"nodes": [
-        {"id": "imp", "type": "import", "source_id": "je"},
-        {"id": "cust", "type": "custom_python", "inputs": ["imp"],
-         "config": {"flavor": "transform", "code": "rows = open('/etc/passwd').read()"}},
-        {"id": "tst", "type": "test", "inputs": ["cust"],
-         "config": {"logic": "any", "item_key_column": "entry_id",
+    graph = {
+        "nodes": [
+            {"id": "imp", "type": "import", "source_id": "je"},
+            {
+                "id": "cust",
+                "type": "custom_python",
+                "inputs": ["imp"],
+                "config": {"flavor": "transform", "code": "rows = open('/etc/passwd').read()"},
+            },
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["cust"],
+                "config": {
+                    "logic": "any",
+                    "item_key_column": "entry_id",
                     "description_template": "x {entry_id}",
-                    "conditions": [{"column": "entry_id", "op": "not_empty"}]}},
-    ]}
+                    "conditions": [{"column": "entry_id", "op": "not_empty"}],
+                },
+            },
+        ]
+    }
     resp = _save_pipeline(client, "C2", graph)
     # Refused (422) — re-rendered editor with the inline offramp, not persisted.
     assert resp.status_code == 422
@@ -312,6 +384,7 @@ def test_custom_node_with_open_shows_inline_offramp_error(client):
     # The error is pinned on the offending node card (inline), not just a banner.
     assert "node-error" in resp.text
     from uticen_lite.store import repo
+
     conn = _conn(client)
     c = repo.get_control(conn, "C2")
     conn.close()
@@ -322,9 +395,12 @@ def test_custom_node_with_open_shows_inline_offramp_error(client):
 def test_pipeline_subroute_not_shadowed_by_catch_all(client):
     """GET /controls/{id}/logic/builder resolves to the editor, not the definition
     catch-all (learning 0007 route-ordering)."""
-    routes = [r for r in client.app.router.routes
-              if getattr(r, "path", "") == "/controls/{control_id}/logic/builder"
-              and "GET" in getattr(r, "methods", set())]
+    routes = [
+        r
+        for r in client.app.router.routes
+        if getattr(r, "path", "") == "/controls/{control_id}/logic/builder"
+        and "GET" in getattr(r, "methods", set())
+    ]
     assert routes, "logic/builder GET sub-route is registered"
     paths = [getattr(r, "path", "") for r in client.app.router.routes]
     assert paths.index("/controls/{control_id}/logic/builder") < paths.index(
@@ -343,16 +419,28 @@ def seeded_pipeline_control(client):
     _make_source(client, "sp_accounts", b"account_id,is_active\nA1,true\nA2,false\n")
     cid = "SP1"
     _make_control(client, cid)
-    graph = {"nodes": [
-        {"id": "imp", "type": "import", "source_id": "sp_accounts"},
-        {"id": "tst", "type": "test", "inputs": ["imp"],
-         "config": {"logic": "all", "severity": "high", "item_key_column": "account_id",
+    graph = {
+        "nodes": [
+            {"id": "imp", "type": "import", "source_id": "sp_accounts"},
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["imp"],
+                "config": {
+                    "logic": "all",
+                    "severity": "high",
+                    "item_key_column": "account_id",
                     "description_template": "Active {account_id}",
-                    "conditions": [{"column": "is_active", "op": "eq", "value": "true"}]}},
-    ]}
-    r = client.post(f"/controls/{cid}/logic/builder",
-                    data={"pipeline_json": json.dumps(graph)},
-                    follow_redirects=False)
+                    "conditions": [{"column": "is_active", "op": "eq", "value": "true"}],
+                },
+            },
+        ]
+    }
+    r = client.post(
+        f"/controls/{cid}/logic/builder",
+        data={"pipeline_json": json.dumps(graph)},
+        follow_redirects=False,
+    )
     assert r.status_code in (302, 303, 307), f"save failed: {r.status_code}"
     return cid
 
@@ -386,6 +474,7 @@ def test_control_tab_says_logic_not_pipeline(client, seeded_pipeline_control):
 # Task 4: Split Builder / Flowchart panes; Builder derives graph
 # ---------------------------------------------------------------------------
 
+
 def _make_rule_control(client) -> str:
     """Create a control with a bound source (no pipeline/rule_spec yet).
 
@@ -396,10 +485,17 @@ def _make_rule_control(client) -> str:
     """
     _make_source(client, "rc_accounts", b"account_id,is_active\nA1,true\nA2,false\n")
     cid = "RC1"
-    client.post("/controls", data={
-        "id": cid, "title": "Rule Control", "objective": "o", "narrative": "n",
-        "source_ids": "rc_accounts",
-    }, follow_redirects=False)
+    client.post(
+        "/controls",
+        data={
+            "id": cid,
+            "title": "Rule Control",
+            "objective": "o",
+            "narrative": "n",
+            "source_ids": "rc_accounts",
+        },
+        follow_redirects=False,
+    )
     return cid
 
 
@@ -412,14 +508,23 @@ def _make_raw_python_control(client) -> str:
     _make_source(client, "rp_accounts", b"account_id,amount\nA1,100\n")
     cid = "RP1"
     # 1. Create the metadata shell via the Definition form.
-    client.post("/controls", data={
-        "id": cid, "title": "Raw Python Control", "objective": "o", "narrative": "n",
-        "source_ids": "rp_accounts",
-    }, follow_redirects=False)
+    client.post(
+        "/controls",
+        data={
+            "id": cid,
+            "title": "Raw Python Control",
+            "objective": "o",
+            "narrative": "n",
+            "source_ids": "rp_accounts",
+        },
+        follow_redirects=False,
+    )
     # 2. Write the hand-authored test_code via the Logic ▸ Python route.
-    client.post(f"/controls/{cid}/logic/python",
-                data={"test_code": "def test(pop, sources):\n    return []\n"},
-                follow_redirects=False)
+    client.post(
+        f"/controls/{cid}/logic/python",
+        data={"test_code": "def test(pop, sources):\n    return []\n"},
+        follow_redirects=False,
+    )
     return cid
 
 
@@ -431,7 +536,7 @@ def test_builder_shows_nodes_for_rule_control(client):
     # card elements), not just text that also appears in the toolbar buttons.
     assert 'data-type="import"' in r.text, "derived Import node card missing"
     assert 'data-type="test"' in r.text, "derived Test node card missing"
-    assert "Generated Python" not in r.text                 # python moved to its own tab
+    assert "Generated Python" not in r.text  # python moved to its own tab
 
 
 def test_builder_derives_graph_for_rule_control_and_save_persists(client):
@@ -449,9 +554,8 @@ def test_builder_derives_graph_for_rule_control_and_save_persists(client):
     # 2. Extract the derived graph from the embedded JSON blob (what the JS would
     #    read and submit on form submit / node-add).
     import re as _re
-    m = _re.search(
-        r'<script id="graph-data"[^>]*>(.*?)</script>', r.text, _re.DOTALL
-    )
+
+    m = _re.search(r'<script id="graph-data"[^>]*>(.*?)</script>', r.text, _re.DOTALL)
     assert m, "graph-data script tag not found in builder HTML"
     derived_graph = json.loads(m.group(1).strip())
     assert derived_graph.get("nodes"), "derived graph has no nodes"
@@ -465,6 +569,7 @@ def test_builder_derives_graph_for_rule_control_and_save_persists(client):
 
     # 4. The control must now have a persisted pipeline (not None).
     from uticen_lite.store import repo
+
     conn = _conn(client)
     c = repo.get_control(conn, cid)
     conn.close()
@@ -479,7 +584,7 @@ def test_flowchart_tab_has_svg_only(client, seeded_pipeline_control):
     r = client.get(f"/controls/{seeded_pipeline_control}/logic/flowchart")
     assert r.status_code == 200
     assert "<svg" in r.text
-    assert "+ Import" not in r.text                         # no builder toolbar here
+    assert "+ Import" not in r.text  # no builder toolbar here
 
 
 def test_builder_shows_python_notice_for_raw_python(client):
@@ -493,6 +598,7 @@ def test_builder_shows_python_notice_for_raw_python(client):
 # Task 5: Logic ▸ Python tab — generated view + relocated escape hatch
 # ---------------------------------------------------------------------------
 
+
 def test_python_tab_readonly_generated_for_graph_control(client, seeded_pipeline_control):
     r = client.get(f"/controls/{seeded_pipeline_control}/logic/python")
     assert "def test(" in r.text
@@ -502,10 +608,13 @@ def test_python_tab_readonly_generated_for_graph_control(client, seeded_pipeline
 def test_python_tab_editable_for_raw_python(client):
     cid = _make_raw_python_control(client)
     r = client.get(f"/controls/{cid}/logic/python")
-    assert 'name="test_code"' in r.text                      # editable textarea present
+    assert 'name="test_code"' in r.text  # editable textarea present
     # save edits
-    client.post(f"/controls/{cid}/logic/python",
-                data={"test_code": "def test(pop):\n    return []"}, follow_redirects=False)
+    client.post(
+        f"/controls/{cid}/logic/python",
+        data={"test_code": "def test(pop):\n    return []"},
+        follow_redirects=False,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -515,29 +624,34 @@ def test_python_tab_editable_for_raw_python(client):
 _XSRC_GRAPH = {
     "nodes": [
         {"id": "imp", "type": "import", "source_id": "cs_accounts", "narrative": ""},
-        {"id": "tst", "type": "test", "inputs": ["imp"], "narrative": "",
-         "config": {
-             "logic": "all",
-             "severity": "high",
-             "item_key_column": "account_id",
-             "description_template": "Account {account_id} has no matching employee",
-             "conditions": [{
-                 "column": "employee_id",
-                 "op": "not_exists_in",
-                 "other_source": "cs_employees",
-                 "this_key": "employee_id",
-                 "other_key": "employee_id",
-             }],
-         }},
+        {
+            "id": "tst",
+            "type": "test",
+            "inputs": ["imp"],
+            "narrative": "",
+            "config": {
+                "logic": "all",
+                "severity": "high",
+                "item_key_column": "account_id",
+                "description_template": "Account {account_id} has no matching employee",
+                "conditions": [
+                    {
+                        "column": "employee_id",
+                        "op": "not_exists_in",
+                        "other_source": "cs_employees",
+                        "this_key": "employee_id",
+                        "other_key": "employee_id",
+                    }
+                ],
+            },
+        },
     ]
 }
 
 
 def _seed_cross_source(client):
-    _make_source(client, "cs_accounts",
-                 b"account_id,employee_id\nA1,E1\nA2,E2\nA3,E3\n")
-    _make_source(client, "cs_employees",
-                 b"employee_id,status\nE1,active\nE2,terminated\n")
+    _make_source(client, "cs_accounts", b"account_id,employee_id\nA1,E1\nA2,E2\nA3,E3\n")
+    _make_source(client, "cs_employees", b"employee_id,status\nE1,active\nE2,terminated\n")
     _make_control(client, "CS1")
 
 
@@ -611,6 +725,7 @@ def test_cross_source_condition_preserved_through_builder_save(client):
     assert r2.status_code in (302, 303), f"re-save returned {r2.status_code}"
 
     from uticen_lite.store import repo
+
     conn = _conn(client)
     ctrl = repo.get_control(conn, "CS1")
     conn.close()
@@ -639,6 +754,7 @@ def test_cross_source_condition_preserved_through_builder_save(client):
 # Task 9: incomplete Test-node condition must NOT 500 the Builder GET
 # ---------------------------------------------------------------------------
 
+
 def test_builder_degrades_gracefully_on_incomplete_test_condition(client):
     """GET /controls/{id}/logic/builder must return 200 (not 500) when the stored
     pipeline graph has a Test node with an incomplete condition (column="").
@@ -656,20 +772,26 @@ def test_builder_degrades_gracefully_on_incomplete_test_condition(client):
     # is bypassed (the save route would reject it; we need the GET to survive it
     # when the graph is already in that state — e.g. after a partial migration).
     from uticen_lite.store import repo
+
     conn = _conn(client)
     ctrl = repo.get_control(conn, "INC1")
     incomplete_graph = {
         "nodes": [
             {"id": "imp", "type": "import", "source_id": "inc_accounts", "narrative": ""},
-            {"id": "tst", "type": "test", "inputs": ["imp"], "narrative": "",
-             "config": {
-                 "logic": "all",
-                 "severity": "high",
-                 "item_key_column": "account_id",
-                 "description_template": "Account {account_id}",
-                 # INCOMPLETE condition: column="" triggers RuleSpecError in parse_rule_spec
-                 "conditions": [{"column": "", "op": "eq", "value": "active"}],
-             }},
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["imp"],
+                "narrative": "",
+                "config": {
+                    "logic": "all",
+                    "severity": "high",
+                    "item_key_column": "account_id",
+                    "description_template": "Account {account_id}",
+                    # INCOMPLETE condition: column="" triggers RuleSpecError in parse_rule_spec
+                    "conditions": [{"column": "", "op": "eq", "value": "active"}],
+                },
+            },
         ]
     }
     repo.upsert_control(
@@ -701,6 +823,7 @@ def test_builder_degrades_gracefully_on_incomplete_test_condition(client):
 # F1: guard POST /controls/{id}/logic/python — must not clobber a GRAPH control
 # ---------------------------------------------------------------------------
 
+
 def test_python_save_does_not_clobber_graph_control(client):
     """A stray POST to /logic/python on a GRAPH control must be a no-op.
 
@@ -713,6 +836,7 @@ def test_python_save_does_not_clobber_graph_control(client):
     _save_pipeline(client, "G1", _terminated_access_graph())
 
     from uticen_lite.store import repo
+
     conn = _conn(client)
     before = repo.get_control(conn, "G1")
     conn.close()
@@ -720,9 +844,11 @@ def test_python_save_does_not_clobber_graph_control(client):
     assert before["rule_spec"] is None or before["test_code"] is not None or before["pipeline"]
 
     # Stray POST to /logic/python — should be a no-op for a graph control.
-    resp = client.post("/controls/G1/logic/python",
-                       data={"test_code": "def test(pop, sources):\n    return []\n"},
-                       follow_redirects=False)
+    resp = client.post(
+        "/controls/G1/logic/python",
+        data={"test_code": "def test(pop, sources):\n    return []\n"},
+        follow_redirects=False,
+    )
     assert resp.status_code in (302, 303), f"expected redirect, got {resp.status_code}"
 
     conn = _conn(client)
@@ -741,12 +867,13 @@ def test_python_save_works_for_raw_python_control(client):
     cid = _make_raw_python_control(client)
 
     new_code = "def test(pop, sources):\n    return list(pop.df.itertuples())\n"
-    resp = client.post(f"/controls/{cid}/logic/python",
-                       data={"test_code": new_code},
-                       follow_redirects=False)
+    resp = client.post(
+        f"/controls/{cid}/logic/python", data={"test_code": new_code}, follow_redirects=False
+    )
     assert resp.status_code in (302, 303), f"expected redirect, got {resp.status_code}"
 
     from uticen_lite.store import repo
+
     conn = _conn(client)
     c = repo.get_control(conn, cid)
     conn.close()
@@ -759,6 +886,7 @@ def test_python_save_works_for_raw_python_control(client):
 # Task 7: Bundle — N procedures for forked controls
 # ---------------------------------------------------------------------------
 
+
 def _seed_forked_bundle_control(client):
     """Seed a forked 2-terminal pipeline control, run it, return the control id.
 
@@ -766,36 +894,41 @@ def _seed_forked_bundle_control(client):
     - Terminal "a" ("High-value items"):  flags items with category == "high"
     - Terminal "b" ("Low-value items"):   flags items with category == "low"
     """
-    _make_source(client, "bundle_inv",
-                 b"item_id,category\nI1,low\nI2,low\nI3,high\nI4,normal\n")
+    _make_source(client, "bundle_inv", b"item_id,category\nI1,low\nI2,low\nI3,high\nI4,normal\n")
     cid = "FORK1"
     _make_control(client, cid)
 
-    graph = {"nodes": [
-        {"id": "imp", "type": "import", "source_id": "bundle_inv"},
-        {
-            "id": "a", "type": "test", "inputs": ["imp"],
-            "config": {
-                "logic": "all",
-                "conditions": [{"column": "category", "op": "eq", "value": "high"}],
-                "severity": "high",
-                "description_template": "Item {item_id} is high-value",
-                "item_key_column": "item_id",
-                "title": "High-value items",
+    graph = {
+        "nodes": [
+            {"id": "imp", "type": "import", "source_id": "bundle_inv"},
+            {
+                "id": "a",
+                "type": "test",
+                "inputs": ["imp"],
+                "config": {
+                    "logic": "all",
+                    "conditions": [{"column": "category", "op": "eq", "value": "high"}],
+                    "severity": "high",
+                    "description_template": "Item {item_id} is high-value",
+                    "item_key_column": "item_id",
+                    "title": "High-value items",
+                },
             },
-        },
-        {
-            "id": "b", "type": "test", "inputs": ["imp"],
-            "config": {
-                "logic": "all",
-                "conditions": [{"column": "category", "op": "eq", "value": "low"}],
-                "severity": "medium",
-                "description_template": "Item {item_id} is low-value",
-                "item_key_column": "item_id",
-                "title": "Low-value items",
+            {
+                "id": "b",
+                "type": "test",
+                "inputs": ["imp"],
+                "config": {
+                    "logic": "all",
+                    "conditions": [{"column": "category", "op": "eq", "value": "low"}],
+                    "severity": "medium",
+                    "description_template": "Item {item_id} is low-value",
+                    "item_key_column": "item_id",
+                    "title": "Low-value items",
+                },
             },
-        },
-    ]}
+        ]
+    }
     r = _save_pipeline(client, cid, graph)
     assert r.status_code in (302, 303), f"save pipeline failed: {r.status_code}"
     r2 = client.post(f"/controls/{cid}/run", follow_redirects=False)
@@ -851,13 +984,17 @@ def test_forked_control_bundle_has_n_procedures(client):
 # Task 8: Builder UI — Test-card fields + relaxed save + all-terminals
 # ---------------------------------------------------------------------------
 
+
 def _forked_graph_with_titles() -> dict:
     """A forked 2-terminal graph where each Test node has config.title + thresholds."""
     return {
         "nodes": [
             {"id": "imp", "type": "import", "source_id": "fork_src", "narrative": ""},
             {
-                "id": "a", "type": "test", "inputs": ["imp"], "narrative": "",
+                "id": "a",
+                "type": "test",
+                "inputs": ["imp"],
+                "narrative": "",
                 "config": {
                     "logic": "all",
                     "severity": "high",
@@ -870,7 +1007,10 @@ def _forked_graph_with_titles() -> dict:
                 },
             },
             {
-                "id": "b", "type": "test", "inputs": ["imp"], "narrative": "",
+                "id": "b",
+                "type": "test",
+                "inputs": ["imp"],
+                "narrative": "",
                 "config": {
                     "logic": "all",
                     "severity": "medium",
@@ -887,8 +1027,7 @@ def _forked_graph_with_titles() -> dict:
 
 
 def _seed_forked_t8(client):
-    _make_source(client, "fork_src",
-                 b"item_id,category\nI1,low\nI2,high\nI3,normal\n")
+    _make_source(client, "fork_src", b"item_id,category\nI1,low\nI2,high\nI3,normal\n")
     _make_control(client, "T8")
 
 
@@ -956,9 +1095,7 @@ def test_diagram_marks_all_terminals_for_forked_control():
     assert len(terminal_boxes) == 2, (
         f"expected 2 terminal boxes, got {len(terminal_boxes)}: {terminal_box_ids}"
     )
-    assert terminal_box_ids == {"a", "b"}, (
-        f"wrong terminal boxes: {terminal_box_ids}"
-    )
+    assert terminal_box_ids == {"a", "b"}, f"wrong terminal boxes: {terminal_box_ids}"
 
 
 def test_single_terminal_back_compat(client):
@@ -969,13 +1106,23 @@ def test_single_terminal_back_compat(client):
     """
     _make_source(client, "bt_items", b"item_id,flag\nI1,yes\nI2,no\n")
     _make_control(client, "BT1")
-    graph = {"nodes": [
-        {"id": "imp", "type": "import", "source_id": "bt_items"},
-        {"id": "tst", "type": "test", "inputs": ["imp"],
-         "config": {"logic": "all", "severity": "high", "item_key_column": "item_id",
+    graph = {
+        "nodes": [
+            {"id": "imp", "type": "import", "source_id": "bt_items"},
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["imp"],
+                "config": {
+                    "logic": "all",
+                    "severity": "high",
+                    "item_key_column": "item_id",
                     "description_template": "Item {item_id}",
-                    "conditions": [{"column": "flag", "op": "eq", "value": "yes"}]}},
-    ]}
+                    "conditions": [{"column": "flag", "op": "eq", "value": "yes"}],
+                },
+            },
+        ]
+    }
     r = _save_pipeline(client, "BT1", graph)
     assert r.status_code in (302, 303), f"single-terminal save failed: {r.status_code}"
 
@@ -990,11 +1137,15 @@ def test_single_terminal_back_compat(client):
     # The flowchart marks the single terminal correctly.
     from uticen_lite.pipeline.model import parse_pipeline
     from uticen_lite.plane.routes.pipeline import _diagram
+
     pipeline = parse_pipeline(graph)
     diagram = _diagram(pipeline, counts={})
     terminal_boxes = [b for b in diagram["boxes"] if b["terminal"]]
     assert len(terminal_boxes) == 1 and terminal_boxes[0]["id"] == "tst"
+
+
 # --- Logic UX polish: flowchart narrative + per-gap insert affordances -------
+
 
 def test_diagram_boxes_carry_node_narrative():
     """Each flowchart box exposes its node's narrative so the SVG can show the
@@ -1017,13 +1168,22 @@ def test_flowchart_shows_narrative_truncated_with_full_text_on_hover(client):
         "Keep only posted invoices above the materiality threshold so immaterial "
         "noise is excluded from the exception population auditors review"
     )
-    graph = {"nodes": [
-        {"id": "src", "type": "import", "source_id": "access_accounts",
-         "narrative": long_narr},
-        {"id": "tst", "type": "test", "inputs": ["src"], "narrative": "Short note",
-         "config": {"logic": "all", "severity": "low",
-                    "conditions": [{"column": "account_id", "op": "not_empty"}]}},
-    ]}
+    graph = {
+        "nodes": [
+            {"id": "src", "type": "import", "source_id": "access_accounts", "narrative": long_narr},
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["src"],
+                "narrative": "Short note",
+                "config": {
+                    "logic": "all",
+                    "severity": "low",
+                    "conditions": [{"column": "account_id", "op": "not_empty"}],
+                },
+            },
+        ]
+    }
     assert _save_pipeline(client, "C1", graph).status_code in (302, 303)
 
     body = client.get("/controls/C1/logic/flowchart").text
@@ -1067,13 +1227,14 @@ def test_builder_has_per_gap_insert_affordances_not_only_bottom_toolbar(client):
     # Per-gap zones live INSIDE #pipe-cards. The "Add procedure" JS also contains a
     # `pipe-insert-empty` literal (the new-section template), so scope the count to
     # the cards region to exclude it.
-    cards = body[body.index('id="pipe-cards"'):body.index('class="page-actions"')]
+    cards = body[body.index('id="pipe-cards"') : body.index('class="page-actions"')]
     # Banded layout: one zone before each card + one end zone per non-empty band.
     pipe = parse_pipeline(_terminated_access_graph())
     vms = [_card_vm(n, pipe, {}, {}, {}) for n in pipe.topological()]
     bands = _card_bands(pipe, vms, _procedure_context(pipe))
     nonempty_bands = (1 if bands["shared"]["nodes"] else 0) + sum(
-        1 for b in bands["procedures"] if b["nodes"])
+        1 for b in bands["procedures"] if b["nodes"]
+    )
     n_nodes = len(_terminated_access_graph()["nodes"])
     assert len(re.findall(r'class="pipe-insert pipe-insert-', cards)) == n_nodes + nonempty_bands
     # Each node type is offerable from an insert menu.
@@ -1084,6 +1245,7 @@ def test_builder_has_per_gap_insert_affordances_not_only_bottom_toolbar(client):
 # ---------------------------------------------------------------------------
 # Task 2: autosave — in-place card swaps for routine edits
 # ---------------------------------------------------------------------------
+
 
 def test_builder_renders_autosave_status_affordance(client):
     """The builder page contains the autosave status element and the
@@ -1114,12 +1276,25 @@ def test_autosave_post_returns_cards_fragment_not_redirect(client):
     _make_source(client, "accounts", b"account_id,is_active\nA1,true\nA2,false\n")
     _make_control(client, "C1")
     # A minimal valid pipeline: Import → Test (terminal).
-    graph = {"nodes": [
-        {"id": "imp", "type": "import", "source_id": "accounts",
-         "narrative": "", "config": {}, "inputs": []},
-        {"id": "tst", "type": "test", "inputs": ["imp"],
-         "narrative": "", "config": {"logic": "all", "conditions": []}},
-    ]}
+    graph = {
+        "nodes": [
+            {
+                "id": "imp",
+                "type": "import",
+                "source_id": "accounts",
+                "narrative": "",
+                "config": {},
+                "inputs": [],
+            },
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["imp"],
+                "narrative": "",
+                "config": {"logic": "all", "conditions": []},
+            },
+        ]
+    }
     resp = client.post(
         "/controls/C1/logic/builder",
         data={"pipeline_json": json.dumps(graph), "autosave": "1"},
@@ -1142,25 +1317,30 @@ def test_autosave_validation_error_returns_cards_fragment_not_full_page(client):
     """
     _make_source(client, "je_frag", b"entry_id,amount\nE1,100\n")
     _make_control(client, "ErrFrag")
-    bad_graph = {"nodes": [
-        {"id": "imp", "type": "import", "source_id": "je_frag",
-         "inputs": [], "config": {}},
-        {"id": "cust", "type": "custom_python", "inputs": ["imp"],
-         "config": {"flavor": "transform",
-                    "code": "rows = open('/etc/passwd').read()"}},
-        {"id": "tst", "type": "test", "inputs": ["cust"],
-         "config": {"logic": "all", "conditions": [],
-                    "item_key_column": "entry_id"}},
-    ]}
+    bad_graph = {
+        "nodes": [
+            {"id": "imp", "type": "import", "source_id": "je_frag", "inputs": [], "config": {}},
+            {
+                "id": "cust",
+                "type": "custom_python",
+                "inputs": ["imp"],
+                "config": {"flavor": "transform", "code": "rows = open('/etc/passwd').read()"},
+            },
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["cust"],
+                "config": {"logic": "all", "conditions": [], "item_key_column": "entry_id"},
+            },
+        ]
+    }
     resp = client.post(
         "/controls/ErrFrag/logic/builder",
         data={"pipeline_json": json.dumps(bad_graph), "autosave": "1"},
         follow_redirects=False,
     )
     # Must still signal an error (422), not a success or redirect.
-    assert resp.status_code == 422, (
-        f"autosave error must return 422, got {resp.status_code}"
-    )
+    assert resp.status_code == 422, f"autosave error must return 422, got {resp.status_code}"
     # The response MUST be a fragment, not a full HTML page.
     assert "<html" not in resp.text, (
         "autosave error should return a cards fragment, not the full HTML page"
@@ -1169,9 +1349,7 @@ def test_autosave_validation_error_returns_cards_fragment_not_full_page(client):
     assert 'data-node="imp"' in resp.text
     assert 'data-node="cust"' in resp.text
     # The lint error must be surfaced inside the fragment.
-    assert _OFFRAMP_STABLE in resp.text, (
-        "lint error must appear in the autosave error fragment"
-    )
+    assert _OFFRAMP_STABLE in resp.text, "lint error must appear in the autosave error fragment"
 
 
 def test_autosave_js_updates_cards_on_non_200_response(client):
@@ -1224,11 +1402,9 @@ def test_builder_renders_recalculate_button(client):
     assert 'id="recalc-btn"' in body, "recalc-btn element missing"
 
     # The button text must be visible.
-    assert '↻ Recalculate' in body or 'Recalculate' in body, (
-        "Recalculate button text missing"
-    )
+    assert "↻ Recalculate" in body or "Recalculate" in body, "Recalculate button text missing"
 
     # The button must have a click handler that calls reload().
-    assert 'recalc-btn' in body and 'addEventListener' in body and 'reload()' in body, (
+    assert "recalc-btn" in body and "addEventListener" in body and "reload()" in body, (
         "recalc-btn click handler missing or doesn't call reload()"
     )

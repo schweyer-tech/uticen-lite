@@ -100,14 +100,16 @@ def _build_workpaper(
             proc_run = procedure_run_map.get(pid)
             if proc_run is None:
                 continue  # no run yet for this procedure — skip (no result)
-            procedures.append({
-                "code": pi.get("code", ""),
-                "assertion": pi.get("assertion", ""),
-                "narrative": pi["narrative"],
-                "result": proc_run,
-                "test_code": pi["test_code"],
-                "title": pi["title"],
-            })
+            procedures.append(
+                {
+                    "code": pi.get("code", ""),
+                    "assertion": pi.get("assertion", ""),
+                    "narrative": pi["narrative"],
+                    "result": proc_run,
+                    "test_code": pi["test_code"],
+                    "title": pi["title"],
+                }
+            )
         return {
             "control_id": control.id,
             "framework_refs": framework_refs,
@@ -182,7 +184,10 @@ def _build_control_block(
         "test_code": test_code,
         "title": control.title,
         "workpaper": _build_workpaper(
-            control, test_code, runs, generated_at,
+            control,
+            test_code,
+            runs,
+            generated_at,
             procedure_run_map=procedure_run_map,
             procedure_info=procedure_info,
         ),
@@ -252,11 +257,15 @@ def assemble_bundle(
         runs = runs_by_control.get(control.id, [])
         ctrl_proc_run_map = (procedure_run_map or {}).get(control.id)
         ctrl_proc_info = (procedure_info_by_control or {}).get(control.id)
-        controls.append(_build_control_block(
-            control, runs, generated_at,
-            procedure_run_map=ctrl_proc_run_map,
-            procedure_info=ctrl_proc_info,
-        ))
+        controls.append(
+            _build_control_block(
+                control,
+                runs,
+                generated_at,
+                procedure_run_map=ctrl_proc_run_map,
+                procedure_info=ctrl_proc_info,
+            )
+        )
 
     manifest: dict[str, Any] = {
         "controls": controls,

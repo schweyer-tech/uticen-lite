@@ -12,14 +12,16 @@ def test_migrate_creates_all_tables_and_sets_version(tmp_path: Path):
     conn = connect(tmp_path)
     migrate(conn)
     tables = {
-        r[0]
-        for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        ).fetchall()
+        r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
     }
     assert {
-        "project", "sources", "columns", "controls",
-        "control_sources", "runs", "violations",
+        "project",
+        "sources",
+        "columns",
+        "controls",
+        "control_sources",
+        "runs",
+        "violations",
     } <= tables
     assert _user_version(conn) == SCHEMA_VERSION
 
@@ -100,8 +102,8 @@ def test_source_files_table_and_backfill(tmp_path: Path):
     from uticen_lite.store.migrations import _STEPS
 
     conn = connect(tmp_path)
-    conn.executescript(_STEPS[0])      # v1 schema
-    conn.executescript(_STEPS[1])      # v2: title column
+    conn.executescript(_STEPS[0])  # v1 schema
+    conn.executescript(_STEPS[1])  # v2: title column
     conn.execute("PRAGMA user_version = 2")
     conn.execute(
         "INSERT INTO sources (id, format, path, key_config, extract_date, created_at) "
@@ -112,8 +114,15 @@ def test_source_files_table_and_backfill(tmp_path: Path):
     migrate(conn)  # forward step 3 adds the table + backfills a current row
     assert _user_version(conn) == SCHEMA_VERSION
     cols = {r[1] for r in conn.execute("PRAGMA table_info(source_files)").fetchall()}
-    assert {"source_id", "stored_path", "original_name", "as_of_date",
-            "row_count", "uploaded_at", "is_current"} <= cols
+    assert {
+        "source_id",
+        "stored_path",
+        "original_name",
+        "as_of_date",
+        "row_count",
+        "uploaded_at",
+        "is_current",
+    } <= cols
     row = conn.execute(
         "SELECT source_id, stored_path, original_name, as_of_date, is_current "
         "FROM source_files WHERE source_id = 's'"

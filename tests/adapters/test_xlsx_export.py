@@ -1,4 +1,5 @@
 """xlsx step exports: sheets, summary, sanitisation, coercion, truncation."""
+
 from __future__ import annotations
 
 from io import BytesIO
@@ -22,8 +23,7 @@ def test_single_step_roundtrips():
 
 
 def test_workbook_has_summary_about_and_one_sheet_per_step():
-    steps = [("import", pd.DataFrame({"x": [1, 2, 3]})),
-             ("filter", pd.DataFrame({"x": [2, 3]}))]
+    steps = [("import", pd.DataFrame({"x": [1, 2, 3]})), ("filter", pd.DataFrame({"x": [2, 3]}))]
     book = X.write_step_workbook(steps, {"control": "C-1", "generated_at": "2026-06-23"})
     names = pd.ExcelFile(BytesIO(book), engine="openpyxl").sheet_names
     assert "Summary" in names and "About" in names
@@ -34,18 +34,20 @@ def test_workbook_has_summary_about_and_one_sheet_per_step():
 
 def test_sheet_name_sanitised_and_deduped():
     used: set[str] = set()
-    a = X._sanitize_sheet_name("a/b:c*d?e[f]" * 4, used)   # illegal chars + > 31 chars
+    a = X._sanitize_sheet_name("a/b:c*d?e[f]" * 4, used)  # illegal chars + > 31 chars
     b = X._sanitize_sheet_name("a/b:c*d?e[f]" * 4, used)
     assert not (set("[]:*?/\\") & set(a)) and len(a) <= 31
-    assert a != b                                          # deduped
+    assert a != b  # deduped
 
 
 def test_coercion_handles_timestamp_nat_numpy_and_objects():
-    frame = pd.DataFrame({
-        "ts": [pd.Timestamp("2026-01-01"), pd.NaT],
-        "np": [np.int64(5), np.float64(1.5)],
-        "obj": [{"k": 1}, [1, 2]],
-    })
+    frame = pd.DataFrame(
+        {
+            "ts": [pd.Timestamp("2026-01-01"), pd.NaT],
+            "np": [np.int64(5), np.float64(1.5)],
+            "obj": [{"k": 1}, [1, 2]],
+        }
+    )
     out = X._coerce_for_excel(frame)
     # writing must not raise, and objects became strings:
     _read(X.write_single_step(frame, "s"))
@@ -53,22 +55,24 @@ def test_coercion_handles_timestamp_nat_numpy_and_objects():
 
 
 def test_truncation_note_when_over_excel_limit(monkeypatch):
-    monkeypatch.setattr(X, "EXCEL_MAX_DATA_ROWS", 3)      # shrink the cap for the test
+    monkeypatch.setattr(X, "EXCEL_MAX_DATA_ROWS", 3)  # shrink the cap for the test
     steps = [("big", pd.DataFrame({"x": list(range(10))}))]
     book = X.write_step_workbook(steps, {"control": "C-1"})
     summary = _read(book, "Summary")
-    assert summary.loc[0, "rows"] == 10                   # reports the TRUE total
+    assert summary.loc[0, "rows"] == 10  # reports the TRUE total
     assert str(summary.loc[0, "truncated"]).lower() in ("yes", "true")
     sheet = pd.ExcelFile(BytesIO(book), engine="openpyxl").sheet_names
     data_sheet = [n for n in sheet if n not in ("Summary", "About")][0]
-    assert len(_read(book, data_sheet)) == 3             # capped
+    assert len(_read(book, data_sheet)) == 3  # capped
 
 
 def test_nat_and_na_coerce_to_none():
-    frame = pd.DataFrame({
-        "d": [pd.Timestamp("2026-01-01"), pd.NaT],
-        "a": pd.array([1, pd.NA], dtype="Int64"),
-    })
+    frame = pd.DataFrame(
+        {
+            "d": [pd.Timestamp("2026-01-01"), pd.NaT],
+            "a": pd.array([1, pd.NA], dtype="Int64"),
+        }
+    )
     out = X._coerce_for_excel(frame)
     assert out["d"].iloc[1] is None
     assert out["a"].iloc[1] is None
@@ -82,8 +86,8 @@ def test_single_step_truncation_keeps_data_sheet(monkeypatch):
     names = xf.sheet_names
     assert len(names) == 2, f"expected 2 sheets, got {names}"
     data_sheet = names[0]
-    assert len(_read(buf, data_sheet)) == 2   # capped rows present
-    assert names[0] != names[1]               # distinct sheet names
+    assert len(_read(buf, data_sheet)) == 2  # capped rows present
+    assert names[0] != names[1]  # distinct sheet names
 
 
 def test_step_label_summary_does_not_collide_with_summary_sheet():

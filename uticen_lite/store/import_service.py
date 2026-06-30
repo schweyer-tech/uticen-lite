@@ -101,9 +101,13 @@ def import_project(conn: sqlite3.Connection, src: Path) -> tuple[int, int]:
         )
         _path = binding.config.get("path", "")
         repo.set_initial_file(
-            conn, source_id=sid, stored_path=_path,
-            original_name=Path(_path).name, as_of_date=binding.extract_date,
-            row_count=_row_count_of(binding, src), uploaded_at=_import_stamp(),
+            conn,
+            source_id=sid,
+            stored_path=_path,
+            original_name=Path(_path).name,
+            as_of_date=binding.extract_date,
+            row_count=_row_count_of(binding, src),
+            uploaded_at=_import_stamp(),
         )
 
     for control in project.controls:
@@ -158,20 +162,27 @@ def _resolve_authoring(control: object) -> dict[str, Any]:
         rule_file = control_dir / "rule.yaml"
         if rule_file.is_file():
             rule_spec = yaml.safe_load(rule_file.read_text(encoding="utf-8")) or {}
-            return {"test_kind": "rule", "rule_spec": rule_spec,
-                    "test_code": None, "pipeline": None}
+            return {
+                "test_kind": "rule",
+                "rule_spec": rule_spec,
+                "test_code": None,
+                "pipeline": None,
+            }
 
         pipeline_file = control_dir / "pipeline.yaml"
         if pipeline_file.is_file():
             graph = yaml.safe_load(pipeline_file.read_text(encoding="utf-8")) or {}
             pipeline = parse_pipeline(graph)  # validate the graph eagerly
             compiled = compile_pipeline(pipeline)
-            return {"test_kind": "pipeline", "rule_spec": compiled.rule_spec,
-                    "test_code": compiled.test_code, "pipeline": graph}
+            return {
+                "test_kind": "pipeline",
+                "rule_spec": compiled.rule_spec,
+                "test_code": compiled.test_code,
+                "pipeline": graph,
+            }
 
     code = Path(test_path).read_text(encoding="utf-8") if test_path else ""
-    return {"test_kind": "python", "rule_spec": None,
-            "test_code": code, "pipeline": None}
+    return {"test_kind": "python", "rule_spec": None, "test_code": code, "pipeline": None}
 
 
 def demo_source_dir() -> Path:

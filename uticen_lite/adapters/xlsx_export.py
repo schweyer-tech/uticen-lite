@@ -17,7 +17,7 @@ from uticen_lite.plane.ingest import AdaptersUnavailable
 
 # A worksheet holds 1_048_576 rows incl. the header row → this many DATA rows.
 EXCEL_MAX_DATA_ROWS = 1_048_575
-_ILLEGAL_SHEET = set('[]:*?/\\')
+_ILLEGAL_SHEET = set("[]:*?/\\")
 
 
 def _require_writer() -> None:
@@ -92,9 +92,9 @@ def write_single_step(frame: pd.DataFrame, label: str) -> bytes:
         coerced.to_excel(xw, sheet_name=sheet, index=False)
         if truncated:
             note_sheet = _sanitize_sheet_name("Truncated", used)
-            pd.DataFrame({"note": [
-                f"Truncated to {EXCEL_MAX_DATA_ROWS:,} of {total:,} rows (Excel limit)."
-            ]}).to_excel(xw, sheet_name=note_sheet, index=False)
+            pd.DataFrame(
+                {"note": [f"Truncated to {EXCEL_MAX_DATA_ROWS:,} of {total:,} rows (Excel limit)."]}
+            ).to_excel(xw, sheet_name=note_sheet, index=False)
     return buf.getvalue()
 
 
@@ -112,17 +112,24 @@ def write_step_workbook(steps: list[tuple[str, pd.DataFrame]], meta: dict[str, s
         coerced, truncated, total = _prep(frame)
         sheet = _sanitize_sheet_name(f"{i} - {label}", used)
         prepared.append((sheet, coerced))
-        summary_rows.append({
-            "step": i, "sheet": sheet, "label": label,
-            "rows": total, "truncated": "yes" if truncated else "",
-        })
+        summary_rows.append(
+            {
+                "step": i,
+                "sheet": sheet,
+                "label": label,
+                "rows": total,
+                "truncated": "yes" if truncated else "",
+            }
+        )
 
     buf = BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as xw:
-        pd.DataFrame(summary_rows, columns=["step", "sheet", "label", "rows", "truncated"]) \
-            .to_excel(xw, sheet_name="Summary", index=False)
-        pd.DataFrame(list(meta.items()), columns=["field", "value"]) \
-            .to_excel(xw, sheet_name="About", index=False)
+        pd.DataFrame(
+            summary_rows, columns=["step", "sheet", "label", "rows", "truncated"]
+        ).to_excel(xw, sheet_name="Summary", index=False)
+        pd.DataFrame(list(meta.items()), columns=["field", "value"]).to_excel(
+            xw, sheet_name="About", index=False
+        )
         for sheet, coerced in prepared:
             coerced.to_excel(xw, sheet_name=sheet, index=False)
     return buf.getvalue()

@@ -2,6 +2,7 @@
 
 Run via: pytest tests/e2e -m browser   (after: playwright install chromium)
 """
+
 from __future__ import annotations
 
 import json
@@ -37,18 +38,29 @@ def _seed(page: Page, base: str) -> str:
     page.request.post(
         f"{base}/controls",
         form={
-            "id": "tr_ctrl", "title": "Trace smoke", "objective": "o",
-            "narrative": "n", "source_ids": "inv_tr", "failure_threshold_count": "0",
+            "id": "tr_ctrl",
+            "title": "Trace smoke",
+            "objective": "o",
+            "narrative": "n",
+            "source_ids": "inv_tr",
+            "failure_threshold_count": "0",
         },
     )
-    graph = {"nodes": [
-        {"id": "imp", "type": "import", "source_id": "inv_tr"},
-        {"id": "tst", "type": "test", "inputs": ["imp"], "config": {
-            "logic": "all",
-            "item_key_column": "invoice_id",
-            "conditions": [{"column": "amount", "op": "gt", "value": 100}],
-        }},
-    ]}
+    graph = {
+        "nodes": [
+            {"id": "imp", "type": "import", "source_id": "inv_tr"},
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["imp"],
+                "config": {
+                    "logic": "all",
+                    "item_key_column": "invoice_id",
+                    "conditions": [{"column": "amount", "op": "gt", "value": 100}],
+                },
+            },
+        ]
+    }
     page.request.post(
         f"{base}/controls/tr_ctrl/logic/builder",
         form={"pipeline_json": json.dumps(graph)},

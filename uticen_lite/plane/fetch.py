@@ -29,10 +29,10 @@ class FetchError(Exception):
 @dataclass(frozen=True)
 class FetchedSnapshot:
     raw: bytes
-    fmt: str            # csv | xlsx | parquet
+    fmt: str  # csv | xlsx | parquet
     suggested_name: str
     source_url: str
-    fetched_at: str     # 20260622T101913Z
+    fetched_at: str  # 20260622T101913Z
 
 
 def _default_opener(req: urllib.request.Request) -> tuple[bytes, str]:
@@ -108,8 +108,11 @@ def _json_to_csv(raw: bytes, record_path: str | None) -> bytes:
 
 
 def fetch_snapshot(
-    url: str, *, headers: dict[str, str] | None = None,
-    record_path: str | None = None, opener: Opener | None = None,
+    url: str,
+    *,
+    headers: dict[str, str] | None = None,
+    record_path: str | None = None,
+    opener: Opener | None = None,
 ) -> FetchedSnapshot:
     """GET *url* once and snapshot the response (JSON normalised to CSV)."""
     if not url.lower().startswith(("http://", "https://")):
@@ -121,6 +124,7 @@ def fetch_snapshot(
     fetched_at = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     stem = _name_stem(url)
     if fmt == "json":
-        return FetchedSnapshot(_json_to_csv(body, record_path), "csv",
-                               f"{stem}.csv", url, fetched_at)
+        return FetchedSnapshot(
+            _json_to_csv(body, record_path), "csv", f"{stem}.csv", url, fetched_at
+        )
     return FetchedSnapshot(body, fmt, f"{stem}.{fmt}", url, fetched_at)

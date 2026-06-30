@@ -119,11 +119,10 @@ class _AnthropicProvider:
             max_tokens=2000,
             thinking={"type": "adaptive"},
             system=system_prompt(),
-            messages=[{"role": "user", "content": user_prompt(objective, source_schema,
-                                                               data_sample)}],
-            output_config={
-                "format": {"type": "json_schema", "schema": RULE_SPEC_JSON_SCHEMA}
-            },
+            messages=[
+                {"role": "user", "content": user_prompt(objective, source_schema, data_sample)}
+            ],
+            output_config={"format": {"type": "json_schema", "schema": RULE_SPEC_JSON_SCHEMA}},
         )
         text = next((b.text for b in resp.content if b.type == "text"), "")
         return _loads_dict(text)

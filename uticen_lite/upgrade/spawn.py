@@ -23,7 +23,7 @@ LOG_FILE = ".controlplane-upgrade.log"
 
 # Self-contained: stdlib only, no uticen_lite imports. A 60s deadline is the
 # backstop in case parent-PID detection is imperfect on a given platform.
-_HELPER_SOURCE = r'''
+_HELPER_SOURCE = r"""
 import errno, json, os, subprocess, sys, time
 
 
@@ -84,7 +84,7 @@ def main():
 
 
 main()
-'''
+"""
 
 
 def write_status(project_root: str | os.PathLike[str], payload: dict) -> None:
@@ -134,9 +134,7 @@ def spawn_detached_upgrade(
     return helper
 
 
-def schedule_shutdown(
-    delay: float = 0.7, *, timer: Callable[..., Any] | None = None
-) -> None:
+def schedule_shutdown(delay: float = 0.7, *, timer: Callable[..., Any] | None = None) -> None:
     import signal
 
     def _stop() -> None:

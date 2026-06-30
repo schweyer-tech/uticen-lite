@@ -62,9 +62,7 @@ class TestVersion:
             main(["--version"])
         assert exc.value.code == 0
 
-    def test_version_prints_installed_version(
-        self, capsys: pytest.CaptureFixture
-    ) -> None:
+    def test_version_prints_installed_version(self, capsys: pytest.CaptureFixture) -> None:
         """--version prints the prog name and the installed distribution version."""
         from importlib.metadata import version
 
@@ -82,7 +80,5 @@ class TestVersion:
 
         from uticen_lite.cli import _version
 
-        with patch(
-            "importlib.metadata.version", side_effect=PackageNotFoundError("x")
-        ):
+        with patch("importlib.metadata.version", side_effect=PackageNotFoundError("x")):
             assert _version() == "unknown"

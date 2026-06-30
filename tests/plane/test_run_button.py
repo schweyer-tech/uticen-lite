@@ -6,6 +6,7 @@ Review (2026-06-27): "when a user clicks the run button it should render a
 workpaper. Right now, they just get an internal server error. The run button
 should also be available on the drilled down control page."
 """
+
 import io
 import json
 
@@ -26,20 +27,41 @@ def _rule_control(client):
     _make_source(client, "users", b"user_id,can_create,can_approve\nU1,true,true\nU2,true,false\n")
     client.post(
         "/controls",
-        data={"id": "sod", "title": "SoD", "objective": "o", "narrative": "n",
-              "source_ids": ["users"], "failure_threshold_count": "0"},
+        data={
+            "id": "sod",
+            "title": "SoD",
+            "objective": "o",
+            "narrative": "n",
+            "source_ids": ["users"],
+            "failure_threshold_count": "0",
+        },
         follow_redirects=False,
     )
-    graph = {"nodes": [
-        {"id": "imp", "type": "import", "source_id": "users"},
-        {"id": "tst", "type": "test", "inputs": ["imp"],
-         "config": {"logic": "all", "severity": "high", "item_key_column": "user_id",
+    graph = {
+        "nodes": [
+            {"id": "imp", "type": "import", "source_id": "users"},
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["imp"],
+                "config": {
+                    "logic": "all",
+                    "severity": "high",
+                    "item_key_column": "user_id",
                     "description_template": "User {user_id}",
-                    "conditions": [{"column": "can_create", "op": "eq", "value": True},
-                                   {"column": "can_approve", "op": "eq", "value": True}]}},
-    ]}
-    client.post("/controls/sod/logic/builder",
-                data={"pipeline_json": json.dumps(graph)}, follow_redirects=False)
+                    "conditions": [
+                        {"column": "can_create", "op": "eq", "value": True},
+                        {"column": "can_approve", "op": "eq", "value": True},
+                    ],
+                },
+            },
+        ]
+    }
+    client.post(
+        "/controls/sod/logic/builder",
+        data={"pipeline_json": json.dumps(graph)},
+        follow_redirects=False,
+    )
 
 
 def test_run_ready_control_renders_workpaper(client):
@@ -47,15 +69,20 @@ def test_run_ready_control_renders_workpaper(client):
     resp = client.post("/controls/sod/run", follow_redirects=True)
     assert resp.status_code == 200, resp.text
     assert "Run results" in resp.text
-    assert "Workpaper" in resp.text          # the embedded workpaper section
+    assert "Workpaper" in resp.text  # the embedded workpaper section
 
 
 def test_run_control_without_sources_is_friendly_not_500(client):
     # A control with no bound data source (half-authored) used to IndexError → 500.
     client.post(
         "/controls",
-        data={"id": "nosrc", "title": "NoSrc", "objective": "o", "narrative": "n",
-              "failure_threshold_count": "0"},
+        data={
+            "id": "nosrc",
+            "title": "NoSrc",
+            "objective": "o",
+            "narrative": "n",
+            "failure_threshold_count": "0",
+        },
         follow_redirects=False,
     )
     resp = client.post("/controls/nosrc/run", follow_redirects=False)
@@ -68,8 +95,14 @@ def test_run_control_without_logic_is_friendly_not_500(client):
     _make_source(client, "users")
     client.post(
         "/controls",
-        data={"id": "nologic", "title": "NoLogic", "objective": "o", "narrative": "n",
-              "source_ids": ["users"], "failure_threshold_count": "0"},
+        data={
+            "id": "nologic",
+            "title": "NoLogic",
+            "objective": "o",
+            "narrative": "n",
+            "source_ids": ["users"],
+            "failure_threshold_count": "0",
+        },
         follow_redirects=False,
     )
     resp = client.post("/controls/nologic/run", follow_redirects=False)
@@ -98,8 +131,14 @@ def _corrupt_rule_control(client, rule_spec, source_ids=("users",), cid="bad"):
     conn = connect(client.app.state.project_root)
     try:
         repo.upsert_control(
-            conn, id=cid, title="Bad", objective="o", narrative="n",
-            framework_refs={}, test_kind="rule", rule_spec=rule_spec,
+            conn,
+            id=cid,
+            title="Bad",
+            objective="o",
+            narrative="n",
+            framework_refs={},
+            test_kind="rule",
+            rule_spec=rule_spec,
             failure_threshold_count=0,
         )
         repo.set_control_sources(conn, cid, list(source_ids))
@@ -110,13 +149,24 @@ def _corrupt_rule_control(client, rule_spec, source_ids=("users",), cid="bad"):
 def test_run_cross_source_unknown_source_is_friendly_not_500(client):
     # A cross-source condition whose other_source was deleted/renamed → ValueError.
     _make_source(client, "users", b"user_id\nU1\nU2\n")
-    _corrupt_rule_control(client, {
-        "logic": "all",
-        "conditions": [{"op": "not_exists_in", "column": "user_id",
-                        "other_source": "ghost", "this_key": "user_id",
-                        "other_key": "employee_id"}],
-        "severity": "high", "description_template": "User {user_id}",
-        "item_key_column": "user_id"})
+    _corrupt_rule_control(
+        client,
+        {
+            "logic": "all",
+            "conditions": [
+                {
+                    "op": "not_exists_in",
+                    "column": "user_id",
+                    "other_source": "ghost",
+                    "this_key": "user_id",
+                    "other_key": "employee_id",
+                }
+            ],
+            "severity": "high",
+            "description_template": "User {user_id}",
+            "item_key_column": "user_id",
+        },
+    )
     resp = client.post("/controls/bad/run", follow_redirects=False)
     assert resp.status_code == 422, resp.text
 
@@ -124,11 +174,16 @@ def test_run_cross_source_unknown_source_is_friendly_not_500(client):
 def test_run_comparison_on_text_column_is_friendly_not_500(client):
     # A gt comparison on a text column (type mismatch) → pandas TypeError.
     _make_source(client, "users", b"user_id\nU1\nU2\n")
-    _corrupt_rule_control(client, {
-        "logic": "all",
-        "conditions": [{"column": "user_id", "op": "gt", "value": 5}],
-        "severity": "high", "description_template": "User {user_id}",
-        "item_key_column": "user_id"})
+    _corrupt_rule_control(
+        client,
+        {
+            "logic": "all",
+            "conditions": [{"column": "user_id", "op": "gt", "value": 5}],
+            "severity": "high",
+            "description_template": "User {user_id}",
+            "item_key_column": "user_id",
+        },
+    )
     resp = client.post("/controls/bad/run", follow_redirects=False)
     assert resp.status_code == 422, resp.text
 
@@ -136,11 +191,16 @@ def test_run_comparison_on_text_column_is_friendly_not_500(client):
 def test_run_invalid_regex_is_friendly_not_500(client):
     # An invalid regex pattern → ArrowInvalid / re.error during evaluation.
     _make_source(client, "users", b"user_id\nU1\nU2\n")
-    _corrupt_rule_control(client, {
-        "logic": "all",
-        "conditions": [{"column": "user_id", "op": "regex", "value": "("}],
-        "severity": "high", "description_template": "User {user_id}",
-        "item_key_column": "user_id"})
+    _corrupt_rule_control(
+        client,
+        {
+            "logic": "all",
+            "conditions": [{"column": "user_id", "op": "regex", "value": "("}],
+            "severity": "high",
+            "description_template": "User {user_id}",
+            "item_key_column": "user_id",
+        },
+    )
     resp = client.post("/controls/bad/run", follow_redirects=False)
     assert resp.status_code == 422, resp.text
 
@@ -149,11 +209,16 @@ def test_run_missing_data_file_is_friendly_not_500(client):
     # A bound source whose backing CSV is gone from disk → FileNotFoundError.
     _make_source(client, "users", b"user_id,can_create\nU1,true\n")
     (client.app.state.project_root / "data" / "users.csv").unlink()
-    _corrupt_rule_control(client, {
-        "logic": "all",
-        "conditions": [{"column": "can_create", "op": "eq", "value": True}],
-        "severity": "high", "description_template": "User {user_id}",
-        "item_key_column": "user_id"})
+    _corrupt_rule_control(
+        client,
+        {
+            "logic": "all",
+            "conditions": [{"column": "can_create", "op": "eq", "value": True}],
+            "severity": "high",
+            "description_template": "User {user_id}",
+            "item_key_column": "user_id",
+        },
+    )
     resp = client.post("/controls/bad/run", follow_redirects=False)
     assert resp.status_code == 422, resp.text
 
@@ -165,9 +230,7 @@ def test_run_unexpected_error_is_friendly_not_500(client, monkeypatch):
     def boom(*args, **kwargs):
         raise RuntimeError("unexpected failure")
 
-    monkeypatch.setattr(
-        "uticen_lite.plane.routes.runs.run_control_in_store", boom
-    )
+    monkeypatch.setattr("uticen_lite.plane.routes.runs.run_control_in_store", boom)
     resp = client.post("/controls/sod/run", follow_redirects=False)
     assert resp.status_code == 422, resp.text
 

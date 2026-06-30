@@ -21,7 +21,7 @@ def register(
     @app.get("/", response_class=HTMLResponse)
     def dashboard(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         project = repo.get_project(conn) or {"name": ""}
         # First run: no engagement name yet → show the onboarding screen instead of

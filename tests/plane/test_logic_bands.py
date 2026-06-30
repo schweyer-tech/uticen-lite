@@ -26,19 +26,35 @@ def _vms(pipeline):
 
 
 def test_card_bands_groups_vms_by_procedure():
-    pipe = parse_pipeline({
-        "nodes": [
-            {"id": "src", "type": "import", "source_id": "s"},
-            {"id": "t1", "type": "test", "inputs": ["src"],
-             "config": {"procedure_id": "p1", "conditions": [{"column": "a", "op": "not_empty"}]}},
-            {"id": "t2", "type": "test", "inputs": ["src"],
-             "config": {"procedure_id": "p2", "conditions": [{"column": "a", "op": "not_empty"}]}},
-        ],
-        "procedures": [
-            {"id": "p1", "code": "P1", "name": "One", "position": 0},
-            {"id": "p2", "code": "P2", "name": "Two", "position": 1},
-        ],
-    })
+    pipe = parse_pipeline(
+        {
+            "nodes": [
+                {"id": "src", "type": "import", "source_id": "s"},
+                {
+                    "id": "t1",
+                    "type": "test",
+                    "inputs": ["src"],
+                    "config": {
+                        "procedure_id": "p1",
+                        "conditions": [{"column": "a", "op": "not_empty"}],
+                    },
+                },
+                {
+                    "id": "t2",
+                    "type": "test",
+                    "inputs": ["src"],
+                    "config": {
+                        "procedure_id": "p2",
+                        "conditions": [{"column": "a", "op": "not_empty"}],
+                    },
+                },
+            ],
+            "procedures": [
+                {"id": "p1", "code": "P1", "name": "One", "position": 0},
+                {"id": "p2", "code": "P2", "name": "Two", "position": 1},
+            ],
+        }
+    )
     bands = _card_bands(pipe, _vms(pipe), _procedure_context(pipe))
     assert bands["shared"]["key"] == "__inputs__"
     assert [vm["id"] for vm in bands["shared"]["nodes"]] == ["src"]
@@ -57,23 +73,45 @@ def test_card_bands_unparsable_pipeline_all_shared():
 
 def _seed_with_procedure(client):
     csv = b"user_id,can_create\nU1,true\nU2,\n"
-    client.post("/sources", data={"source_id": "users", "format": "csv"},
-                files={"file": ("users.csv", io.BytesIO(csv), "text/csv")},
-                follow_redirects=False)
-    client.post("/controls", data={"id": "c1", "title": "C1", "objective": "o",
-                "narrative": "n", "source_ids": ["users"], "failure_threshold_count": "0"},
-                follow_redirects=False)
+    client.post(
+        "/sources",
+        data={"source_id": "users", "format": "csv"},
+        files={"file": ("users.csv", io.BytesIO(csv), "text/csv")},
+        follow_redirects=False,
+    )
+    client.post(
+        "/controls",
+        data={
+            "id": "c1",
+            "title": "C1",
+            "objective": "o",
+            "narrative": "n",
+            "source_ids": ["users"],
+            "failure_threshold_count": "0",
+        },
+        follow_redirects=False,
+    )
     graph = {
         "nodes": [
             {"id": "src", "type": "import", "source_id": "users"},
-            {"id": "tst", "type": "test", "inputs": ["src"],
-             "config": {"logic": "all", "procedure_id": "p1",
-                        "conditions": [{"column": "can_create", "op": "not_empty"}]}},
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["src"],
+                "config": {
+                    "logic": "all",
+                    "procedure_id": "p1",
+                    "conditions": [{"column": "can_create", "op": "not_empty"}],
+                },
+            },
         ],
         "procedures": [{"id": "p1", "code": "P1", "name": "One", "position": 0}],
     }
-    client.post("/controls/c1/logic/builder",
-                data={"pipeline_json": json.dumps(graph)}, follow_redirects=False)
+    client.post(
+        "/controls/c1/logic/builder",
+        data={"pipeline_json": json.dumps(graph)},
+        follow_redirects=False,
+    )
 
 
 def test_builder_get_renders_sectioned_details_ui(client):
@@ -90,19 +128,35 @@ def test_builder_get_renders_sectioned_details_ui(client):
 
 
 def _forked():
-    return parse_pipeline({
-        "nodes": [
-            {"id": "src", "type": "import", "source_id": "s"},
-            {"id": "t1", "type": "test", "inputs": ["src"],
-             "config": {"procedure_id": "p1", "conditions": [{"column": "a", "op": "not_empty"}]}},
-            {"id": "t2", "type": "test", "inputs": ["src"],
-             "config": {"procedure_id": "p2", "conditions": [{"column": "a", "op": "not_empty"}]}},
-        ],
-        "procedures": [
-            {"id": "p1", "code": "P1", "name": "One", "position": 0},
-            {"id": "p2", "code": "P2", "name": "Two", "position": 1},
-        ],
-    })
+    return parse_pipeline(
+        {
+            "nodes": [
+                {"id": "src", "type": "import", "source_id": "s"},
+                {
+                    "id": "t1",
+                    "type": "test",
+                    "inputs": ["src"],
+                    "config": {
+                        "procedure_id": "p1",
+                        "conditions": [{"column": "a", "op": "not_empty"}],
+                    },
+                },
+                {
+                    "id": "t2",
+                    "type": "test",
+                    "inputs": ["src"],
+                    "config": {
+                        "procedure_id": "p2",
+                        "conditions": [{"column": "a", "op": "not_empty"}],
+                    },
+                },
+            ],
+            "procedures": [
+                {"id": "p1", "code": "P1", "name": "One", "position": 0},
+                {"id": "p2", "code": "P2", "name": "Two", "position": 1},
+            ],
+        }
+    )
 
 
 def test_diagram_exposes_procedure_bands():
@@ -126,33 +180,61 @@ def test_diagram_collapsed_band_emits_summary_box():
 
 
 def test_procedure_context_includes_narrative():
-    pipe = parse_pipeline({
-        "nodes": [
-            {"id": "src", "type": "import", "source_id": "s"},
-            {"id": "t1", "type": "test", "inputs": ["src"],
-             "config": {"procedure_id": "p1", "conditions": [{"column": "a", "op": "not_empty"}]}},
-        ],
-        "procedures": [
-            {"id": "p1", "code": "P1", "name": "One",
-             "narrative": "Why we test this", "position": 0},
-        ],
-    })
+    pipe = parse_pipeline(
+        {
+            "nodes": [
+                {"id": "src", "type": "import", "source_id": "s"},
+                {
+                    "id": "t1",
+                    "type": "test",
+                    "inputs": ["src"],
+                    "config": {
+                        "procedure_id": "p1",
+                        "conditions": [{"column": "a", "op": "not_empty"}],
+                    },
+                },
+            ],
+            "procedures": [
+                {
+                    "id": "p1",
+                    "code": "P1",
+                    "name": "One",
+                    "narrative": "Why we test this",
+                    "position": 0,
+                },
+            ],
+        }
+    )
     ctx = _procedure_context(pipe)
     assert ctx["procedures"][0]["narrative"] == "Why we test this"
 
 
 def test_card_bands_proc_carries_narrative():
-    pipe = parse_pipeline({
-        "nodes": [
-            {"id": "src", "type": "import", "source_id": "s"},
-            {"id": "t1", "type": "test", "inputs": ["src"],
-             "config": {"procedure_id": "p1", "conditions": [{"column": "a", "op": "not_empty"}]}},
-        ],
-        "procedures": [
-            {"id": "p1", "code": "P1", "name": "One",
-             "narrative": "Why we test this", "position": 0},
-        ],
-    })
+    pipe = parse_pipeline(
+        {
+            "nodes": [
+                {"id": "src", "type": "import", "source_id": "s"},
+                {
+                    "id": "t1",
+                    "type": "test",
+                    "inputs": ["src"],
+                    "config": {
+                        "procedure_id": "p1",
+                        "conditions": [{"column": "a", "op": "not_empty"}],
+                    },
+                },
+            ],
+            "procedures": [
+                {
+                    "id": "p1",
+                    "code": "P1",
+                    "name": "One",
+                    "narrative": "Why we test this",
+                    "position": 0,
+                },
+            ],
+        }
+    )
     bands = _card_bands(pipe, _vms(pipe), _procedure_context(pipe))
     assert bands["procedures"][0]["proc"]["narrative"] == "Why we test this"
 
@@ -160,13 +242,19 @@ def test_card_bands_proc_carries_narrative():
 def test_procedure_context_sole_procedure_code_empty():
     """A single auto-derived procedure shows an EMPTY code so the workpaper heading
     stays the legacy 'P1: title' form (learning 0036) — not 'P1'."""
-    pipe = parse_pipeline({
-        "nodes": [
-            {"id": "src", "type": "import", "source_id": "s"},
-            {"id": "t1", "type": "test", "inputs": ["src"],
-             "config": {"conditions": [{"column": "a", "op": "not_empty"}]}},
-        ],
-    })
+    pipe = parse_pipeline(
+        {
+            "nodes": [
+                {"id": "src", "type": "import", "source_id": "s"},
+                {
+                    "id": "t1",
+                    "type": "test",
+                    "inputs": ["src"],
+                    "config": {"conditions": [{"column": "a", "op": "not_empty"}]},
+                },
+            ],
+        }
+    )
     ctx = _procedure_context(pipe)
     assert len(ctx["procedures"]) == 1
     assert ctx["procedures"][0]["code"] == ""
@@ -174,15 +262,25 @@ def test_procedure_context_sole_procedure_code_empty():
 
 def test_procedure_context_multi_procedure_codes_numbered():
     """With 2+ procedures, auto codes are P1..Pn by position."""
-    pipe = parse_pipeline({
-        "nodes": [
-            {"id": "src", "type": "import", "source_id": "s"},
-            {"id": "t1", "type": "test", "inputs": ["src"],
-             "config": {"conditions": [{"column": "a", "op": "not_empty"}]}},
-            {"id": "t2", "type": "test", "inputs": ["src"],
-             "config": {"conditions": [{"column": "a", "op": "not_empty"}]}},
-        ],
-    })
+    pipe = parse_pipeline(
+        {
+            "nodes": [
+                {"id": "src", "type": "import", "source_id": "s"},
+                {
+                    "id": "t1",
+                    "type": "test",
+                    "inputs": ["src"],
+                    "config": {"conditions": [{"column": "a", "op": "not_empty"}]},
+                },
+                {
+                    "id": "t2",
+                    "type": "test",
+                    "inputs": ["src"],
+                    "config": {"conditions": [{"column": "a", "op": "not_empty"}]},
+                },
+            ],
+        }
+    )
     ctx = _procedure_context(pipe)
     assert [p["code"] for p in ctx["procedures"]] == ["P1", "P2"]
 
@@ -191,24 +289,53 @@ def test_builder_get_renders_procedure_narrative_field(client):
     """The procedure section header exposes an editable narrative field, pre-filled
     from the procedure's narrative."""
     csv = b"user_id,can_create\nU1,true\nU2,\n"
-    client.post("/sources", data={"source_id": "users", "format": "csv"},
-                files={"file": ("users.csv", io.BytesIO(csv), "text/csv")},
-                follow_redirects=False)
-    client.post("/controls", data={"id": "c1", "title": "C1", "objective": "o",
-                "narrative": "n", "source_ids": ["users"], "failure_threshold_count": "0"},
-                follow_redirects=False)
+    client.post(
+        "/sources",
+        data={"source_id": "users", "format": "csv"},
+        files={"file": ("users.csv", io.BytesIO(csv), "text/csv")},
+        follow_redirects=False,
+    )
+    client.post(
+        "/controls",
+        data={
+            "id": "c1",
+            "title": "C1",
+            "objective": "o",
+            "narrative": "n",
+            "source_ids": ["users"],
+            "failure_threshold_count": "0",
+        },
+        follow_redirects=False,
+    )
     graph = {
         "nodes": [
             {"id": "src", "type": "import", "source_id": "users"},
-            {"id": "tst", "type": "test", "inputs": ["src"],
-             "config": {"logic": "all", "procedure_id": "p1",
-                        "conditions": [{"column": "can_create", "op": "not_empty"}]}},
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["src"],
+                "config": {
+                    "logic": "all",
+                    "procedure_id": "p1",
+                    "conditions": [{"column": "can_create", "op": "not_empty"}],
+                },
+            },
         ],
-        "procedures": [{"id": "p1", "code": "P1", "name": "One",
-                        "narrative": "Reviewer independence", "position": 0}],
+        "procedures": [
+            {
+                "id": "p1",
+                "code": "P1",
+                "name": "One",
+                "narrative": "Reviewer independence",
+                "position": 0,
+            }
+        ],
     }
-    client.post("/controls/c1/logic/builder",
-                data={"pipeline_json": json.dumps(graph)}, follow_redirects=False)
+    client.post(
+        "/controls/c1/logic/builder",
+        data={"pipeline_json": json.dumps(graph)},
+        follow_redirects=False,
+    )
     page = client.get("/controls/c1/logic/builder").text
     assert "data-proc-narrative" in page
     assert "Reviewer independence" in page
@@ -219,30 +346,52 @@ def test_test_node_card_has_no_procedure_identity_fields(client):
     per-node Threshold fields moved to the procedure header. The 'Belongs to'
     selector and Severity stay."""
     csv = b"user_id,can_create\nU1,true\nU2,\n"
-    client.post("/sources", data={"source_id": "users", "format": "csv"},
-                files={"file": ("users.csv", io.BytesIO(csv), "text/csv")},
-                follow_redirects=False)
-    client.post("/controls", data={"id": "c1", "title": "C1", "objective": "o",
-                "narrative": "n", "source_ids": ["users"], "failure_threshold_count": "0"},
-                follow_redirects=False)
+    client.post(
+        "/sources",
+        data={"source_id": "users", "format": "csv"},
+        files={"file": ("users.csv", io.BytesIO(csv), "text/csv")},
+        follow_redirects=False,
+    )
+    client.post(
+        "/controls",
+        data={
+            "id": "c1",
+            "title": "C1",
+            "objective": "o",
+            "narrative": "n",
+            "source_ids": ["users"],
+            "failure_threshold_count": "0",
+        },
+        follow_redirects=False,
+    )
     graph = {
         "nodes": [
             {"id": "src", "type": "import", "source_id": "users"},
-            {"id": "tst", "type": "test", "inputs": ["src"],
-             "config": {"logic": "all", "procedure_id": "p1",
-                        "conditions": [{"column": "can_create", "op": "not_empty"}]}},
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["src"],
+                "config": {
+                    "logic": "all",
+                    "procedure_id": "p1",
+                    "conditions": [{"column": "can_create", "op": "not_empty"}],
+                },
+            },
         ],
         "procedures": [{"id": "p1", "code": "P1", "name": "One", "position": 0}],
     }
-    client.post("/controls/c1/logic/builder",
-                data={"pipeline_json": json.dumps(graph)}, follow_redirects=False)
+    client.post(
+        "/controls/c1/logic/builder",
+        data={"pipeline_json": json.dumps(graph)},
+        follow_redirects=False,
+    )
     page = client.get("/controls/c1/logic/builder").text
     # Vestigial procedure fields are gone from every Test node card and the serializer.
     assert "data-proc-title" not in page
     assert "data-threshold-pct" not in page
     assert "data-threshold-count" not in page
     # Genuine step mechanics remain.
-    assert "data-procedure" in page   # "Belongs to" selector
+    assert "data-procedure" in page  # "Belongs to" selector
     assert "data-severity" in page
 
 
@@ -265,8 +414,14 @@ def test_builder_get_renders_procedure_title_layout(client):
     # Narrative is present via its stable hook.
     assert "data-proc-narrative" in page
     # Attributes the serializer reads are still present.
-    for attr in ("data-proc-code", "data-proc-name", "data-proc-assert",
-                 "data-proc-pct", "data-proc-count", "data-proc-narrative"):
+    for attr in (
+        "data-proc-code",
+        "data-proc-name",
+        "data-proc-assert",
+        "data-proc-pct",
+        "data-proc-count",
+        "data-proc-narrative",
+    ):
         assert attr in page
 
 
@@ -284,8 +439,12 @@ def test_builder_get_degrades_gracefully_on_partial_pipeline(
         "nodes": [
             {"id": "src", "type": "import", "source_id": "users", "inputs": [], "config": {}},
             # dangling input — "ghost" never appears as a node id → PipelineError
-            {"id": "tst", "type": "test", "inputs": ["ghost"],
-             "config": {"logic": "all", "conditions": []}},
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["ghost"],
+                "config": {"logic": "all", "conditions": []},
+            },
         ],
     }
     conn = connect(engagement)

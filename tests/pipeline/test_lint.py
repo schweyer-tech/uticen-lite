@@ -38,10 +38,7 @@ from uticen_lite.pipeline.model import parse_pipeline
 
 
 def test_clean_transform_passes():
-    code = (
-        "rows = rows[rows['amount'].astype(float) >= 1000]\n"
-        "rows = rows.sort_values('amount')"
-    )
+    code = "rows = rows[rows['amount'].astype(float) >= 1000]\nrows = rows.sort_values('amount')"
     # Returns no errors → clean.
     assert lint_custom_code(code) == []
 
@@ -220,11 +217,22 @@ def _pipeline_with_custom(code: str, flavor: str = "transform") -> dict:
     return {
         "nodes": [
             {"id": "imp", "type": "import", "source_id": "payments"},
-            {"id": "cust", "type": "custom_python", "inputs": ["imp"],
-             "config": {"flavor": flavor, "code": code}},
-            {"id": "tst", "type": "test", "inputs": ["cust"],
-             "config": {"logic": "any", "item_key_column": "id",
-                        "conditions": [{"column": "id", "op": "not_empty"}]}},
+            {
+                "id": "cust",
+                "type": "custom_python",
+                "inputs": ["imp"],
+                "config": {"flavor": flavor, "code": code},
+            },
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["cust"],
+                "config": {
+                    "logic": "any",
+                    "item_key_column": "id",
+                    "conditions": [{"column": "id", "op": "not_empty"}],
+                },
+            },
         ]
     }
 
@@ -249,9 +257,16 @@ def test_lint_pipeline_ignores_non_custom_nodes():
     raw = {
         "nodes": [
             {"id": "imp", "type": "import", "source_id": "payments"},
-            {"id": "tst", "type": "test", "inputs": ["imp"],
-             "config": {"logic": "any", "item_key_column": "id",
-                        "conditions": [{"column": "id", "op": "not_empty"}]}},
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["imp"],
+                "config": {
+                    "logic": "any",
+                    "item_key_column": "id",
+                    "conditions": [{"column": "id", "op": "not_empty"}],
+                },
+            },
         ]
     }
     assert lint_pipeline(parse_pipeline(raw)) == []

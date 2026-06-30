@@ -551,23 +551,40 @@ class TestRunControlMultiSource:
 def _csv(tmp_path: Path) -> Path:
     p = tmp_path / "data"
     p.mkdir()
-    pd.DataFrame({"user_id": ["U1", "U2"], "can_create": ["true", "true"],
-                  "can_approve": ["true", "false"]}).to_csv(p / "users.csv", index=False)
+    pd.DataFrame(
+        {"user_id": ["U1", "U2"], "can_create": ["true", "true"], "can_approve": ["true", "false"]}
+    ).to_csv(p / "users.csv", index=False)
     return tmp_path
 
 
 def _users_binding() -> SourceBinding:
     return SourceBinding(
-        id="users", type="file",
+        id="users",
+        type="file",
         config={"path": "data/users.csv", "format": "csv"},
         key_config={"mode": "single", "columns": ["user_id"]},
         column_mappings=[
-            {"original_name": "user_id", "display_name": "User ID",
-             "data_type": "text", "is_key": True, "include": True},
-            {"original_name": "can_create", "display_name": "Can Create",
-             "data_type": "boolean", "is_key": False, "include": True},
-            {"original_name": "can_approve", "display_name": "Can Approve",
-             "data_type": "boolean", "is_key": False, "include": True},
+            {
+                "original_name": "user_id",
+                "display_name": "User ID",
+                "data_type": "text",
+                "is_key": True,
+                "include": True,
+            },
+            {
+                "original_name": "can_create",
+                "display_name": "Can Create",
+                "data_type": "boolean",
+                "is_key": False,
+                "include": True,
+            },
+            {
+                "original_name": "can_approve",
+                "display_name": "Can Approve",
+                "data_type": "boolean",
+                "is_key": False,
+                "include": True,
+            },
         ],
     )
 
@@ -578,8 +595,13 @@ def test_run_control_executes_a_rule(tmp_path: Path):
     root = _csv(tmp_path)
     binding = _users_binding()
     control = ControlDef(
-        id="sod", title="SoD", objective="o", narrative="n",
-        framework_refs=FrameworkRefs(), risk=None, sources=[binding],
+        id="sod",
+        title="SoD",
+        objective="o",
+        narrative="n",
+        framework_refs=FrameworkRefs(),
+        risk=None,
+        sources=[binding],
         rule_spec={
             "logic": "all",
             "conditions": [
@@ -607,8 +629,12 @@ def test_run_control_executes_a_rule(tmp_path: Path):
 
 def _rule_control(rule_spec: dict, binding: SourceBinding | None = None) -> ControlDef:
     return ControlDef(
-        id="sod", title="SoD", objective="o", narrative="n",
-        framework_refs=FrameworkRefs(), risk=None,
+        id="sod",
+        title="SoD",
+        objective="o",
+        narrative="n",
+        framework_refs=FrameworkRefs(),
+        risk=None,
         sources=[binding or _users_binding()],
         rule_spec=rule_spec,
     )
@@ -625,9 +651,13 @@ class TestRunControlCorruptedState:
             {
                 "logic": "all",
                 "conditions": [
-                    {"op": "not_exists_in", "column": "user_id",
-                     "other_source": "ghost", "this_key": "user_id",
-                     "other_key": "employee_id"},
+                    {
+                        "op": "not_exists_in",
+                        "column": "user_id",
+                        "other_source": "ghost",
+                        "this_key": "user_id",
+                        "other_key": "employee_id",
+                    },
                 ],
                 "severity": "high",
                 "description_template": "User {user_id}",

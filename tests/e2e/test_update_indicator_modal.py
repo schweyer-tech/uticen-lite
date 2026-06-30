@@ -83,9 +83,7 @@ def test_header_update_modal_traps_focus_and_restores_trigger(page, live_server)
     )
 
 
-def test_header_update_indicator_stays_hidden_when_checks_are_off(
-    page, live_server, engagement
-):
+def test_header_update_indicator_stays_hidden_when_checks_are_off(page, live_server, engagement):
     # The launch check defaults ON, so explicitly turn it OFF to assert the
     # zero-egress path leaves the header indicator hidden.
     conn = connect(engagement)

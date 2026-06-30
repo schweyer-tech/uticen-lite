@@ -142,11 +142,18 @@ def test_author_run_export_two_procedure_control(
     complete_graph = {
         "nodes": [
             {
-                "id": "src", "type": "import", "source_id": "mpusers",
-                "narrative": "", "config": {}, "inputs": [],
+                "id": "src",
+                "type": "import",
+                "source_id": "mpusers",
+                "narrative": "",
+                "config": {},
+                "inputs": [],
             },
             {
-                "id": "tst", "type": "test", "inputs": ["src"], "narrative": "",
+                "id": "tst",
+                "type": "test",
+                "inputs": ["src"],
+                "narrative": "",
                 "config": {
                     "logic": "all",
                     "severity": "high",
@@ -158,7 +165,10 @@ def test_author_run_export_two_procedure_control(
                 },
             },
             {
-                "id": "tes1", "type": "test", "inputs": ["src"], "narrative": "",
+                "id": "tes1",
+                "type": "test",
+                "inputs": ["src"],
+                "narrative": "",
                 "config": {
                     "logic": "all",
                     "severity": "high",
@@ -201,17 +211,17 @@ def test_author_run_export_two_procedure_control(
     # Confirm the procedure section headers derive their names + thresholds from
     # node config.title / config.failure_threshold_count (auto-procedures — no
     # explicit procedures in the injected graph; proc id == terminal id).
-    expect(
-        page.locator('[data-proc-head][data-proc-id="tst"] [data-proc-name]')
-    ).to_have_value("High pass rate")
-    expect(
-        page.locator('[data-proc-head][data-proc-id="tes1"] [data-proc-name]')
-    ).to_have_value("Zero tolerance")
+    expect(page.locator('[data-proc-head][data-proc-id="tst"] [data-proc-name]')).to_have_value(
+        "High pass rate"
+    )
+    expect(page.locator('[data-proc-head][data-proc-id="tes1"] [data-proc-name]')).to_have_value(
+        "Zero tolerance"
+    )
     # Branch A's threshold (authored in node config, surfaced via auto-derivation)
     # persists on the procedure header — migrated from the removed node-card field.
-    expect(
-        page.locator('[data-proc-head][data-proc-id="tst"] [data-proc-count]')
-    ).to_have_value("5")
+    expect(page.locator('[data-proc-head][data-proc-id="tst"] [data-proc-count]')).to_have_value(
+        "5"
+    )
     # Confirm tes1's input wiring survived the save.
     tes1 = page.locator('[data-node="tes1"]')
     expect(tes1.locator("[data-input]")).to_have_value("src")

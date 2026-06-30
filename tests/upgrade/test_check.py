@@ -20,9 +20,7 @@ def test_latest_version_uses_injected_fetcher():
 
 
 def test_pip_update_available(monkeypatch):
-    monkeypatch.setattr(
-        "uticen_lite.upgrade.check.current_version", lambda: "0.1.0"
-    )
+    monkeypatch.setattr("uticen_lite.upgrade.check.current_version", lambda: "0.1.0")
     info = check_for_update(InstallMethod.PIP, fetch=lambda: "0.2.0")
     assert isinstance(info, UpdateInfo)
     assert info.available is True
@@ -31,34 +29,26 @@ def test_pip_update_available(monkeypatch):
 
 
 def test_pip_up_to_date(monkeypatch):
-    monkeypatch.setattr(
-        "uticen_lite.upgrade.check.current_version", lambda: "0.2.0"
-    )
+    monkeypatch.setattr("uticen_lite.upgrade.check.current_version", lambda: "0.2.0")
     info = check_for_update(InstallMethod.PIP, fetch=lambda: "0.2.0")
     assert info.available is False
 
 
 def test_pip_unreachable_index_degrades(monkeypatch):
-    monkeypatch.setattr(
-        "uticen_lite.upgrade.check.current_version", lambda: "0.1.0"
-    )
+    monkeypatch.setattr("uticen_lite.upgrade.check.current_version", lambda: "0.1.0")
     info = check_for_update(InstallMethod.PIP, fetch=lambda: None)
     assert info.available is False
     assert "couldn't" in info.message.lower()
 
 
 def test_unknown_method_is_not_available(monkeypatch):
-    monkeypatch.setattr(
-        "uticen_lite.upgrade.check.current_version", lambda: "0.1.0"
-    )
+    monkeypatch.setattr("uticen_lite.upgrade.check.current_version", lambda: "0.1.0")
     info = check_for_update(InstallMethod.UNKNOWN)
     assert info.available is False
 
 
 def test_git_behind_uses_injected_runner(monkeypatch):
-    monkeypatch.setattr(
-        "uticen_lite.upgrade.check.current_version", lambda: "0.1.0"
-    )
+    monkeypatch.setattr("uticen_lite.upgrade.check.current_version", lambda: "0.1.0")
     monkeypatch.setattr(
         "uticen_lite.upgrade.check.source_dir", lambda: __import__("pathlib").Path(".")
     )

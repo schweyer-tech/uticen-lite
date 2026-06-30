@@ -189,8 +189,7 @@ def run_control(
     # ── 2. Select the primary population (first bound source) ─────────────────
     if not populations:
         raise RunnerError(
-            f"Control '{control.id}' has no bound data source — "
-            "bind a source before running."
+            f"Control '{control.id}' has no bound data source — bind a source before running."
         )
     primary: Population = populations[0]
 
@@ -201,9 +200,7 @@ def run_control(
         from uticen_lite.rules.spec import parse_rule_spec
 
         try:
-            raw_result = evaluate_rule(
-                parse_rule_spec(control.rule_spec), primary, sources_by_id
-            )
+            raw_result = evaluate_rule(parse_rule_spec(control.rule_spec), primary, sources_by_id)
         except Exception as exc:
             # Authoring mistakes (unknown cross-source, a comparison op on a text
             # column, a bad regex, a missing column) must degrade, never 500 (0013).

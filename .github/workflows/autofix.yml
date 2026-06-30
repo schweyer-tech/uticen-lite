@@ -1,0 +1,67 @@
+name: Autofix
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+permissions:
+  contents: write
+jobs:
+  autofix:
+    if: github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft
+    runs-on: [self-hosted, macOS]
+    steps:
+      - name: Checkout PR head (PAT so the push re-triggers CI)
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.COPILOT_PAT }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Detect ecosystem
+        id: eco
+        run: |
+          if [ -f package.json ]; then echo "kind=node" >> "$GITHUB_OUTPUT"
+          elif [ -f pyproject.toml ] || [ -f ruff.toml ]; then echo "kind=python" >> "$GITHUB_OUTPUT"
+          else echo "kind=none" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Setup Node
+        if: steps.eco.outputs.kind == 'node'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install + eslint --fix
+        if: steps.eco.outputs.kind == 'node'
+        run: |
+          npm ci
+          npx eslint . --fix || true
+
+      - name: Setup Python + ruff --fix
+        if: steps.eco.outputs.kind == 'python'
+        run: |
+          python -m pip install --upgrade ruff
+          ruff check --fix . || true
+          ruff format . || true
+
+      - name: Commit + push fixes back to the PR branch
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "autofix-bot"
+            git config user.email "autofix-bot@users.noreply.github.com"
+            git add -A
+            git commit -m "style: auto-fix lint (eslint/ruff --fix)"
+            git push origin "HEAD:$HEAD_REF"
+            echo "pushed autofix commit"
+          else
+            echo "nothing to fix"
+          fi
+
+      - name: Fail only on NON-autofixable lint errors
+        if: steps.eco.outputs.kind == 'node'
+        run: npx eslint .
+
+      - name: Fail only on NON-autofixable ruff errors
+        if: steps.eco.outputs.kind == 'python'
+        run: ruff check .

@@ -83,9 +83,7 @@ def _seed(page: Page, base: str) -> str:
                     "severity": "high",
                     "item_key_column": "user_id",
                     "description_template": "User {user_id}",
-                    "conditions": [
-                        {"column": "can_create", "op": "eq", "value": "true"}
-                    ],
+                    "conditions": [{"column": "can_create", "op": "eq", "value": "true"}],
                 },
             },
         ]

@@ -28,6 +28,7 @@ _UPLOAD_FORMATS = {".csv": "csv", ".xlsx": "xlsx", ".parquet": "parquet"}
 def _fmt_from_name(name: str) -> str | None:
     return _UPLOAD_FORMATS.get(Path(name).suffix.lower())
 
+
 PAGE_SIZE = 50
 
 # ---- data-file versioning helpers -----------------------------------------
@@ -35,6 +36,7 @@ PAGE_SIZE = 50
 # copied into data/.versions/<id>/ before being overwritten, and uploads awaiting
 # the user's explicit confirmation are staged under data/.pending/<id>/. Both live
 # under nested dirs so the top-level data/*.csv glob (import/load_demo) ignores them.
+
 
 def _pending_dir(root: Path, sid: str) -> Path:
     return root / "data" / ".pending" / sid
@@ -75,8 +77,14 @@ def _reconcile_columns(
             col = dict(by_name[h])
             col["ordinal"] = i
         else:
-            col = {"original_name": h, "display_name": h, "data_type": "text",
-                   "is_key": False, "include": True, "ordinal": i}
+            col = {
+                "original_name": h,
+                "display_name": h,
+                "data_type": "text",
+                "is_key": False,
+                "include": True,
+                "ordinal": i,
+            }
         reconciled.append(col)
     added = [h for h in new_headers if h not in by_name]
     removed = [c["original_name"] for c in existing if c["original_name"] not in new_headers]
@@ -90,7 +98,7 @@ def _coerce_date(val: str) -> str | None:
 
 def _set_extract_date(conn: sqlite3.Connection, source_id: str, as_of_date: str) -> None:
     """Stamp the source's extract_date from a posted as-of date (no-op when blank)."""
-    if (stripped := as_of_date.strip()):
+    if stripped := as_of_date.strip():
         conn.execute("UPDATE sources SET extract_date = ? WHERE id = ?", (stripped, source_id))
         conn.commit()
 
@@ -113,7 +121,7 @@ def register(
     @app.get("/sources", response_class=HTMLResponse)
     def list_sources(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         return templates.TemplateResponse(
             request,
@@ -124,7 +132,7 @@ def register(
     @app.get("/sources/new", response_class=HTMLResponse)
     def new_source(
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         return templates.TemplateResponse(
             request,
@@ -135,10 +143,10 @@ def register(
     @app.post("/sources", response_model=None)
     async def create_source(
         request: Request,
-        source_id: str = Form(...),
-        as_of_date: str = Form(""),
-        sheet: str = Form(""),
-        file: UploadFile = File(...),
+        source_id: str = Form(...),  # noqa: FAST002
+        as_of_date: str = Form(""),  # noqa: FAST002
+        sheet: str = Form(""),  # noqa: FAST002
+        file: UploadFile = File(...),  # noqa: FAST002
     ) -> HTMLResponse | RedirectResponse:
         root = request.app.state.project_root
         filename = file.filename or f"{source_id}.csv"
@@ -147,8 +155,10 @@ def register(
 
         def _err(msg: str) -> HTMLResponse:
             return templates.TemplateResponse(
-                request, "source_new.html",
-                {"project": _project(root), "error": msg}, status_code=200,
+                request,
+                "source_new.html",
+                {"project": _project(root), "error": msg},
+                status_code=200,
             )
 
         if fmt is None:
@@ -167,18 +177,37 @@ def register(
             (root / "data").mkdir(parents=True, exist_ok=True)
             dest = root / "data" / Path(filename).name
             dest.write_bytes(raw)
-            repo.upsert_source(conn, id=source_id, format=fmt,
-                               path=f"data/{dest.name}", key_config={"mode": "auto"},
-                               sheet=sheet_val)
-            repo.set_columns(conn, source_id, [
-                {"original_name": h, "display_name": h, "data_type": "text",
-                 "is_key": False, "include": True, "ordinal": i}
-                for i, h in enumerate(table.header)
-            ])
+            repo.upsert_source(
+                conn,
+                id=source_id,
+                format=fmt,
+                path=f"data/{dest.name}",
+                key_config={"mode": "auto"},
+                sheet=sheet_val,
+            )
+            repo.set_columns(
+                conn,
+                source_id,
+                [
+                    {
+                        "original_name": h,
+                        "display_name": h,
+                        "data_type": "text",
+                        "is_key": False,
+                        "include": True,
+                        "ordinal": i,
+                    }
+                    for i, h in enumerate(table.header)
+                ],
+            )
             repo.set_initial_file(
-                conn, source_id=source_id, stored_path=f"data/{dest.name}",
-                original_name=dest.name, as_of_date=_coerce_date(as_of_date),
-                row_count=len(table.rows), uploaded_at=_stamp(),
+                conn,
+                source_id=source_id,
+                stored_path=f"data/{dest.name}",
+                original_name=dest.name,
+                as_of_date=_coerce_date(as_of_date),
+                row_count=len(table.rows),
+                uploaded_at=_stamp(),
             )
             _set_extract_date(conn, source_id, as_of_date)
         finally:
@@ -188,8 +217,9 @@ def register(
     def _do_fetch(request: Request, url: str, headers: dict, record_path: str | None):
         # Tests inject app.state.fetch_opener; production uses the default opener.
         opener = getattr(request.app.state, "fetch_opener", None)
-        return fetchmod.fetch_snapshot(url, headers=headers or None,
-                                       record_path=record_path or None, opener=opener)
+        return fetchmod.fetch_snapshot(
+            url, headers=headers or None, record_path=record_path or None, opener=opener
+        )
 
     def _parse_headers(raw: str) -> dict:
         raw = (raw or "").strip()
@@ -200,33 +230,42 @@ def register(
         except jsonmod.JSONDecodeError as e:
             raise fetchmod.FetchError(f"Headers must be a JSON object: {e}") from e
         if not isinstance(parsed, dict):
-            raise fetchmod.FetchError("Headers must be a JSON object, e.g. "
-                                      '{"Authorization": "Bearer ..."}')
+            raise fetchmod.FetchError(
+                'Headers must be a JSON object, e.g. {"Authorization": "Bearer ..."}'
+            )
         return {str(k): str(v) for k, v in parsed.items()}
 
     @app.get("/sources/from-url", response_class=HTMLResponse)
     def new_source_from_url(request: Request) -> HTMLResponse:
         return templates.TemplateResponse(
-            request, "source_new.html",
+            request,
+            "source_new.html",
             {"project": _project(request.app.state.project_root), "mode": "url"},
         )
 
     @app.post("/sources/from-url", response_model=None)
     async def create_source_from_url(
         request: Request,
-        source_id: str = Form(...),
-        url: str = Form(...),
-        headers: str = Form(""),
-        record_path: str = Form(""),
-        as_of_date: str = Form(""),
+        source_id: str = Form(...),  # noqa: FAST002
+        url: str = Form(...),  # noqa: FAST002
+        headers: str = Form(""),  # noqa: FAST002
+        record_path: str = Form(""),  # noqa: FAST002
+        as_of_date: str = Form(""),  # noqa: FAST002
     ) -> HTMLResponse | RedirectResponse:
         root = request.app.state.project_root
 
         def _err(msg: str) -> HTMLResponse:
             return templates.TemplateResponse(
-                request, "source_new.html",
-                {"project": _project(root), "mode": "url", "error": msg,
-                 "url": url, "record_path": record_path}, status_code=200,
+                request,
+                "source_new.html",
+                {
+                    "project": _project(root),
+                    "mode": "url",
+                    "error": msg,
+                    "url": url,
+                    "record_path": record_path,
+                },
+                status_code=200,
             )
 
         try:
@@ -241,21 +280,45 @@ def register(
             (root / "data").mkdir(parents=True, exist_ok=True)
             dest = root / "data" / snap.suggested_name
             dest.write_bytes(snap.raw)
-            repo.upsert_source(conn, id=source_id, format=snap.fmt,
-                               path=f"data/{dest.name}", key_config={"mode": "auto"})
-            repo.set_columns(conn, source_id, [
-                {"original_name": h, "display_name": h, "data_type": "text",
-                 "is_key": False, "include": True, "ordinal": i}
-                for i, h in enumerate(table.header)
-            ])
-            repo.set_initial_file(
-                conn, source_id=source_id, stored_path=f"data/{dest.name}",
-                original_name=dest.name, as_of_date=_coerce_date(as_of_date),
-                row_count=len(table.rows), uploaded_at=_stamp(),
+            repo.upsert_source(
+                conn,
+                id=source_id,
+                format=snap.fmt,
+                path=f"data/{dest.name}",
+                key_config={"mode": "auto"},
             )
-            repo.upsert_source_fetch(conn, source_id=source_id, url=snap.source_url,
-                                     headers=hdrs, record_path=record_path.strip() or None,
-                                     last_fetched_at=snap.fetched_at)
+            repo.set_columns(
+                conn,
+                source_id,
+                [
+                    {
+                        "original_name": h,
+                        "display_name": h,
+                        "data_type": "text",
+                        "is_key": False,
+                        "include": True,
+                        "ordinal": i,
+                    }
+                    for i, h in enumerate(table.header)
+                ],
+            )
+            repo.set_initial_file(
+                conn,
+                source_id=source_id,
+                stored_path=f"data/{dest.name}",
+                original_name=dest.name,
+                as_of_date=_coerce_date(as_of_date),
+                row_count=len(table.rows),
+                uploaded_at=_stamp(),
+            )
+            repo.upsert_source_fetch(
+                conn,
+                source_id=source_id,
+                url=snap.source_url,
+                headers=hdrs,
+                record_path=record_path.strip() or None,
+                last_fetched_at=snap.fetched_at,
+            )
             _set_extract_date(conn, source_id, as_of_date)
         finally:
             conn.close()
@@ -265,14 +328,16 @@ def register(
     def edit_source(
         source_id: str,
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         return templates.TemplateResponse(
             request,
             "source_edit.html",
-            {"project": repo.get_project(conn) or {"name": ""},
-             "source": repo.get_source(conn, source_id),
-             "active": "definition"},
+            {
+                "project": repo.get_project(conn) or {"name": ""},
+                "source": repo.get_source(conn, source_id),
+                "active": "definition",
+            },
         )
 
     @app.get("/sources/{source_id}/data", response_class=HTMLResponse)
@@ -280,7 +345,7 @@ def register(
         source_id: str,
         request: Request,
         page: int = 1,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         root = request.app.state.project_root
         source = repo.get_source(conn, source_id)
@@ -303,7 +368,7 @@ def register(
                     total = len(data_rows)
                     page = max(1, page)
                     start = (page - 1) * PAGE_SIZE
-                    rows = data_rows[start:start + PAGE_SIZE]
+                    rows = data_rows[start : start + PAGE_SIZE]
                 except (AdaptersUnavailable, TableParseError) as e:
                     adapters_error = str(e)
         page_count = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
@@ -313,38 +378,51 @@ def register(
         if header and source:
             coercion = coercion_report(header, data_rows, source["columns"])
         return templates.TemplateResponse(
-            request, "source_data.html",
-            {"project": repo.get_project(conn) or {"name": ""},
-             "source": source, "current": current,
-             "header": header, "rows": rows, "total": total,
-             "page": min(page, page_count), "page_count": page_count,
-             "page_size": PAGE_SIZE, "coercion": coercion,
-             "adapters_error": adapters_error, "active": "data",
-             "fetch": repo.get_source_fetch(conn, source_id)},
+            request,
+            "source_data.html",
+            {
+                "project": repo.get_project(conn) or {"name": ""},
+                "source": source,
+                "current": current,
+                "header": header,
+                "rows": rows,
+                "total": total,
+                "page": min(page, page_count),
+                "page_count": page_count,
+                "page_size": PAGE_SIZE,
+                "coercion": coercion,
+                "adapters_error": adapters_error,
+                "active": "data",
+                "fetch": repo.get_source_fetch(conn, source_id),
+            },
         )
 
     @app.get("/sources/{source_id}/history", response_class=HTMLResponse)
     def source_history(
         source_id: str,
         request: Request,
-        conn: sqlite3.Connection = Depends(get_conn),
+        conn: sqlite3.Connection = Depends(get_conn),  # noqa: FAST002
     ) -> HTMLResponse:
         files = repo.list_source_files(conn, source_id)
         for f in files:
             f["uploaded"] = _fmt_stamp(f["uploaded_at"]) if f["uploaded_at"] else ""
         return templates.TemplateResponse(
-            request, "source_history.html",
-            {"project": repo.get_project(conn) or {"name": ""},
-             "source": repo.get_source(conn, source_id),
-             "files": files, "active": "history",
-             "fetch": repo.get_source_fetch(conn, source_id)},
+            request,
+            "source_history.html",
+            {
+                "project": repo.get_project(conn) or {"name": ""},
+                "source": repo.get_source(conn, source_id),
+                "files": files,
+                "active": "history",
+                "fetch": repo.get_source_fetch(conn, source_id),
+            },
         )
 
     @app.post("/sources/{source_id}/data/asof")
     async def update_asof(
         source_id: str,
         request: Request,
-        as_of_date: str = Form(""),
+        as_of_date: str = Form(""),  # noqa: FAST002
     ) -> RedirectResponse:
         root = request.app.state.project_root
         conn = connect(root)
@@ -367,21 +445,21 @@ def register(
             if existing is None:
                 return RedirectResponse("/sources", status_code=303)
             key_columns = [
-                k.strip()
-                for k in str(form.get("key_columns", "")).split(",")
-                if k.strip()
+                k.strip() for k in str(form.get("key_columns", "")).split(",") if k.strip()
             ]
             columns = []
             for i, col in enumerate(existing["columns"]):
                 name = col["original_name"]
-                columns.append({
-                    "original_name": name,
-                    "display_name": form.get(f"display_name__{name}", name),
-                    "data_type": form.get(f"data_type__{name}", "text"),
-                    "is_key": name in key_columns,
-                    "include": form.get(f"include__{name}") is not None,
-                    "ordinal": i,
-                })
+                columns.append(
+                    {
+                        "original_name": name,
+                        "display_name": form.get(f"display_name__{name}", name),
+                        "data_type": form.get(f"data_type__{name}", "text"),
+                        "is_key": name in key_columns,
+                        "include": form.get(f"include__{name}") is not None,
+                        "ordinal": i,
+                    }
+                )
             repo.set_columns(conn, source_id, columns)
             if len(key_columns) == 1:
                 key_config: dict[str, Any] = {"mode": "single", "columns": key_columns}
@@ -394,8 +472,11 @@ def register(
                 return str(form.get(name, "")).strip() or None
 
             repo.upsert_source(
-                conn, id=source_id, format=existing["format"],
-                path=existing["path"], key_config=key_config,
+                conn,
+                id=source_id,
+                format=existing["format"],
+                path=existing["path"],
+                key_config=key_config,
                 title=_field("title"),
                 description=_field("description"),
                 # Not exposed in the editor form — preserve the imported value.
@@ -411,8 +492,8 @@ def register(
     async def refresh_source(
         source_id: str,
         request: Request,
-        file: UploadFile = File(...),
-        as_of_date: str = Form(""),
+        file: UploadFile = File(...),  # noqa: FAST002
+        as_of_date: str = Form(""),  # noqa: FAST002
     ) -> HTMLResponse | RedirectResponse:
         """Stage a new data file and show a confirm page with the column diff."""
         root = request.app.state.project_root
@@ -431,19 +512,29 @@ def register(
             except (AdaptersUnavailable, TableParseError) as e:
                 (pdir / pending_name).unlink(missing_ok=True)
                 return templates.TemplateResponse(
-                    request, "source_edit.html",
-                    {"project": repo.get_project(conn) or {"name": ""},
-                     "source": existing, "active": "definition", "error": str(e)},
+                    request,
+                    "source_edit.html",
+                    {
+                        "project": repo.get_project(conn) or {"name": ""},
+                        "source": existing,
+                        "active": "definition",
+                        "error": str(e),
+                    },
                     status_code=200,
                 )
             _, added, removed = _reconcile_columns(existing["columns"], new_headers)
             return templates.TemplateResponse(
                 request,
                 "source_refresh.html",
-                {"project": repo.get_project(conn) or {"name": ""},
-                 "source": existing, "pending": pending_name,
-                 "new_headers": new_headers, "added": added, "removed": removed,
-                 "as_of_date": as_of_date},
+                {
+                    "project": repo.get_project(conn) or {"name": ""},
+                    "source": existing,
+                    "pending": pending_name,
+                    "new_headers": new_headers,
+                    "added": added,
+                    "removed": removed,
+                    "as_of_date": as_of_date,
+                },
             )
         finally:
             conn.close()
@@ -452,8 +543,8 @@ def register(
     async def confirm_refresh(
         source_id: str,
         request: Request,
-        pending: str = Form(...),
-        as_of_date: str = Form(""),
+        pending: str = Form(...),  # noqa: FAST002
+        as_of_date: str = Form(""),  # noqa: FAST002
     ) -> RedirectResponse:
         """Archive the current file, promote the staged file, reconcile columns."""
         root = request.app.state.project_root
@@ -486,8 +577,9 @@ def register(
             repo.set_columns(conn, source_id, reconciled)
 
             # Drop any dropped column from the key config so it can't dangle.
-            key_cols = [c for c in (existing.get("key_config") or {}).get("columns", [])
-                        if c not in removed]
+            key_cols = [
+                c for c in (existing.get("key_config") or {}).get("columns", []) if c not in removed
+            ]
             if len(key_cols) == 1:
                 key_config: dict[str, Any] = {"mode": "single", "columns": key_cols}
             elif key_cols:
@@ -497,7 +589,9 @@ def register(
 
             # Record the new current file version (old one archived above if it existed).
             repo.record_current_file(
-                conn, source_id=source_id, stored_path=existing["path"],
+                conn,
+                source_id=source_id,
+                stored_path=existing["path"],
                 original_name=Path(pending).name,
                 as_of_date=_coerce_date(as_of_date),
                 row_count=_row_count(new_bytes, existing["format"], existing.get("sheet")),
@@ -506,9 +600,13 @@ def register(
 
             new_extract_date = as_of_date.strip() or existing.get("extract_date")
             repo.upsert_source(
-                conn, id=source_id, format=existing["format"],
-                path=existing["path"], key_config=key_config,
-                title=existing.get("title"), description=existing.get("description"),
+                conn,
+                id=source_id,
+                format=existing["format"],
+                path=existing["path"],
+                key_config=key_config,
+                title=existing.get("title"),
+                description=existing.get("description"),
                 completeness_accuracy=existing.get("completeness_accuracy"),
                 extract_date=new_extract_date,
                 sheet=existing.get("sheet"),
@@ -521,7 +619,7 @@ def register(
     async def cancel_refresh(
         source_id: str,
         request: Request,
-        pending: str = Form(""),
+        pending: str = Form(""),  # noqa: FAST002
     ) -> RedirectResponse:
         """Discard a staged file without touching the current data."""
         root = request.app.state.project_root
@@ -542,33 +640,57 @@ def register(
             if existing is None or fetch_row is None:
                 return RedirectResponse(f"/sources/{source_id}", status_code=303)
             try:
-                snap = _do_fetch(request, fetch_row["url"], fetch_row["headers"],
-                                 fetch_row.get("record_path"))
+                snap = _do_fetch(
+                    request, fetch_row["url"], fetch_row["headers"], fetch_row.get("record_path")
+                )
                 new_headers = extract_table(snap.raw, snap.fmt).header
             except (fetchmod.FetchError, AdaptersUnavailable, TableParseError) as e:
                 return templates.TemplateResponse(
-                    request, "source_data.html",
-                    {"project": repo.get_project(conn) or {"name": ""},
-                     "source": existing, "current": repo.get_current_file(conn, source_id),
-                     "header": [], "rows": [], "total": 0, "page": 1, "page_count": 1,
-                     "page_size": PAGE_SIZE, "coercion": [], "active": "data",
-                     "fetch": fetch_row, "error": str(e), "adapters_error": None}, status_code=200,
+                    request,
+                    "source_data.html",
+                    {
+                        "project": repo.get_project(conn) or {"name": ""},
+                        "source": existing,
+                        "current": repo.get_current_file(conn, source_id),
+                        "header": [],
+                        "rows": [],
+                        "total": 0,
+                        "page": 1,
+                        "page_count": 1,
+                        "page_size": PAGE_SIZE,
+                        "coercion": [],
+                        "active": "data",
+                        "fetch": fetch_row,
+                        "error": str(e),
+                        "adapters_error": None,
+                    },
+                    status_code=200,
                 )
             pdir = _pending_dir(root, source_id)
             pdir.mkdir(parents=True, exist_ok=True)
             (pdir / snap.suggested_name).write_bytes(snap.raw)
             _, added, removed = _reconcile_columns(existing["columns"], new_headers)
             # Refresh last_fetched_at provenance now (the snapshot was taken).
-            repo.upsert_source_fetch(conn, source_id=source_id, url=fetch_row["url"],
-                                     headers=fetch_row["headers"],
-                                     record_path=fetch_row.get("record_path"),
-                                     last_fetched_at=snap.fetched_at)
+            repo.upsert_source_fetch(
+                conn,
+                source_id=source_id,
+                url=fetch_row["url"],
+                headers=fetch_row["headers"],
+                record_path=fetch_row.get("record_path"),
+                last_fetched_at=snap.fetched_at,
+            )
             return templates.TemplateResponse(
-                request, "source_refresh.html",
-                {"project": repo.get_project(conn) or {"name": ""},
-                 "source": existing, "pending": snap.suggested_name,
-                 "new_headers": new_headers, "added": added, "removed": removed,
-                 "as_of_date": ""},
+                request,
+                "source_refresh.html",
+                {
+                    "project": repo.get_project(conn) or {"name": ""},
+                    "source": existing,
+                    "pending": snap.suggested_name,
+                    "new_headers": new_headers,
+                    "added": added,
+                    "removed": removed,
+                    "as_of_date": "",
+                },
             )
         finally:
             conn.close()

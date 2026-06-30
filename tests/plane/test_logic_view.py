@@ -65,10 +65,7 @@ def test_empty_control_no_sources_scaffold_has_unbound_import():
 
 
 def test_raw_python_returns_none():
-    assert (
-        derive_builder_graph({"test_code": "def test(pop):\n    return []"}, [])
-        is None
-    )
+    assert derive_builder_graph({"test_code": "def test(pop):\n    return []"}, []) is None
     assert is_raw_python({"test_code": "def test(pop): ..."}) is True
     assert is_raw_python({"rule_spec": {"conditions": []}}) is False
 

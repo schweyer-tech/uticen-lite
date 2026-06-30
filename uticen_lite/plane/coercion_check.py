@@ -52,12 +52,14 @@ def coercion_report(
             bad = 0
 
         all_bad = non_empty_count > 0 and bad == non_empty_count
-        report.append({
-            "original_name": name,
-            "display_name": col.get("display_name", name),
-            "data_type": data_type,
-            "total": non_empty_count,
-            "bad": bad,
-            "all_bad": all_bad,
-        })
+        report.append(
+            {
+                "original_name": name,
+                "display_name": col.get("display_name", name),
+                "data_type": data_type,
+                "total": non_empty_count,
+                "bad": bad,
+                "all_bad": all_bad,
+            }
+        )
     return report

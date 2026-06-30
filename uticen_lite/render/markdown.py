@@ -247,9 +247,7 @@ def _render_procedures(lines: list[str], wp: Workpaper) -> None:
         if len(wp.procedures) > 1:
             det = proc.determination
             threshold_text, result_text = det.conclusion_text()
-            lines.append(
-                f"**Procedure verdict: {det.verdict}** — {threshold_text} {result_text}"
-            )
+            lines.append(f"**Procedure verdict: {det.verdict}** — {threshold_text} {result_text}")
             lines.append("")
         if run.violations:
             has_checks = any(v.details.get("checks") for v in run.violations)

@@ -42,9 +42,7 @@ RULE_SPEC_JSON_SCHEMA: dict[str, Any] = {
                 "properties": {
                     "column": {"type": "string"},
                     "op": {"type": "string", "enum": sorted(OPERATORS)},
-                    "value": {
-                        "type": ["string", "number", "boolean", "array", "null"]
-                    },
+                    "value": {"type": ["string", "number", "boolean", "array", "null"]},
                 },
             },
         },
@@ -93,9 +91,7 @@ def draft_and_validate(
     DraftError
         The draft references an unknown column, or does not execute on the sample.
     """
-    raw = get_provider(provider).draft_rule_spec(
-        objective, source_schema, data_sample, model=model
-    )
+    raw = get_provider(provider).draft_rule_spec(objective, source_schema, data_sample, model=model)
     spec = parse_rule_spec(raw)  # → RuleSpecError on bad shape
     _check_columns(spec, source_schema)
     _run_on_sample(spec, source_schema, data_sample)
@@ -112,9 +108,7 @@ def _check_columns(spec: RuleSpec, source_schema: dict) -> None:
     known = {c.get("original_name") for c in _schema_columns(source_schema)}
     for col in referenced_columns(spec):
         if col not in known:
-            raise DraftError(
-                f"the drafted rule references a column not in your data: {col!r}"
-            )
+            raise DraftError(f"the drafted rule references a column not in your data: {col!r}")
 
 
 def _run_on_sample(spec: RuleSpec, source_schema: dict, data_sample: dict) -> None:
@@ -140,9 +134,12 @@ def _run_on_sample(spec: RuleSpec, source_schema: dict, data_sample: dict) -> No
     rows = list(data_sample.get("rows", []))[:_SAMPLE_ROW_CAP]
     raw_df = pd.DataFrame(rows, columns=original_names) if original_names else pd.DataFrame()
     df = pd.DataFrame(
-        {c["original_name"]: coerce_series(raw_df[c["original_name"]],
-                                           c.get("data_type", "text"))
-         for c in cols}
+        {
+            c["original_name"]: coerce_series(
+                raw_df[c["original_name"]], c.get("data_type", "text")
+            )
+            for c in cols
+        }
     )
 
     column_meta = [
@@ -189,9 +186,7 @@ def user_prompt(objective: str, source_schema: dict, data_sample: dict) -> str:
     )
     original_names = [c["original_name"] for c in cols]
     rows = list(data_sample.get("rows", []))[:_SAMPLE_ROW_CAP]
-    sample_lines = "\n".join(
-        "  | " + " | ".join(str(cell) for cell in row) for row in rows
-    )
+    sample_lines = "\n".join("  | " + " | ".join(str(cell) for cell in row) for row in rows)
     return (
         f"Control objective:\n{objective.strip()}\n\n"
         f"Columns (use these exact original_name values):\n{col_lines}\n\n"

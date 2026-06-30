@@ -12,6 +12,7 @@ from uticen_lite.store.run_service import run_control_in_store
 # Forked (2-terminal) pipeline control
 # ---------------------------------------------------------------------------
 
+
 def _seed_forked_pipeline(tmp_path: Path):
     """A forked pipeline control with two terminal Test nodes sharing one Import.
 
@@ -26,29 +27,54 @@ def _seed_forked_pipeline(tmp_path: Path):
     Branch B: items where value < 10   →  2 exceptions (I1, I2)
     """
     (tmp_path / "data").mkdir()
-    pd.DataFrame({
-        "item_id": ["I1", "I2", "I3", "I4"],
-        "value": [5, 8, 150, 50],
-    }).to_csv(tmp_path / "data" / "inv.csv", index=False)
+    pd.DataFrame(
+        {
+            "item_id": ["I1", "I2", "I3", "I4"],
+            "value": [5, 8, 150, 50],
+        }
+    ).to_csv(tmp_path / "data" / "inv.csv", index=False)
 
     conn = connect(tmp_path)
     migrate(conn)
     repo.upsert_project(conn, name="Acme")
-    repo.upsert_source(conn, id="inv", format="csv", path="data/inv.csv",
-                       key_config={"mode": "single", "columns": ["item_id"]})
-    repo.set_columns(conn, "inv", [
-        {"original_name": "item_id", "display_name": "Item ID", "data_type": "text",
-         "is_key": True, "include": True, "ordinal": 0},
-        {"original_name": "value", "display_name": "Value", "data_type": "number",
-         "is_key": False, "include": True, "ordinal": 1},
-    ])
+    repo.upsert_source(
+        conn,
+        id="inv",
+        format="csv",
+        path="data/inv.csv",
+        key_config={"mode": "single", "columns": ["item_id"]},
+    )
+    repo.set_columns(
+        conn,
+        "inv",
+        [
+            {
+                "original_name": "item_id",
+                "display_name": "Item ID",
+                "data_type": "text",
+                "is_key": True,
+                "include": True,
+                "ordinal": 0,
+            },
+            {
+                "original_name": "value",
+                "display_name": "Value",
+                "data_type": "number",
+                "is_key": False,
+                "include": True,
+                "ordinal": 1,
+            },
+        ],
+    )
 
     # Forked pipeline: Import("inv") → Test("a") and Import("inv") → Test("b")
     pipeline = {
         "nodes": [
             {"id": "imp", "type": "import", "source_id": "inv"},
             {
-                "id": "a", "type": "test", "inputs": ["imp"],
+                "id": "a",
+                "type": "test",
+                "inputs": ["imp"],
                 "config": {
                     "logic": "all",
                     "conditions": [{"column": "value", "op": "gt", "value": 100}],
@@ -59,7 +85,9 @@ def _seed_forked_pipeline(tmp_path: Path):
                 },
             },
             {
-                "id": "b", "type": "test", "inputs": ["imp"],
+                "id": "b",
+                "type": "test",
+                "inputs": ["imp"],
                 "config": {
                     "logic": "all",
                     "conditions": [{"column": "value", "op": "lt", "value": 10}],
@@ -71,10 +99,17 @@ def _seed_forked_pipeline(tmp_path: Path):
             },
         ]
     }
-    repo.upsert_control(conn, id="forked", title="Forked control", objective="o",
-                        narrative="n", framework_refs={"nist": ["AC-5"]},
-                        test_kind="pipeline", pipeline=pipeline,
-                        failure_threshold_count=0)
+    repo.upsert_control(
+        conn,
+        id="forked",
+        title="Forked control",
+        objective="o",
+        narrative="n",
+        framework_refs={"nist": ["AC-5"]},
+        test_kind="pipeline",
+        pipeline=pipeline,
+        failure_threshold_count=0,
+    )
     repo.set_control_sources(conn, "forked", ["inv"])
     return conn
 
@@ -132,31 +167,69 @@ def test_forked_control_runs_one_result_per_procedure(tmp_path: Path):
 
 def _seed(tmp_path: Path):
     (tmp_path / "data").mkdir()
-    pd.DataFrame({"user_id": ["U1", "U2"], "can_create": ["true", "true"],
-                  "can_approve": ["true", "false"]}).to_csv(
-        tmp_path / "data" / "users.csv", index=False)
+    pd.DataFrame(
+        {"user_id": ["U1", "U2"], "can_create": ["true", "true"], "can_approve": ["true", "false"]}
+    ).to_csv(tmp_path / "data" / "users.csv", index=False)
     conn = connect(tmp_path)
     migrate(conn)
     repo.upsert_project(conn, name="Acme")
-    repo.upsert_source(conn, id="users", format="csv", path="data/users.csv",
-                       key_config={"mode": "single", "columns": ["user_id"]})
-    repo.set_columns(conn, "users", [
-        {"original_name": "user_id", "display_name": "User ID", "data_type": "text",
-         "is_key": True, "include": True, "ordinal": 0},
-        {"original_name": "can_create", "display_name": "Can Create",
-         "data_type": "boolean", "is_key": False, "include": True, "ordinal": 1},
-        {"original_name": "can_approve", "display_name": "Can Approve",
-         "data_type": "boolean", "is_key": False, "include": True, "ordinal": 2},
-    ])
-    repo.upsert_control(conn, id="sod", title="SoD", objective="o", narrative="n",
-                        framework_refs={"nist": ["AC-5"]}, test_kind="rule",
-                        rule_spec={"logic": "all", "conditions": [
-                            {"column": "can_create", "op": "eq", "value": True},
-                            {"column": "can_approve", "op": "eq", "value": True}],
-                            "severity": "high",
-                            "description_template": "User {user_id}",
-                            "item_key_column": "user_id"},
-                        failure_threshold_count=0)
+    repo.upsert_source(
+        conn,
+        id="users",
+        format="csv",
+        path="data/users.csv",
+        key_config={"mode": "single", "columns": ["user_id"]},
+    )
+    repo.set_columns(
+        conn,
+        "users",
+        [
+            {
+                "original_name": "user_id",
+                "display_name": "User ID",
+                "data_type": "text",
+                "is_key": True,
+                "include": True,
+                "ordinal": 0,
+            },
+            {
+                "original_name": "can_create",
+                "display_name": "Can Create",
+                "data_type": "boolean",
+                "is_key": False,
+                "include": True,
+                "ordinal": 1,
+            },
+            {
+                "original_name": "can_approve",
+                "display_name": "Can Approve",
+                "data_type": "boolean",
+                "is_key": False,
+                "include": True,
+                "ordinal": 2,
+            },
+        ],
+    )
+    repo.upsert_control(
+        conn,
+        id="sod",
+        title="SoD",
+        objective="o",
+        narrative="n",
+        framework_refs={"nist": ["AC-5"]},
+        test_kind="rule",
+        rule_spec={
+            "logic": "all",
+            "conditions": [
+                {"column": "can_create", "op": "eq", "value": True},
+                {"column": "can_approve", "op": "eq", "value": True},
+            ],
+            "severity": "high",
+            "description_template": "User {user_id}",
+            "item_key_column": "user_id",
+        },
+        failure_threshold_count=0,
+    )
     repo.set_control_sources(conn, "sod", ["users"])
     return conn
 
@@ -179,22 +252,51 @@ def _seed_inline(tmp_path: Path):
     """An inline-python control whose test_code is embedded directly in the store."""
     (tmp_path / "data").mkdir()
     pd.DataFrame({"user_id": ["U1", "U2"], "can_create": ["true", "true"]}).to_csv(
-        tmp_path / "data" / "users.csv", index=False)
+        tmp_path / "data" / "users.csv", index=False
+    )
     conn = connect(tmp_path)
     migrate(conn)
     repo.upsert_project(conn, name="Acme")
-    repo.upsert_source(conn, id="users", format="csv", path="data/users.csv",
-                       key_config={"mode": "single", "columns": ["user_id"]})
-    repo.set_columns(conn, "users", [
-        {"original_name": "user_id", "display_name": "User ID", "data_type": "text",
-         "is_key": True, "include": True, "ordinal": 0},
-        {"original_name": "can_create", "display_name": "Can Create",
-         "data_type": "boolean", "is_key": False, "include": True, "ordinal": 1},
-    ])
-    repo.upsert_control(conn, id="inline", title="Inline", objective="o", narrative="n",
-                        framework_refs={"nist": ["AC-2"]}, test_kind="python",
-                        test_code="# inline\ndef test(pop):\n    return []\n",
-                        failure_threshold_count=0)
+    repo.upsert_source(
+        conn,
+        id="users",
+        format="csv",
+        path="data/users.csv",
+        key_config={"mode": "single", "columns": ["user_id"]},
+    )
+    repo.set_columns(
+        conn,
+        "users",
+        [
+            {
+                "original_name": "user_id",
+                "display_name": "User ID",
+                "data_type": "text",
+                "is_key": True,
+                "include": True,
+                "ordinal": 0,
+            },
+            {
+                "original_name": "can_create",
+                "display_name": "Can Create",
+                "data_type": "boolean",
+                "is_key": False,
+                "include": True,
+                "ordinal": 1,
+            },
+        ],
+    )
+    repo.upsert_control(
+        conn,
+        id="inline",
+        title="Inline",
+        objective="o",
+        narrative="n",
+        framework_refs={"nist": ["AC-2"]},
+        test_kind="python",
+        test_code="# inline\ndef test(pop):\n    return []\n",
+        failure_threshold_count=0,
+    )
     repo.set_control_sources(conn, "inline", ["users"])
     return conn
 
@@ -216,35 +318,89 @@ def _seed_cross_source(tmp_path: Path):
     (tmp_path / "data").mkdir()
     # access: U1, U2, U3 hold accounts; only U1 + U3 are still employed.
     pd.DataFrame({"user_id": ["U1", "U2", "U3"]}).to_csv(
-        tmp_path / "data" / "access.csv", index=False)
+        tmp_path / "data" / "access.csv", index=False
+    )
     pd.DataFrame({"employee_id": ["U1", "U3"], "name": ["Ann", "Cara"]}).to_csv(
-        tmp_path / "data" / "hr_roster.csv", index=False)
+        tmp_path / "data" / "hr_roster.csv", index=False
+    )
     conn = connect(tmp_path)
     migrate(conn)
     repo.upsert_project(conn, name="Acme")
-    repo.upsert_source(conn, id="access", format="csv", path="data/access.csv",
-                       key_config={"mode": "single", "columns": ["user_id"]})
-    repo.set_columns(conn, "access", [
-        {"original_name": "user_id", "display_name": "User ID", "data_type": "text",
-         "is_key": True, "include": True, "ordinal": 0}])
-    repo.upsert_source(conn, id="hr_roster", format="csv", path="data/hr_roster.csv",
-                       key_config={"mode": "single", "columns": ["employee_id"]})
-    repo.set_columns(conn, "hr_roster", [
-        {"original_name": "employee_id", "display_name": "Employee ID",
-         "data_type": "text", "is_key": True, "include": True, "ordinal": 0},
-        {"original_name": "name", "display_name": "Name", "data_type": "text",
-         "is_key": False, "include": True, "ordinal": 1}])
-    repo.upsert_control(conn, id="term", title="Terminated access", objective="o",
-                        narrative="n", framework_refs={"nist": ["AC-2"]},
-                        test_kind="rule",
-                        rule_spec={"logic": "all", "conditions": [
-                            {"op": "not_exists_in", "column": "user_id",
-                             "other_source": "hr_roster", "this_key": "user_id",
-                             "other_key": "employee_id"}],
-                            "severity": "high",
-                            "description_template": "User {user_id} retains access",
-                            "item_key_column": "user_id"},
-                        failure_threshold_count=0)
+    repo.upsert_source(
+        conn,
+        id="access",
+        format="csv",
+        path="data/access.csv",
+        key_config={"mode": "single", "columns": ["user_id"]},
+    )
+    repo.set_columns(
+        conn,
+        "access",
+        [
+            {
+                "original_name": "user_id",
+                "display_name": "User ID",
+                "data_type": "text",
+                "is_key": True,
+                "include": True,
+                "ordinal": 0,
+            }
+        ],
+    )
+    repo.upsert_source(
+        conn,
+        id="hr_roster",
+        format="csv",
+        path="data/hr_roster.csv",
+        key_config={"mode": "single", "columns": ["employee_id"]},
+    )
+    repo.set_columns(
+        conn,
+        "hr_roster",
+        [
+            {
+                "original_name": "employee_id",
+                "display_name": "Employee ID",
+                "data_type": "text",
+                "is_key": True,
+                "include": True,
+                "ordinal": 0,
+            },
+            {
+                "original_name": "name",
+                "display_name": "Name",
+                "data_type": "text",
+                "is_key": False,
+                "include": True,
+                "ordinal": 1,
+            },
+        ],
+    )
+    repo.upsert_control(
+        conn,
+        id="term",
+        title="Terminated access",
+        objective="o",
+        narrative="n",
+        framework_refs={"nist": ["AC-2"]},
+        test_kind="rule",
+        rule_spec={
+            "logic": "all",
+            "conditions": [
+                {
+                    "op": "not_exists_in",
+                    "column": "user_id",
+                    "other_source": "hr_roster",
+                    "this_key": "user_id",
+                    "other_key": "employee_id",
+                }
+            ],
+            "severity": "high",
+            "description_template": "User {user_id} retains access",
+            "item_key_column": "user_id",
+        },
+        failure_threshold_count=0,
+    )
     # access first (primary), hr_roster second (lookup B)
     repo.set_control_sources(conn, "term", ["access", "hr_roster"])
     return conn

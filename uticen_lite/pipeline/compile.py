@@ -138,6 +138,7 @@ def compile_pipeline_procedures(pipeline: Pipeline) -> list[CompiledProcedure]:
 # Pure single-source → rule_spec
 # ---------------------------------------------------------------------------
 
+
 def _try_pure_rule_spec(pipeline: Pipeline) -> dict | None:
     """Return a flattened rule_spec dict iff the pipeline is pure & single-source.
 
@@ -219,9 +220,7 @@ def _walk_linear_filter_chain(
     return filters
 
 
-def _build_flat_spec(
-    terminal: Node, filters: list[Node], test_logic: str
-) -> dict | None:
+def _build_flat_spec(terminal: Node, filters: list[Node], test_logic: str) -> dict | None:
     """Flatten the Filter + Test conditions into a single rule_spec dict.
 
     Filter conditions come first (Import-order narrowing) then the Test's own
@@ -246,6 +245,7 @@ def _build_flat_spec(
 # ---------------------------------------------------------------------------
 # General DAG → test(pop, sources) string
 # ---------------------------------------------------------------------------
+
 
 def _frame(node_id: str) -> str:
     """The DataFrame variable name for a node's output stream."""
@@ -327,9 +327,7 @@ def _emit_python(pipeline: Pipeline) -> str:
 
 
 _SAFEDICT = (
-    "class _SafeDict(dict):\n"
-    "    def __missing__(self, key):\n"
-    '        return "{" + key + "}"\n'
+    'class _SafeDict(dict):\n    def __missing__(self, key):\n        return "{" + key + "}"\n'
 )
 
 
@@ -489,28 +487,30 @@ def _emit_terminal_rule(node: Node, out_var: str) -> list[str]:
     template = node.config.get("description_template", "")
     severity = node.config.get("severity", "medium")
     item_key = node.config.get("item_key_column")
-    lines.extend([
-        f"_df = {src}",
-        f"_mask = {mask}",
-        f"_key_col = {item_key!r}",
-        "if not _key_col:",
-        "    _key_col = pop.key_columns[0] if pop.key_columns else None",
-        f"_ref_cols = {ref_cols!r}",
-        f"_template = {template!r}",
-        f"_severity = {severity!r}",
-        f"{out_var} = []",
-        "for _idx, _row in _df[_mask].iterrows():",
-        "    _r = _row.to_dict()",
-        "    _item_key = str(_r[_key_col]) if _key_col else str(_idx)",
-        "    _description = _template.format_map(_SafeDict(_r)) if _template else ''",
-        "    _details = {_c: _r[_c] for _c in _ref_cols if _c in _r}",
-        f"    {out_var}.append({{",
-        '        "item_key": _item_key,',
-        '        "description": _description,',
-        '        "severity": _severity,',
-        '        "details": _details,',
-        "    })",
-    ])
+    lines.extend(
+        [
+            f"_df = {src}",
+            f"_mask = {mask}",
+            f"_key_col = {item_key!r}",
+            "if not _key_col:",
+            "    _key_col = pop.key_columns[0] if pop.key_columns else None",
+            f"_ref_cols = {ref_cols!r}",
+            f"_template = {template!r}",
+            f"_severity = {severity!r}",
+            f"{out_var} = []",
+            "for _idx, _row in _df[_mask].iterrows():",
+            "    _r = _row.to_dict()",
+            "    _item_key = str(_r[_key_col]) if _key_col else str(_idx)",
+            "    _description = _template.format_map(_SafeDict(_r)) if _template else ''",
+            "    _details = {_c: _r[_c] for _c in _ref_cols if _c in _r}",
+            f"    {out_var}.append({{",
+            '        "item_key": _item_key,',
+            '        "description": _description,',
+            '        "severity": _severity,',
+            '        "details": _details,',
+            "    })",
+        ]
+    )
     if out_var == "_out":
         lines.append("return _out")
     return lines

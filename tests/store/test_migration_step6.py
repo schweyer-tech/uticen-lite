@@ -14,7 +14,11 @@ def test_step6_adds_sheet_and_source_fetch(tmp_path):
     assert conn.execute("PRAGMA user_version").fetchone()[0] >= 6
     assert "sheet" in _cols(conn, "sources")
     assert _cols(conn, "source_fetch") == {
-        "source_id", "url", "headers", "record_path", "last_fetched_at"
+        "source_id",
+        "url",
+        "headers",
+        "record_path",
+        "last_fetched_at",
     }
     # idempotent
     migrate(conn)

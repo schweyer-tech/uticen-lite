@@ -43,7 +43,11 @@ def test_spawn_writes_helper_and_invokes_popen(tmp_path):
     cfg = json.loads(calls["argv"][2])
     assert cfg["commands"] == commands
     assert cfg["restart_command"] == [
-        "python", "-m", "uticen_lite.plane", "--project", str(tmp_path)
+        "python",
+        "-m",
+        "uticen_lite.plane",
+        "--project",
+        str(tmp_path),
     ]
     assert cfg["from"] == "0.1.0"
     assert cfg["status"].endswith(spawn.STATUS_FILE)

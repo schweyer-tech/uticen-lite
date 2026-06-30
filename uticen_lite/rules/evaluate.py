@@ -20,7 +20,8 @@ def _safe_format(template: str, row: dict) -> str:
 
 
 def _condition_mask(
-    df: pd.DataFrame, cond: Condition,
+    df: pd.DataFrame,
+    cond: Condition,
     sources: dict[str, Population] | None = None,
 ) -> pd.Series:
     op = cond.op
@@ -61,7 +62,8 @@ def _condition_mask(
 
 
 def evaluate_rule(
-    spec: RuleSpec, pop: Population,
+    spec: RuleSpec,
+    pop: Population,
     sources: dict[str, Population] | None = None,
 ) -> list[dict]:
     df = pop.df
@@ -82,10 +84,12 @@ def evaluate_rule(
         row_map = row.to_dict()
         item_key = str(row_map[key_col]) if key_col else str(idx)
         details: dict[str, Any] = {c: row_map[c] for c in ref_cols if c in row_map}
-        violations.append({
-            "item_key": item_key,
-            "description": _safe_format(spec.description_template, row_map),
-            "severity": spec.severity,
-            "details": details,
-        })
+        violations.append(
+            {
+                "item_key": item_key,
+                "description": _safe_format(spec.description_template, row_map),
+                "severity": spec.severity,
+                "details": details,
+            }
+        )
     return violations

@@ -55,17 +55,17 @@ def _per_procedure_threshold(
     count = pipeline_node_config.get("failure_threshold_count")
     if pct is None and count is None:
         return control_threshold
-    return Threshold.from_raw({
-        "failure_threshold_pct": pct,
-        "failure_threshold_count": count,
-    })
+    return Threshold.from_raw(
+        {
+            "failure_threshold_pct": pct,
+            "failure_threshold_count": count,
+        }
+    )
 
 
 def _severity_rank(sev: Any) -> int:
     """Order severities low < medium < high < critical (mirrors the renderer)."""
-    return {"low": 0, "medium": 1, "high": 2, "critical": 3}.get(
-        getattr(sev, "value", str(sev)), 1
-    )
+    return {"low": 0, "medium": 1, "high": 2, "critical": 3}.get(getattr(sev, "value", str(sev)), 1)
 
 
 def _load_run_frames(
@@ -148,12 +148,16 @@ def _merge_violations(per_check: list[tuple[str, list[Violation]]]) -> list[Viol
         slot = by_key[k]
         details = dict(slot["details"])
         details["checks"] = sorted(slot["_checks"])
-        merged.append(Violation.from_raw({
-            "item_key": slot["item_key"],
-            "description": slot["description"],
-            "severity": slot["severity"],
-            "details": details,
-        }))
+        merged.append(
+            Violation.from_raw(
+                {
+                    "item_key": slot["item_key"],
+                    "description": slot["description"],
+                    "severity": slot["severity"],
+                    "details": details,
+                }
+            )
+        )
     return merged
 
 
@@ -250,36 +254,42 @@ def _run_multi_procedure(
         if union_cp is not None and union_cp.result.test_kind == "python":
             display_code = union_cp.result.test_code or ""
         else:
-            display_code = resolve_test_code(ControlDef(
-                id=control.id,
-                title=proc.name or control.title,
-                objective=control.objective,
-                narrative=proc.narrative,
-                framework_refs=control.framework_refs,
-                risk=control.risk,
-                sources=control.sources,
-                test_path="",
-                test_code=(union_cp.result.test_code if union_cp else None),
-                rule_spec=(union_cp.result.rule_spec if union_cp else None),
-                threshold=control.threshold,
-            ))
+            display_code = resolve_test_code(
+                ControlDef(
+                    id=control.id,
+                    title=proc.name or control.title,
+                    objective=control.objective,
+                    narrative=proc.narrative,
+                    framework_refs=control.framework_refs,
+                    risk=control.risk,
+                    sources=control.sources,
+                    test_path="",
+                    test_code=(union_cp.result.test_code if union_cp else None),
+                    rule_spec=(union_cp.result.rule_spec if union_cp else None),
+                    threshold=control.threshold,
+                )
+            )
 
         proc_threshold = _per_procedure_threshold(
-            {"failure_threshold_pct": proc.failure_threshold_pct,
-             "failure_threshold_count": proc.failure_threshold_count},
+            {
+                "failure_threshold_pct": proc.failure_threshold_pct,
+                "failure_threshold_count": proc.failure_threshold_count,
+            },
             control.threshold,
         )
-        per_proc_runs.append((
-            ProcedureSpec(
-                code=proc.code,
-                title=proc.name or display_code,
-                assertion=proc.assertion,
-                narrative=proc.narrative,
-                test_code=display_code,
-                threshold=proc_threshold,
-            ),
-            proc_run,
-        ))
+        per_proc_runs.append(
+            (
+                ProcedureSpec(
+                    code=proc.code,
+                    title=proc.name or display_code,
+                    assertion=proc.assertion,
+                    narrative=proc.narrative,
+                    test_code=display_code,
+                    threshold=proc_threshold,
+                ),
+                proc_run,
+            )
+        )
 
     wp = Workpaper.assemble_procedures(
         control,
@@ -308,8 +318,13 @@ def _run_multi_procedure(
 
     if not per_proc_runs:
         # Defensive: a pipeline with no runnable procedure — degrade, never 500 (0013).
-        empty = RunRecord(control_id=control.id, executed_at=executed_at,
-                          population_size=0, violations=[], provenance=[])
+        empty = RunRecord(
+            control_id=control.id,
+            executed_at=executed_at,
+            population_size=0,
+            violations=[],
+            provenance=[],
+        )
         repo.insert_run(conn, empty)
         return empty
 
@@ -319,14 +334,20 @@ def _run_multi_procedure(
     # the distinct-examined population across ALL checks of ALL procedures + merged violations.
     union_run = per_proc_runs[0][1]
     if len(per_proc_runs) > 1:
-        all_tests = [t for proc in effective_procedures(pipeline)
-                     for t in tests_for_procedure(pipeline, proc.id)]
+        all_tests = [
+            t
+            for proc in effective_procedures(pipeline)
+            for t in tests_for_procedure(pipeline, proc.id)
+        ]
         agg_population = _distinct_examined(node_frames, all_tests)
         union_run = RunRecord(
             control_id=control.id,
             executed_at=executed_at,
-            population_size=(agg_population if agg_population is not None
-                             else per_proc_runs[0][1].population_size),
+            population_size=(
+                agg_population
+                if agg_population is not None
+                else per_proc_runs[0][1].population_size
+            ),
             violations=all_violations,
             provenance=per_proc_runs[0][1].provenance,
         )
@@ -375,9 +396,7 @@ def run_control_in_store(
     raw_ctrl = repo.get_control(conn, control_id)
     raw_pipeline = raw_ctrl.get("pipeline") if raw_ctrl else None
     if raw_pipeline:
-        return _run_multi_procedure(
-            conn, root, control, project.sources, raw_pipeline, executed_at
-        )
+        return _run_multi_procedure(conn, root, control, project.sources, raw_pipeline, executed_at)
 
     # ── Single-procedure path (unchanged) ─────────────────────────────────────
     run = run_control(control, project.sources, root, executed_at)

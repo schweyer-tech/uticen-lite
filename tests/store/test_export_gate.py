@@ -37,12 +37,21 @@ def _engagement(tmp_path: Path):
 
 
 def _seed_source(conn, sid: str) -> None:
-    repo.upsert_source(conn, id=sid, format="csv", path=f"data/{sid}.csv",
-                       key_config={"mode": "single", "columns": ["payment_id"]})
-    repo.set_columns(conn, sid, [
-        {"original_name": "payment_id", "display_name": "payment_id", "is_key": True},
-        {"original_name": "amount", "display_name": "amount"},
-    ])
+    repo.upsert_source(
+        conn,
+        id=sid,
+        format="csv",
+        path=f"data/{sid}.csv",
+        key_config={"mode": "single", "columns": ["payment_id"]},
+    )
+    repo.set_columns(
+        conn,
+        sid,
+        [
+            {"original_name": "payment_id", "display_name": "payment_id", "is_key": True},
+            {"original_name": "amount", "display_name": "amount"},
+        ],
+    )
 
 
 def _seed_run(conn, cid: str) -> None:
@@ -51,32 +60,55 @@ def _seed_run(conn, cid: str) -> None:
         control_id=cid,
         executed_at="2026-06-20T00:00:00+00:00",
         population_size=1,
-        violations=[Violation.from_raw(
-            {"item_key": "P1", "description": "x", "severity": "high", "details": {}})],
-        provenance=[SourceProvenance(source_id="payments", path="data/payments.csv",
-                                     sha256="", row_count=1)],
+        violations=[
+            Violation.from_raw(
+                {"item_key": "P1", "description": "x", "severity": "high", "details": {}}
+            )
+        ],
+        provenance=[
+            SourceProvenance(source_id="payments", path="data/payments.csv", sha256="", row_count=1)
+        ],
     )
     repo.insert_run(conn, run)
 
 
 def _malicious_graph(code: str) -> dict:
-    return {"nodes": [
-        {"id": "imp", "type": "import", "source_id": "payments"},
-        {"id": "cust", "type": "custom_python", "inputs": ["imp"],
-         "config": {"flavor": "transform", "code": code}},
-        {"id": "tst", "type": "test", "inputs": ["cust"],
-         "config": {"logic": "any", "item_key_column": "payment_id",
-                    "conditions": [{"column": "payment_id", "op": "not_empty"}]}},
-    ]}
+    return {
+        "nodes": [
+            {"id": "imp", "type": "import", "source_id": "payments"},
+            {
+                "id": "cust",
+                "type": "custom_python",
+                "inputs": ["imp"],
+                "config": {"flavor": "transform", "code": code},
+            },
+            {
+                "id": "tst",
+                "type": "test",
+                "inputs": ["cust"],
+                "config": {
+                    "logic": "any",
+                    "item_key_column": "payment_id",
+                    "conditions": [{"column": "payment_id", "op": "not_empty"}],
+                },
+            },
+        ]
+    }
 
 
 def _seed_pipeline_control(conn, cid: str, graph: dict) -> None:
     # Persist exactly what _save_from_form would, MINUS the lint — i.e. simulate a
     # node that slipped past (or predates) the save-time guard.
     repo.upsert_control(
-        conn, id=cid, title="Dup", objective="o", narrative="n",
-        framework_refs={"nist": []}, test_kind="pipeline",
-        rule_spec=None, test_code="def test(pop, sources):\n    return []",
+        conn,
+        id=cid,
+        title="Dup",
+        objective="o",
+        narrative="n",
+        framework_refs={"nist": []},
+        test_kind="pipeline",
+        rule_spec=None,
+        test_code="def test(pop, sources):\n    return []",
         pipeline=graph,
     )
     repo.set_control_sources(conn, cid, ["payments"])
@@ -133,7 +165,8 @@ def test_export_gate_blocks_builtins_subscript_bypass(tmp_path: Path):
     conn = _engagement(tmp_path)
     _seed_source(conn, "payments")
     _seed_pipeline_control(
-        conn, "dup",
+        conn,
+        "dup",
         _malicious_graph("leaked = __builtins__['open']('/etc/passwd').read()\nrows = rows"),
     )
     _seed_run(conn, "dup")
@@ -183,11 +216,20 @@ def test_export_gate_ignores_non_pipeline_controls(tmp_path: Path):
     conn = _engagement(tmp_path)
     _seed_source(conn, "payments")
     repo.upsert_control(
-        conn, id="r1", title="Rule", objective="o", narrative="n",
-        framework_refs={"nist": []}, test_kind="rule",
-        rule_spec={"logic": "all", "conditions": [
-            {"column": "amount", "op": "not_empty"}], "severity": "low",
-            "description_template": "", "item_key_column": "payment_id"},
+        conn,
+        id="r1",
+        title="Rule",
+        objective="o",
+        narrative="n",
+        framework_refs={"nist": []},
+        test_kind="rule",
+        rule_spec={
+            "logic": "all",
+            "conditions": [{"column": "amount", "op": "not_empty"}],
+            "severity": "low",
+            "description_template": "",
+            "item_key_column": "payment_id",
+        },
     )
     repo.set_control_sources(conn, "r1", ["payments"])
     _seed_run(conn, "r1")

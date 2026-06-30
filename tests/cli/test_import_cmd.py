@@ -31,8 +31,7 @@ def test_import_northwind(tmp_path: Path):
     # (the escape hatch as a single node, not a standalone script).
     pipelines = [c for c in controls if c["test_kind"] == "pipeline"]
     assert any(
-        any(n.get("type") == "custom_python" for n in c["pipeline"]["nodes"])
-        for c in pipelines
+        any(n.get("type") == "custom_python" for n in c["pipeline"]["nodes"]) for c in pipelines
     ), "expected at least one pipeline to use a Custom Python node"
 
     for c in controls:

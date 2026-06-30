@@ -1,5 +1,6 @@
 """A non-terminal pipeline endpoint must report a node-id-prefixed error so the
 editor can pin it on the offending card (2026-06-27 review)."""
+
 import pytest
 
 from uticen_lite.pipeline.model import PipelineError, parse_pipeline

@@ -16,10 +16,12 @@ def _xlsx_bytes(sheets: dict[str, pd.DataFrame]) -> bytes:
 
 
 def test_read_dataframe_xlsx_default_and_named_sheet():
-    raw = _xlsx_bytes({
-        "First": pd.DataFrame({"a": [1, 2], "b": ["x", "y"]}),
-        "Second": pd.DataFrame({"a": [9], "b": ["z"]}),
-    })
+    raw = _xlsx_bytes(
+        {
+            "First": pd.DataFrame({"a": [1, 2], "b": ["x", "y"]}),
+            "Second": pd.DataFrame({"a": [9], "b": ["z"]}),
+        }
+    )
     assert inspect.sheet_names(raw) == ["First", "Second"]
     # default -> first sheet
     df0 = inspect.read_dataframe(raw, "xlsx")

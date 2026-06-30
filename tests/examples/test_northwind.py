@@ -117,7 +117,8 @@ def test_northwind_runs_and_builds(tmp_path: Path) -> None:
     gl1_procs = gl1["workpaper"]["procedures"]
     assert [p["code"] for p in gl1_procs] == ["P1", "P2"], gl1_procs
     assert {p["assertion"] for p in gl1_procs} == {
-        "Segregation of duties", "Authorization / approval evidence"
+        "Segregation of duties",
+        "Authorization / approval evidence",
     }, gl1_procs
     # Each procedure's distinct-items-examined population = 5 (the post-materiality set).
     for proc in gl1_procs:

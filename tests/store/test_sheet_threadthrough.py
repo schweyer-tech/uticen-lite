@@ -21,14 +21,36 @@ def test_stored_sheet_is_read_at_runtime(tmp_path):
 
     conn = connect(tmp_path)
     migrate(conn)
-    repo.upsert_source(conn, id="gl", format="xlsx", path="data/gl.xlsx",
-                       key_config={"mode": "auto"}, sheet="Second")
-    repo.set_columns(conn, "gl", [
-        {"original_name": "id", "display_name": "id", "data_type": "text",
-         "is_key": True, "include": True, "ordinal": 0},
-        {"original_name": "v", "display_name": "v", "data_type": "text",
-         "is_key": False, "include": True, "ordinal": 1},
-    ])
+    repo.upsert_source(
+        conn,
+        id="gl",
+        format="xlsx",
+        path="data/gl.xlsx",
+        key_config={"mode": "auto"},
+        sheet="Second",
+    )
+    repo.set_columns(
+        conn,
+        "gl",
+        [
+            {
+                "original_name": "id",
+                "display_name": "id",
+                "data_type": "text",
+                "is_key": True,
+                "include": True,
+                "ordinal": 0,
+            },
+            {
+                "original_name": "v",
+                "display_name": "v",
+                "data_type": "text",
+                "is_key": False,
+                "include": True,
+                "ordinal": 1,
+            },
+        ],
+    )
     src = repo.get_source(conn, "gl")
     conn.close()
 
@@ -41,12 +63,21 @@ def test_stored_sheet_is_read_at_runtime(tmp_path):
 def test_binding_omits_sheet_when_none(tmp_path):
     conn = connect(tmp_path)
     migrate(conn)
-    repo.upsert_source(conn, id="c", format="csv", path="data/c.csv",
-                       key_config={"mode": "auto"})
-    repo.set_columns(conn, "c", [
-        {"original_name": "id", "display_name": "id", "data_type": "text",
-         "is_key": True, "include": True, "ordinal": 0},
-    ])
+    repo.upsert_source(conn, id="c", format="csv", path="data/c.csv", key_config={"mode": "auto"})
+    repo.set_columns(
+        conn,
+        "c",
+        [
+            {
+                "original_name": "id",
+                "display_name": "id",
+                "data_type": "text",
+                "is_key": True,
+                "include": True,
+                "ordinal": 0,
+            },
+        ],
+    )
     src = repo.get_source(conn, "c")
     conn.close()
     assert "sheet" not in _binding(src).config

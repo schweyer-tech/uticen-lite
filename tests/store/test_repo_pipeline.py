@@ -55,15 +55,27 @@ def test_v3_store_upgrades_to_pipeline_without_data_loss(tmp_path: Path):
 
 def test_upsert_control_persists_pipeline_and_kind(tmp_path: Path):
     conn = _conn(tmp_path)
-    graph = {"nodes": [
-        {"id": "imp", "type": "import", "source_id": "s1"},
-        {"id": "t", "type": "test", "inputs": ["imp"],
-         "config": {"logic": "all", "conditions": []}},
-    ]}
+    graph = {
+        "nodes": [
+            {"id": "imp", "type": "import", "source_id": "s1"},
+            {
+                "id": "t",
+                "type": "test",
+                "inputs": ["imp"],
+                "config": {"logic": "all", "conditions": []},
+            },
+        ]
+    }
     repo.upsert_control(
-        conn, id="C1", title="Pipe", objective="", narrative="",
-        framework_refs={}, test_kind="pipeline",
-        rule_spec={"logic": "all", "conditions": []}, pipeline=graph,
+        conn,
+        id="C1",
+        title="Pipe",
+        objective="",
+        narrative="",
+        framework_refs={},
+        test_kind="pipeline",
+        rule_spec={"logic": "all", "conditions": []},
+        pipeline=graph,
     )
     ctrl = repo.get_control(conn, "C1")
     assert ctrl["test_kind"] == "pipeline"
@@ -75,8 +87,13 @@ def test_upsert_control_persists_pipeline_and_kind(tmp_path: Path):
 def test_get_control_pipeline_is_none_for_non_pipeline_controls(tmp_path: Path):
     conn = _conn(tmp_path)
     repo.upsert_control(
-        conn, id="C2", title="Rule", objective="", narrative="",
-        framework_refs={}, test_kind="rule",
+        conn,
+        id="C2",
+        title="Rule",
+        objective="",
+        narrative="",
+        framework_refs={},
+        test_kind="rule",
         rule_spec={"logic": "all", "conditions": []},
     )
     ctrl = repo.get_control(conn, "C2")
@@ -88,8 +105,14 @@ def test_pipeline_column_round_trips_via_raw_json(tmp_path: Path):
     conn = _conn(tmp_path)
     graph = {"nodes": [{"id": "x", "type": "import", "source_id": "s"}]}
     repo.upsert_control(
-        conn, id="C3", title="", objective="", narrative="",
-        framework_refs={}, test_kind="pipeline", pipeline=graph,
+        conn,
+        id="C3",
+        title="",
+        objective="",
+        narrative="",
+        framework_refs={},
+        test_kind="pipeline",
+        pipeline=graph,
     )
     raw = conn.execute("SELECT pipeline FROM controls WHERE id='C3'").fetchone()[0]
     assert json.loads(raw) == graph

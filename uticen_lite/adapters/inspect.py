@@ -18,8 +18,10 @@ def read_dataframe(raw: bytes, fmt: str, *, sheet: str | int | None = None) -> p
         return pd.read_csv(io.BytesIO(raw), dtype=str)
     if fmt == "xlsx":
         return pd.read_excel(
-            io.BytesIO(raw), sheet_name=(0 if sheet is None else sheet),
-            engine="openpyxl", dtype=str,
+            io.BytesIO(raw),
+            sheet_name=(0 if sheet is None else sheet),
+            engine="openpyxl",
+            dtype=str,
         )
     if fmt == "parquet":
         return pd.read_parquet(io.BytesIO(raw))
