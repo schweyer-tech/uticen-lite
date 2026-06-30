@@ -62,6 +62,10 @@ to `INDEX.md` (newest on top). Capture reusable RULES, not stories or one-off tr
   pyproject-parse test does not prove the wheel builds (see 0003).
 - Specs/plans live in `docs/superpowers/{specs,plans}/`.
 
+## Branching & release
+
+Code and quality/cleanup changes merge **directly to `main`** via PR (main is the default branch and the SonarQube scan target). There is **no `staging`→`main` promotion gate** (retired 2026-06-30; only the `true-experts` repo retains a staging→main promotion gate). Deploys: no `staging` branch — main-only; public package.
+
 ## Grounding loop (per cycle)
 
 1. **Before brainstorming/planning** a feature: read `STRATEGY.md` and the relevant `docs/learnings/`
