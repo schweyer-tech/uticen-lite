@@ -61,8 +61,9 @@ def _cell_str(value: object) -> str:
     """Stringify a cell value for the data table (renderer escapes it)."""
     if value is None:
         return ""
-    # pandas NaN / NaT compare unequal to themselves.
-    if value != value:  # noqa: PLR0124
+    # pandas NaN / NaT compare unequal to themselves. Detected via self-inequality
+    # (not pd.isna) to keep this module pandas-free / Pyodide-safe — see module docstring.
+    if value != value:  # noqa: PLR0124  # NOSONAR - deliberate NaN/NaT sentinel check
         return ""
     return str(value)
 

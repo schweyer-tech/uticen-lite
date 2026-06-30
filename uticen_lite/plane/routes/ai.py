@@ -23,6 +23,7 @@ from collections.abc import Callable, Generator
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -80,8 +81,8 @@ def _build_sample(conn: sqlite3.Connection, root: Path, source_id: str) -> dict[
     return {"columns": original_names, "schema": schema, "rows": rows}
 
 
-def _cell(value: object) -> str:
-    if value is None or value != value:  # noqa: PLR0124 (NaN/NaT)
+def _cell(value: Any) -> str:
+    if pd.isna(value):  # None / NaN / NaT all render as an empty cell
         return ""
     return str(value)
 

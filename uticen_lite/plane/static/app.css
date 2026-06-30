@@ -241,7 +241,7 @@ td.shrink, th.shrink { width: 1%; white-space: nowrap; }
 .field { margin-bottom: 16px; }
 .field:last-child { margin-bottom: 0; }
 label { display: block; }
-.field > label { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.field > label, .field > .field-label { display: block; font-size: 13px; font-weight: 500; color: var(--text-primary); }
 /* Instructional help text uses the secondary (not tertiary) tier so guidance is
    comfortably legible (audit D4). */
 .field .hint { display: block; font-size: 12px; color: var(--text-secondary); margin: 2px 0 6px; font-weight: 400; }
@@ -790,6 +790,7 @@ details[open] > .band-head > .band-caret { transform: rotate(90deg); }
   display: inline-flex; align-items: center; justify-content: center;
   width: 13px; height: 13px; font-size: 10px; cursor: help;
   color: var(--text-tertiary); border: 1px solid var(--border-strong); border-radius: 999px;
+  appearance: none; background: none; padding: 0; font-family: inherit; line-height: 1;
 }
 .proc-help:hover, .proc-help:focus { color: var(--accent-primary); border-color: var(--accent-primary); outline: none; }
 .proc-head .proc-assert-in { width: 100%; }

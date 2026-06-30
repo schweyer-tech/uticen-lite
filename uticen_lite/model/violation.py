@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -24,7 +25,7 @@ def _json_safe(value: Any) -> Any:
     if isinstance(value, int):
         return value
     if isinstance(value, float):  # also catches np.float64 (a float subclass)
-        return None if value != value else value  # NaN → None
+        return None if math.isnan(value) else value  # NaN → None
     if isinstance(value, str):
         return value
     if isinstance(value, Mapping):

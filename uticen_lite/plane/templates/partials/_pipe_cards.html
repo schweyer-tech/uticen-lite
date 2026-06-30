@@ -72,14 +72,14 @@
       </div>
       <div class="proc-settings">
         <div class="proc-field proc-field-assert">
-          <label class="proc-field-label">Assertion
-            <span class="proc-help" tabindex="0" role="img" aria-label="What is an assertion?"
-                  title="{{ ASSERTION_HELP }}">&#9432;</span>
-          </label>
+          <span class="proc-field-label">Assertion
+            <button type="button" class="proc-help" aria-label="What is an assertion?"
+                    title="{{ ASSERTION_HELP }}">&#9432;</button>
+          </span>
           <input class="proc-in proc-assert-in" data-proc-assert value="{{ band.proc.assertion }}" placeholder="e.g. Segregation of duties" aria-label="Assertion">
         </div>
         <div class="proc-field proc-field-tol">
-          <label class="proc-field-label">Tolerance</label>
+          <span class="proc-field-label">Tolerance</span>
           <div class="proc-tol-row">
             <span class="proc-tol-op">&#8804;</span>
             <input class="proc-in proc-thr-in" data-proc-pct value="{{ band.proc.failure_threshold_pct if band.proc.failure_threshold_pct is not none else '' }}" placeholder="&#8212;" aria-label="Threshold percent">
@@ -91,7 +91,7 @@
         </div>
       </div>
       <div class="proc-field proc-field-narr">
-        <label class="proc-field-label">Narrative</label>
+        <span class="proc-field-label">Narrative</span>
         <textarea class="proc-in proc-narr" data-proc-narrative rows="2"
                   placeholder="What this procedure tests and why"
                   aria-label="Procedure narrative">{{ band.proc.narrative }}</textarea>

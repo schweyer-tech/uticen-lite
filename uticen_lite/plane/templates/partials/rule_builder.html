@@ -1,14 +1,14 @@
 <div id="rule-builder">
   <div class="field">
-    <label>Logic</label>
-    <select name="rule_logic">
+    <label for="rb-logic">Logic</label>
+    <select id="rb-logic" name="rule_logic">
       <option value="all" {% if not control or not control.rule_spec or control.rule_spec.logic == 'all' %}selected{% endif %}>all (AND)</option>
       <option value="any" {% if control and control.rule_spec and control.rule_spec.logic == 'any' %}selected{% endif %}>any (OR)</option>
     </select>
   </div>
   <div class="field">
-    <label>Severity</label>
-    <select name="rule_severity">
+    <label for="rb-severity">Severity</label>
+    <select id="rb-severity" name="rule_severity">
       <option value="low" {% if control and control.rule_spec and control.rule_spec.severity == 'low' %}selected{% endif %}>low</option>
       <option value="medium" {% if not control or not control.rule_spec or control.rule_spec.severity == 'medium' %}selected{% endif %}>medium</option>
       <option value="high" {% if control and control.rule_spec and control.rule_spec.severity == 'high' %}selected{% endif %}>high</option>
@@ -16,14 +16,14 @@
     </select>
   </div>
   <div class="field">
-    <label>Description template</label>
+    <label for="rb-description">Description template</label>
     <span class="hint">Shown on each exception. Reference columns with <code class="mono">{column}</code>.</span>
-    <input type="text" name="rule_description"
+    <input type="text" id="rb-description" name="rule_description"
            value="{{ control.rule_spec.description_template if control and control.rule_spec else '' }}">
   </div>
   <div class="field">
-    <label>Item key column</label>
-    <input type="text" name="rule_item_key"
+    <label for="rb-itemkey">Item key column</label>
+    <input type="text" id="rb-itemkey" name="rule_item_key"
            value="{{ control.rule_spec.item_key_column if control and control.rule_spec else '' }}">
   </div>
 

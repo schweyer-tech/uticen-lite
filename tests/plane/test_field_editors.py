@@ -3,6 +3,7 @@ Python node code gets the same pop-out with CodeMirror syntax highlighting.
 2026-06-27 review."""
 import io
 import json
+import re
 
 
 def _seed(client):
@@ -37,7 +38,8 @@ def test_narrative_is_a_textarea_with_expand(client):
     _save(client)
     page = client.get("/controls/c1/logic/builder")
     # narrative is now a textarea (wraps/expands), not a single-line input
-    assert "<textarea data-narrative" in page.text
+    # (order-independent: the textarea also carries a `for`/`id` a11y hook)
+    assert re.search(r"<textarea[^>]*\bdata-narrative\b", page.text)
     assert "openFieldModal(this, 'narrative')" in page.text
     # the pop-out modal + its editor exist on the page
     assert 'id="field-modal"' in page.text

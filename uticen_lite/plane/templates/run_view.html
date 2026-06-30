@@ -60,8 +60,16 @@
 <h2 style="margin-top:24px;">Workpaper</h2>
 {# Auto-size the frame to its content so the workpaper is never cropped and the page
    scrolls as one document (no nested scroll trap). srcdoc is same-origin (audit A4). #}
-<iframe class="workpaper-frame" srcdoc="{{ workpaper_html | e }}"
-        onload="(function(f){try{var d=f.contentWindow.document.documentElement;
-                f.style.height=(d.scrollHeight+2)+'px';}catch(e){}})(this)"></iframe>
+<iframe class="workpaper-frame" title="Workpaper" srcdoc="{{ workpaper_html | e }}"></iframe>
+<script>
+  // Auto-size each workpaper frame to its content (srcdoc is same-origin — audit A4).
+  document.querySelectorAll('.workpaper-frame').forEach(function (f) {
+    f.addEventListener('load', function () {
+      try {
+        f.style.height = (f.contentWindow.document.documentElement.scrollHeight + 2) + 'px';
+      } catch (e) { /* same-origin guard */ }
+    });
+  });
+</script>
 {% endif %}
 {% endblock %}

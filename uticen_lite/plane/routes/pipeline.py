@@ -294,7 +294,7 @@ def _band_diagram(
 
     # Render order + per-render-id band key + collapsed-private → summary id map.
     render_order: list[str] = list(shared_ids)
-    band_of: dict[str, str] = {nid: "__inputs__" for nid in shared_ids}
+    band_of: dict[str, str] = dict.fromkeys(shared_ids, "__inputs__")
     collapsed_private: dict[str, str] = {}
     summary_lane: dict[str, int] = {}
     for band in proc_bands:

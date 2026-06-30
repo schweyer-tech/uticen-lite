@@ -19,16 +19,16 @@
   <div class="pipe-body">
     {# Name: a human-readable display title for this node (rename). 2026-06-27 review. #}
     <div class="pipe-row">
-      <label>Name</label>
-      <input type="text" data-node-title style="flex:1;min-width:240px;"
+      <label for="pn-name-{{ node.id }}">Name</label>
+      <input id="pn-name-{{ node.id }}" type="text" data-node-title style="flex:1;min-width:240px;"
              placeholder="{{ node.id }}" value="{{ node.title }}">
     </div>
 
     {# Inputs: which upstream stream(s) this node consumes (Join names TWO by id). #}
     {% if node.type != 'import' %}
     <div class="pipe-row">
-      <label>{% if node.type == 'join' %}Left input{% else %}Input{% endif %}</label>
-      <select data-input>
+      <label for="pn-input-{{ node.id }}">{% if node.type == 'join' %}Left input{% else %}Input{% endif %}</label>
+      <select id="pn-input-{{ node.id }}" data-input>
         <option value="">— choose a step —</option>
         {% for other in nodes %}
           {% if other.id != node.id %}
@@ -37,8 +37,8 @@
         {% endfor %}
       </select>
       {% if node.type == 'join' %}
-      <label>Right input</label>
-      <select data-input>
+      <label for="pn-input2-{{ node.id }}">Right input</label>
+      <select id="pn-input2-{{ node.id }}" data-input>
         <option value="">— choose a step —</option>
         {% for other in nodes %}
           {% if other.id != node.id %}
@@ -53,8 +53,8 @@
     {# Import: pick a documented source. #}
     {% if node.type == 'import' %}
     <div class="pipe-row">
-      <label>Source</label>
-      <select data-source>
+      <label for="pn-source-{{ node.id }}">Source</label>
+      <select id="pn-source-{{ node.id }}" data-source>
         <option value="">— choose a source —</option>
         {% for s in sources %}
         <option value="{{ s.id }}" {% if node.source_id == s.id %}selected{% endif %}>{{ s.title or s.id }} ({{ s.id }})</option>
@@ -66,8 +66,8 @@
     {# Filter / Test conditions. #}
     {% if node.type in ('filter', 'test') %}
     <div class="pipe-row">
-      <label>Match</label>
-      <select data-logic>
+      <label for="pn-logic-{{ node.id }}">Match</label>
+      <select id="pn-logic-{{ node.id }}" data-logic>
         <option value="all" {% if node.config.get('logic', 'all') == 'all' %}selected{% endif %}>all (AND)</option>
         <option value="any" {% if node.config.get('logic') == 'any' %}selected{% endif %}>any (OR)</option>
       </select>
@@ -123,8 +123,8 @@
        round-trips on save instead of resetting to "unassigned". #}
     {% if procedures is defined %}
     <div class="pipe-row">
-      <label>Belongs to</label>
-      <select data-procedure>
+      <label for="pn-proc-{{ node.id }}">Belongs to</label>
+      <select id="pn-proc-{{ node.id }}" data-procedure>
         <option value="">— unassigned —</option>
         {% for p in procedures %}
         <option value="{{ p.id }}" {% if selected_procedure_for.get(node.id) == p.id %}selected{% endif %}>{{ p.code }} · {{ p.name }}</option>
@@ -133,30 +133,30 @@
     </div>
     {% endif %}
     <div class="pipe-row">
-      <label>Severity</label>
-      <select data-severity>
+      <label for="pn-sev-{{ node.id }}">Severity</label>
+      <select id="pn-sev-{{ node.id }}" data-severity>
         {% for sev in ['low', 'medium', 'high', 'critical'] %}
         <option value="{{ sev }}" {% if node.config.get('severity', 'medium') == sev %}selected{% endif %}>{{ sev }}</option>
         {% endfor %}
       </select>
     </div>
     <div class="pipe-row">
-      <label>Description</label>
-      <input type="text" data-desc style="flex:1;min-width:240px;"
+      <label for="pn-desc-{{ node.id }}">Description</label>
+      <input id="pn-desc-{{ node.id }}" type="text" data-desc style="flex:1;min-width:240px;"
              placeholder="Shown on each exception, e.g. Account {account_id} is active"
              value="{{ node.config.get('description_template', '') }}">
     </div>
     <div class="pipe-row">
-      <label>Item key</label>
+      <label for="pn-itemkey-{{ node.id }}">Item key</label>
       {% if node.columns %}
-      <select data-itemkey>
+      <select id="pn-itemkey-{{ node.id }}" data-itemkey>
         <option value="">— default (source key) —</option>
         {% for c in node.columns %}
         <option value="{{ c.original_name }}" {% if node.config.get('item_key_column') == c.original_name %}selected{% endif %}>{{ c.display_name }}</option>
         {% endfor %}
       </select>
       {% else %}
-      <input type="text" data-itemkey value="{{ node.config.get('item_key_column') or '' }}">
+      <input id="pn-itemkey-{{ node.id }}" type="text" data-itemkey value="{{ node.config.get('item_key_column') or '' }}">
       {% endif %}
     </div>
     {% endif %}
@@ -164,33 +164,33 @@
     {# Join keys + mode. #}
     {% if node.type == 'join' %}
     <div class="pipe-row">
-      <label>Mode</label>
-      <select data-join-mode>
+      <label for="pn-mode-{{ node.id }}">Mode</label>
+      <select id="pn-mode-{{ node.id }}" data-join-mode>
         {% for modeval, modelabel in join_mode_choices %}
         <option value="{{ modeval }}" {% if node.config.get('mode', 'inner') == modeval %}selected{% endif %}>{{ modelabel }}</option>
         {% endfor %}
       </select>
     </div>
     <div class="pipe-row">
-      <label>Left key</label>
-      <input type="text" data-join-lk placeholder="left key column" value="{{ node.config.get('left_key', '') }}">
-      <label>Right key</label>
-      <input type="text" data-join-rk placeholder="right key column" value="{{ node.config.get('right_key', '') }}">
+      <label for="pn-leftkey-{{ node.id }}">Left key</label>
+      <input id="pn-leftkey-{{ node.id }}" type="text" data-join-lk placeholder="left key column" value="{{ node.config.get('left_key', '') }}">
+      <label for="pn-rightkey-{{ node.id }}">Right key</label>
+      <input id="pn-rightkey-{{ node.id }}" type="text" data-join-rk placeholder="right key column" value="{{ node.config.get('right_key', '') }}">
     </div>
     {% endif %}
 
     {# Custom Python. #}
     {% if node.type == 'custom_python' %}
     <div class="pipe-row">
-      <label>Flavor</label>
-      <select data-flavor>
+      <label for="pn-flavor-{{ node.id }}">Flavor</label>
+      <select id="pn-flavor-{{ node.id }}" data-flavor>
         <option value="transform" {% if node.config.get('flavor', 'transform') == 'transform' %}selected{% endif %}>transform (rows → rows)</option>
         <option value="test" {% if node.config.get('flavor') == 'test' %}selected{% endif %}>test (rows → violations)</option>
       </select>
     </div>
     <div class="pipe-row" style="align-items:flex-start;">
-      <label>Code</label>
-      <textarea data-code rows="6" style="flex:1;min-width:320px;font-family:var(--font-mono);font-size:12px;"
+      <label for="pn-code-{{ node.id }}">Code</label>
+      <textarea id="pn-code-{{ node.id }}" data-code rows="6" style="flex:1;min-width:320px;font-family:var(--font-mono);font-size:12px;"
                 placeholder="# only `rows` is in scope — no file/source access">{{ node.config.get('code', '') }}</textarea>
       <button type="button" class="btn btn-sm btn-ghost pipe-expand"
               title="Expand with syntax highlighting" onclick="openFieldModal(this, 'code')">⤢</button>
@@ -200,8 +200,8 @@
     {# Narrative (why this step exists) — workpaper metadata. Wraps + expands;
        pop out to a modal for the full text. 2026-06-27 review. #}
     <div class="pipe-row pipe-row-field">
-      <label>Narrative</label>
-      <textarea data-narrative class="pipe-textarea" rows="2"
+      <label for="pn-narr-{{ node.id }}">Narrative</label>
+      <textarea id="pn-narr-{{ node.id }}" data-narrative class="pipe-textarea" rows="2"
                 placeholder="Why this step exists">{{ node.narrative }}</textarea>
       <button type="button" class="btn btn-sm btn-ghost pipe-expand" title="Expand to edit"
               onclick="openFieldModal(this, 'narrative')">⤢</button>

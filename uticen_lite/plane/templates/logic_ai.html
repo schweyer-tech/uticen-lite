@@ -19,8 +19,8 @@
   {% if ai_enabled %}
   <form hx-post="/controls/ai/draft" hx-target="#ai-draft-panel" hx-swap="innerHTML">
     <div class="field">
-      <label>Prompt</label>
-      <textarea name="objective" rows="5">{{ control.objective if control else '' }}</textarea>
+      <label for="ai-objective">Prompt</label>
+      <textarea id="ai-objective" name="objective" rows="5">{{ control.objective if control else '' }}</textarea>
       <span class="hint">
         Tip: include extra constraints or examples in this prompt to steer the suggestion.
       </span>
