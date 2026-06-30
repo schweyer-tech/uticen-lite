@@ -98,9 +98,17 @@ def _corrupt_rule_control(client, rule_spec, source_ids=("users",), cid="bad"):
     conn = connect(client.app.state.project_root)
     try:
         repo.upsert_control(
-            conn, id=cid, title="Bad", objective="o", narrative="n",
-            framework_refs={}, test_kind="rule", rule_spec=rule_spec,
-            failure_threshold_count=0,
+            conn,
+            repo.ControlRow(
+                id=cid,
+                title="Bad",
+                objective="o",
+                narrative="n",
+                framework_refs={},
+                test_kind="rule",
+                rule_spec=rule_spec,
+                failure_threshold_count=0,
+            ),
         )
         repo.set_control_sources(conn, cid, list(source_ids))
     finally:

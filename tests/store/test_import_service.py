@@ -83,8 +83,16 @@ def test_reset_to_demo_wipes_junk_and_reloads(tmp_path: Path):
     repo.upsert_project(conn, name="Junk Engagement")
     repo.upsert_source(conn, id="junk_src", format="csv", path="data/junk.csv", key_config={})
     repo.upsert_control(
-        conn, id="JUNK.1", title="junk", objective="", narrative="",
-        framework_refs={}, test_kind="rule", rule_spec={},
+        conn,
+        repo.ControlRow(
+            id="JUNK.1",
+            title="junk",
+            objective="",
+            narrative="",
+            framework_refs={},
+            test_kind="rule",
+            rule_spec={},
+        ),
     )
 
     n_controls, n_sources = reset_to_demo(conn, tmp_path)

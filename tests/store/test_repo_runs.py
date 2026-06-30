@@ -8,8 +8,18 @@ from uticen_lite.store.migrations import migrate
 def _db(tmp_path):
     conn = connect(tmp_path)
     migrate(conn)
-    repo.upsert_control(conn, id="c1", title="t", objective="o", narrative="n",
-                        framework_refs={}, test_kind="python", test_code="x")
+    repo.upsert_control(
+        conn,
+        repo.ControlRow(
+            id="c1",
+            title="t",
+            objective="o",
+            narrative="n",
+            framework_refs={},
+            test_kind="python",
+            test_code="x",
+        ),
+    )
     return conn
 
 

@@ -110,21 +110,23 @@ def import_project(conn: sqlite3.Connection, src: Path) -> tuple[int, int]:
         authoring = _resolve_authoring(control)
         repo.upsert_control(
             conn,
-            id=control.id,
-            title=control.title,
-            objective=control.objective,
-            narrative=control.narrative,
-            framework_refs={
-                "nist": control.framework_refs.nist,
-                **control.framework_refs.extra,
-            },
-            test_kind=authoring["test_kind"],
-            rule_spec=authoring["rule_spec"],
-            test_code=authoring["test_code"],
-            pipeline=authoring["pipeline"],
-            failure_threshold_pct=control.threshold.failure_threshold_pct,
-            failure_threshold_count=control.threshold.failure_threshold_count,
-            failure_threshold_rationale=control.threshold.rationale,
+            repo.ControlRow(
+                id=control.id,
+                title=control.title,
+                objective=control.objective,
+                narrative=control.narrative,
+                framework_refs={
+                    "nist": control.framework_refs.nist,
+                    **control.framework_refs.extra,
+                },
+                test_kind=authoring["test_kind"],
+                rule_spec=authoring["rule_spec"],
+                test_code=authoring["test_code"],
+                pipeline=authoring["pipeline"],
+                failure_threshold_pct=control.threshold.failure_threshold_pct,
+                failure_threshold_count=control.threshold.failure_threshold_count,
+                failure_threshold_rationale=control.threshold.rationale,
+            ),
         )
         repo.set_control_sources(conn, control.id, [s.id for s in control.sources])
 

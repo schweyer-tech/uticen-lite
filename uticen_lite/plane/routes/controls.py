@@ -263,18 +263,20 @@ def _save_pipeline_graph(
     compiled = compile_pipeline(parsed)
     repo.upsert_control(
         conn,
-        id=control["id"],
-        title=control["title"],
-        objective=control["objective"],
-        narrative=control["narrative"],
-        framework_refs=control["framework_refs"],
-        test_kind="pipeline",
-        rule_spec=compiled.rule_spec,
-        test_code=compiled.test_code,
-        pipeline=graph,
-        failure_threshold_pct=control["failure_threshold_pct"],
-        failure_threshold_count=control["failure_threshold_count"],
-        failure_threshold_rationale=control["failure_threshold_rationale"],
+        repo.ControlRow(
+            id=control["id"],
+            title=control["title"],
+            objective=control["objective"],
+            narrative=control["narrative"],
+            framework_refs=control["framework_refs"],
+            test_kind="pipeline",
+            rule_spec=compiled.rule_spec,
+            test_code=compiled.test_code,
+            pipeline=graph,
+            failure_threshold_pct=control["failure_threshold_pct"],
+            failure_threshold_count=control["failure_threshold_count"],
+            failure_threshold_rationale=control["failure_threshold_rationale"],
+        ),
     )
     # Union Import-node sources (primary) with other_source values from
     # cross-source conditions — Import sources come first (they are the primary
@@ -483,18 +485,20 @@ def _save_from_form(conn: sqlite3.Connection, form: Any, original_id: str | None
 
     repo.upsert_control(
         conn,
-        id=cid,
-        title=form.get("title", ""),
-        objective=form.get("objective", ""),
-        narrative=form.get("narrative", ""),
-        framework_refs={"nist": nist},
-        test_kind=test_kind,
-        rule_spec=rule_spec,
-        test_code=test_code,
-        pipeline=pipeline,
-        failure_threshold_pct=float(pct) if pct else None,
-        failure_threshold_count=int(cnt) if cnt else None,
-        failure_threshold_rationale=rationale,
+        repo.ControlRow(
+            id=cid,
+            title=form.get("title", ""),
+            objective=form.get("objective", ""),
+            narrative=form.get("narrative", ""),
+            framework_refs={"nist": nist},
+            test_kind=test_kind,
+            rule_spec=rule_spec,
+            test_code=test_code,
+            pipeline=pipeline,
+            failure_threshold_pct=float(pct) if pct else None,
+            failure_threshold_count=int(cnt) if cnt else None,
+            failure_threshold_rationale=rationale,
+        ),
     )
     repo.set_control_sources(conn, cid, source_ids)
     return cid
@@ -620,18 +624,20 @@ def _update_title_or_rerender(
         )
     repo.upsert_control(
         conn,
-        id=existing["id"],
-        title=title,
-        objective=existing["objective"],
-        narrative=existing["narrative"],
-        framework_refs=existing["framework_refs"],
-        test_kind=existing["test_kind"],
-        rule_spec=existing["rule_spec"],
-        test_code=existing["test_code"],
-        pipeline=existing["pipeline"],
-        failure_threshold_pct=existing["failure_threshold_pct"],
-        failure_threshold_count=existing["failure_threshold_count"],
-        failure_threshold_rationale=existing["failure_threshold_rationale"],
+        repo.ControlRow(
+            id=existing["id"],
+            title=title,
+            objective=existing["objective"],
+            narrative=existing["narrative"],
+            framework_refs=existing["framework_refs"],
+            test_kind=existing["test_kind"],
+            rule_spec=existing["rule_spec"],
+            test_code=existing["test_code"],
+            pipeline=existing["pipeline"],
+            failure_threshold_pct=existing["failure_threshold_pct"],
+            failure_threshold_count=existing["failure_threshold_count"],
+            failure_threshold_rationale=existing["failure_threshold_rationale"],
+        ),
     )
     repo.set_control_sources(conn, control_id, existing["source_ids"])
     return RedirectResponse(f"/controls/{control_id}", status_code=303)

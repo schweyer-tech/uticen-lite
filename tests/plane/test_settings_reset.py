@@ -29,8 +29,16 @@ def test_reset_demo_wipes_junk_and_reloads(client: TestClient, engagement: Path)
     # engagement would carry one.
     conn = connect(engagement)
     repo.upsert_control(
-        conn, id="JUNK.1", title="junk", objective="", narrative="",
-        framework_refs={}, test_kind="rule", rule_spec={},
+        conn,
+        repo.ControlRow(
+            id="JUNK.1",
+            title="junk",
+            objective="",
+            narrative="",
+            framework_refs={},
+            test_kind="rule",
+            rule_spec={},
+        ),
     )
     conn.close()
 

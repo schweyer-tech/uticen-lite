@@ -74,10 +74,13 @@ def _seed_pipeline_control(conn, cid: str, graph: dict) -> None:
     # Persist exactly what _save_from_form would, MINUS the lint — i.e. simulate a
     # node that slipped past (or predates) the save-time guard.
     repo.upsert_control(
-        conn, id=cid, title="Dup", objective="o", narrative="n",
-        framework_refs={"nist": []}, test_kind="pipeline",
-        rule_spec=None, test_code="def test(pop, sources):\n    return []",
-        pipeline=graph,
+        conn,
+        repo.ControlRow(
+            id=cid, title="Dup", objective="o", narrative="n",
+            framework_refs={"nist": []}, test_kind="pipeline",
+            rule_spec=None, test_code="def test(pop, sources):\n    return []",
+            pipeline=graph,
+        ),
     )
     repo.set_control_sources(conn, cid, ["payments"])
 
@@ -183,11 +186,14 @@ def test_export_gate_ignores_non_pipeline_controls(tmp_path: Path):
     conn = _engagement(tmp_path)
     _seed_source(conn, "payments")
     repo.upsert_control(
-        conn, id="r1", title="Rule", objective="o", narrative="n",
-        framework_refs={"nist": []}, test_kind="rule",
-        rule_spec={"logic": "all", "conditions": [
-            {"column": "amount", "op": "not_empty"}], "severity": "low",
-            "description_template": "", "item_key_column": "payment_id"},
+        conn,
+        repo.ControlRow(
+            id="r1", title="Rule", objective="o", narrative="n",
+            framework_refs={"nist": []}, test_kind="rule",
+            rule_spec={"logic": "all", "conditions": [
+                {"column": "amount", "op": "not_empty"}], "severity": "low",
+                "description_template": "", "item_key_column": "payment_id"},
+        ),
     )
     repo.set_control_sources(conn, "r1", ["payments"])
     _seed_run(conn, "r1")

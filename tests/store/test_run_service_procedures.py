@@ -65,9 +65,19 @@ def _seed(tmp_path: Path):
              "assertion": "Segregation of Duties", "failure_threshold_count": 0, "position": 0},
         ],
     }
-    repo.upsert_control(conn, id="gl1", title="Journal Integrity", objective="o",
-                        narrative="n", framework_refs={}, test_kind="pipeline",
-                        pipeline=pipeline, failure_threshold_count=0)
+    repo.upsert_control(
+        conn,
+        repo.ControlRow(
+            id="gl1",
+            title="Journal Integrity",
+            objective="o",
+            narrative="n",
+            framework_refs={},
+            test_kind="pipeline",
+            pipeline=pipeline,
+            failure_threshold_count=0,
+        ),
+    )
     repo.set_control_sources(conn, "gl1", ["je"])
     return conn
 

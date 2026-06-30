@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from typing import Any
 
 from uticen_lite.model.run import RunRecord
@@ -269,22 +270,35 @@ def get_source_fetch(conn: sqlite3.Connection, source_id: str) -> dict | None:
 
 
 # ---- controls + bindings ---------------------------------------------------
-def upsert_control(
-    conn: sqlite3.Connection, *, id: str, title: str, objective: str, narrative: str,
-    framework_refs: dict, test_kind: str, rule_spec: dict | None = None,
-    test_code: str | None = None, pipeline: dict | None = None,
-    failure_threshold_pct: float | None = None,
-    failure_threshold_count: int | None = None,
-    failure_threshold_rationale: str | None = None,
-    created_at: str = "", updated_at: str = "",
-) -> None:
-    """Upsert a control.
+@dataclass(frozen=True, kw_only=True)
+class ControlRow:
+    """The writable fields of a control row, passed as one value to
+    :func:`upsert_control` (keeps the writer off SonarQube's S107 param ceiling).
 
     ``test_kind`` is ``rule`` | ``python`` | ``pipeline``. For a ``pipeline``
-    control the *store-only* visual graph lands in the ``pipeline`` column while
+    control the *store-only* visual graph lands in the ``pipeline`` field while
     its COMPILED artifact still lands in ``rule_spec``/``test_code`` (so the
     runner/bundle reuse the existing paths and the bundle never sees the graph).
     """
+
+    id: str
+    title: str
+    objective: str
+    narrative: str
+    framework_refs: dict
+    test_kind: str
+    rule_spec: dict | None = None
+    test_code: str | None = None
+    pipeline: dict | None = None
+    failure_threshold_pct: float | None = None
+    failure_threshold_count: int | None = None
+    failure_threshold_rationale: str | None = None
+    created_at: str = ""
+    updated_at: str = ""
+
+
+def upsert_control(conn: sqlite3.Connection, row: ControlRow) -> None:
+    """Upsert a control from a :class:`ControlRow`."""
     conn.execute(
         """INSERT INTO controls
              (id, title, objective, narrative, framework_refs,
@@ -301,12 +315,13 @@ def upsert_control(
              test_kind=excluded.test_kind, rule_spec=excluded.rule_spec,
              test_code=excluded.test_code, pipeline=excluded.pipeline,
              updated_at=excluded.updated_at""",
-        (id, title, objective, narrative, json.dumps(framework_refs),
-         failure_threshold_pct, failure_threshold_count, failure_threshold_rationale,
-         test_kind,
-         json.dumps(rule_spec) if rule_spec is not None else None,
-         test_code, json.dumps(pipeline) if pipeline is not None else None,
-         created_at, updated_at),
+        (row.id, row.title, row.objective, row.narrative, json.dumps(row.framework_refs),
+         row.failure_threshold_pct, row.failure_threshold_count,
+         row.failure_threshold_rationale,
+         row.test_kind,
+         json.dumps(row.rule_spec) if row.rule_spec is not None else None,
+         row.test_code, json.dumps(row.pipeline) if row.pipeline is not None else None,
+         row.created_at, row.updated_at),
     )
     conn.commit()
 

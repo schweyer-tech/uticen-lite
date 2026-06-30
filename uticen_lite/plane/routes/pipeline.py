@@ -1394,17 +1394,19 @@ async def _save_python_impl(request: Request, control_id: str) -> RedirectRespon
         code = str(form.get("test_code", ""))
         repo.upsert_control(
             conn,
-            id=control["id"],
-            title=control["title"],
-            objective=control["objective"],
-            narrative=control["narrative"],
-            framework_refs=control["framework_refs"],
-            test_kind="python",
-            rule_spec=None,
-            test_code=code,
-            pipeline=None,
-            failure_threshold_pct=control["failure_threshold_pct"],
-            failure_threshold_count=control["failure_threshold_count"],
+            repo.ControlRow(
+                id=control["id"],
+                title=control["title"],
+                objective=control["objective"],
+                narrative=control["narrative"],
+                framework_refs=control["framework_refs"],
+                test_kind="python",
+                rule_spec=None,
+                test_code=code,
+                pipeline=None,
+                failure_threshold_pct=control["failure_threshold_pct"],
+                failure_threshold_count=control["failure_threshold_count"],
+            ),
         )
         return RedirectResponse(f"/controls/{control_id}/logic/python", status_code=303)
     finally:
@@ -1480,17 +1482,19 @@ async def _convert_to_python_impl(request: Request, control_id: str) -> Redirect
         code = _generated_python(parsed)
         repo.upsert_control(
             conn,
-            id=control["id"],
-            title=control["title"],
-            objective=control["objective"],
-            narrative=control["narrative"],
-            framework_refs=control["framework_refs"],
-            test_kind="python",
-            rule_spec=None,
-            test_code=code,
-            pipeline=None,
-            failure_threshold_pct=control["failure_threshold_pct"],
-            failure_threshold_count=control["failure_threshold_count"],
+            repo.ControlRow(
+                id=control["id"],
+                title=control["title"],
+                objective=control["objective"],
+                narrative=control["narrative"],
+                framework_refs=control["framework_refs"],
+                test_kind="python",
+                rule_spec=None,
+                test_code=code,
+                pipeline=None,
+                failure_threshold_pct=control["failure_threshold_pct"],
+                failure_threshold_count=control["failure_threshold_count"],
+            ),
         )
         return RedirectResponse(f"/controls/{control_id}/logic/python", status_code=303)
     finally:

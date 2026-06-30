@@ -674,17 +674,19 @@ def test_builder_degrades_gracefully_on_incomplete_test_condition(client):
     }
     repo.upsert_control(
         conn,
-        id=ctrl["id"],
-        title=ctrl["title"],
-        objective=ctrl["objective"],
-        narrative=ctrl["narrative"],
-        framework_refs=ctrl["framework_refs"],
-        test_kind="pipeline",
-        rule_spec=None,
-        test_code=None,
-        pipeline=incomplete_graph,
-        failure_threshold_pct=ctrl["failure_threshold_pct"],
-        failure_threshold_count=ctrl["failure_threshold_count"],
+        repo.ControlRow(
+            id=ctrl["id"],
+            title=ctrl["title"],
+            objective=ctrl["objective"],
+            narrative=ctrl["narrative"],
+            framework_refs=ctrl["framework_refs"],
+            test_kind="pipeline",
+            rule_spec=None,
+            test_code=None,
+            pipeline=incomplete_graph,
+            failure_threshold_pct=ctrl["failure_threshold_pct"],
+            failure_threshold_count=ctrl["failure_threshold_count"],
+        ),
     )
     conn.close()
 

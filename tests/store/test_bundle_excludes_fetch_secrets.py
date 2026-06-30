@@ -63,15 +63,18 @@ def _seed_source_with_fetch(conn) -> None:
 
 def _seed_rule_control_and_run(conn) -> None:
     repo.upsert_control(
-        conn, id="c1", title="Role check", objective="o", narrative="n",
-        framework_refs={"nist": []}, test_kind="rule",
-        rule_spec={
-            "logic": "all",
-            "conditions": [{"column": "role", "op": "not_empty"}],
-            "severity": "low",
-            "description_template": "",
-            "item_key_column": "user_id",
-        },
+        conn,
+        repo.ControlRow(
+            id="c1", title="Role check", objective="o", narrative="n",
+            framework_refs={"nist": []}, test_kind="rule",
+            rule_spec={
+                "logic": "all",
+                "conditions": [{"column": "role", "op": "not_empty"}],
+                "severity": "low",
+                "description_template": "",
+                "item_key_column": "user_id",
+            },
+        ),
     )
     repo.set_control_sources(conn, "c1", ["api"])
     run = RunRecord(

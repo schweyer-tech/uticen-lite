@@ -291,13 +291,15 @@ def test_builder_get_degrades_gracefully_on_partial_pipeline(
     conn = connect(engagement)
     repo.upsert_control(
         conn,
-        id="broken_ctrl",
-        title="Broken pipeline control",
-        objective="",
-        narrative="",
-        framework_refs={},
-        test_kind="pipeline",
-        pipeline=broken,
+        repo.ControlRow(
+            id="broken_ctrl",
+            title="Broken pipeline control",
+            objective="",
+            narrative="",
+            framework_refs={},
+            test_kind="pipeline",
+            pipeline=broken,
+        ),
     )
     conn.close()
 

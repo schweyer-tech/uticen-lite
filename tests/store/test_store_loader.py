@@ -14,10 +14,19 @@ def _seed(tmp_path):
         {"original_name": "user_id", "display_name": "User ID", "data_type": "text",
          "is_key": True, "include": True, "ordinal": 0},
     ])
-    repo.upsert_control(conn, id="c1", title="SoD", objective="o", narrative="n",
-                        framework_refs={"nist": ["AC-5"]}, test_kind="rule",
-                        rule_spec={"logic": "all", "conditions": [], "severity": "high"},
-                        failure_threshold_count=0)
+    repo.upsert_control(
+        conn,
+        repo.ControlRow(
+            id="c1",
+            title="SoD",
+            objective="o",
+            narrative="n",
+            framework_refs={"nist": ["AC-5"]},
+            test_kind="rule",
+            rule_spec={"logic": "all", "conditions": [], "severity": "high"},
+            failure_threshold_count=0,
+        ),
+    )
     repo.set_control_sources(conn, "c1", ["users"])
     return conn
 

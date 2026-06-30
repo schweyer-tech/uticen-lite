@@ -71,10 +71,15 @@ def _seed_forked_pipeline(tmp_path: Path):
             },
         ]
     }
-    repo.upsert_control(conn, id="forked", title="Forked control", objective="o",
-                        narrative="n", framework_refs={"nist": ["AC-5"]},
-                        test_kind="pipeline", pipeline=pipeline,
-                        failure_threshold_count=0)
+    repo.upsert_control(
+        conn,
+        repo.ControlRow(
+            id="forked", title="Forked control", objective="o",
+            narrative="n", framework_refs={"nist": ["AC-5"]},
+            test_kind="pipeline", pipeline=pipeline,
+            failure_threshold_count=0,
+        ),
+    )
     repo.set_control_sources(conn, "forked", ["inv"])
     return conn
 
@@ -148,15 +153,20 @@ def _seed(tmp_path: Path):
         {"original_name": "can_approve", "display_name": "Can Approve",
          "data_type": "boolean", "is_key": False, "include": True, "ordinal": 2},
     ])
-    repo.upsert_control(conn, id="sod", title="SoD", objective="o", narrative="n",
-                        framework_refs={"nist": ["AC-5"]}, test_kind="rule",
-                        rule_spec={"logic": "all", "conditions": [
-                            {"column": "can_create", "op": "eq", "value": True},
-                            {"column": "can_approve", "op": "eq", "value": True}],
-                            "severity": "high",
-                            "description_template": "User {user_id}",
-                            "item_key_column": "user_id"},
-                        failure_threshold_count=0)
+    repo.upsert_control(
+        conn,
+        repo.ControlRow(
+            id="sod", title="SoD", objective="o", narrative="n",
+            framework_refs={"nist": ["AC-5"]}, test_kind="rule",
+            rule_spec={"logic": "all", "conditions": [
+                {"column": "can_create", "op": "eq", "value": True},
+                {"column": "can_approve", "op": "eq", "value": True}],
+                "severity": "high",
+                "description_template": "User {user_id}",
+                "item_key_column": "user_id"},
+            failure_threshold_count=0,
+        ),
+    )
     repo.set_control_sources(conn, "sod", ["users"])
     return conn
 
@@ -191,10 +201,15 @@ def _seed_inline(tmp_path: Path):
         {"original_name": "can_create", "display_name": "Can Create",
          "data_type": "boolean", "is_key": False, "include": True, "ordinal": 1},
     ])
-    repo.upsert_control(conn, id="inline", title="Inline", objective="o", narrative="n",
-                        framework_refs={"nist": ["AC-2"]}, test_kind="python",
-                        test_code="# inline\ndef test(pop):\n    return []\n",
-                        failure_threshold_count=0)
+    repo.upsert_control(
+        conn,
+        repo.ControlRow(
+            id="inline", title="Inline", objective="o", narrative="n",
+            framework_refs={"nist": ["AC-2"]}, test_kind="python",
+            test_code="# inline\ndef test(pop):\n    return []\n",
+            failure_threshold_count=0,
+        ),
+    )
     repo.set_control_sources(conn, "inline", ["users"])
     return conn
 
@@ -234,17 +249,22 @@ def _seed_cross_source(tmp_path: Path):
          "data_type": "text", "is_key": True, "include": True, "ordinal": 0},
         {"original_name": "name", "display_name": "Name", "data_type": "text",
          "is_key": False, "include": True, "ordinal": 1}])
-    repo.upsert_control(conn, id="term", title="Terminated access", objective="o",
-                        narrative="n", framework_refs={"nist": ["AC-2"]},
-                        test_kind="rule",
-                        rule_spec={"logic": "all", "conditions": [
-                            {"op": "not_exists_in", "column": "user_id",
-                             "other_source": "hr_roster", "this_key": "user_id",
-                             "other_key": "employee_id"}],
-                            "severity": "high",
-                            "description_template": "User {user_id} retains access",
-                            "item_key_column": "user_id"},
-                        failure_threshold_count=0)
+    repo.upsert_control(
+        conn,
+        repo.ControlRow(
+            id="term", title="Terminated access", objective="o",
+            narrative="n", framework_refs={"nist": ["AC-2"]},
+            test_kind="rule",
+            rule_spec={"logic": "all", "conditions": [
+                {"op": "not_exists_in", "column": "user_id",
+                 "other_source": "hr_roster", "this_key": "user_id",
+                 "other_key": "employee_id"}],
+                "severity": "high",
+                "description_template": "User {user_id} retains access",
+                "item_key_column": "user_id"},
+            failure_threshold_count=0,
+        ),
+    )
     # access first (primary), hr_roster second (lookup B)
     repo.set_control_sources(conn, "term", ["access", "hr_roster"])
     return conn

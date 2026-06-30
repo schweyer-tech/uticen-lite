@@ -492,9 +492,16 @@ def test_workpaper_reflects_latest_run_not_oldest(test_py_file: pathlib.Path) ->
         {"original_name": "entry_id", "display_name": "Entry ID", "is_key": True, "include": True},
     ])
     repo.upsert_control(
-        conn, id="cash_cutoff", title="Cash Cutoff", objective="o", narrative="n",
-        framework_refs={"nist": [], "extra": {}}, test_kind="python",
-        test_code="# test",
+        conn,
+        repo.ControlRow(
+            id="cash_cutoff",
+            title="Cash Cutoff",
+            objective="o",
+            narrative="n",
+            framework_refs={"nist": [], "extra": {}},
+            test_kind="python",
+            test_code="# test",
+        ),
     )
     repo.set_control_sources(conn, "cash_cutoff", ["gl"])
 
