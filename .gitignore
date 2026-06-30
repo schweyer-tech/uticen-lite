@@ -9,6 +9,10 @@ dist/
 import-bundle.zip
 *.zip
 .ruff_cache/
+# Coverage artifacts + the SonarQube scan's isolated venv (see sonarqube.yml).
+.coverage
+coverage.xml
+.sonar-venv/
 .compound/
 .claude/worktrees/
 .worktrees/

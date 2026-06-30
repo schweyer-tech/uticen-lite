@@ -20,6 +20,19 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Produce coverage.xml so the scan can report line coverage (Sonar reads
+      # it via sonar.python.coverage.reportPaths). An isolated venv keeps the
+      # self-hosted runner's global site-packages untouched; the editable
+      # install also makes the package metadata available so the CLI version
+      # test resolves importlib.metadata.version("uticen-lite").
+      - name: Run tests with coverage
+        run: |
+          export PATH="/opt/homebrew/bin:$PATH"
+          python3 -m venv .sonar-venv
+          ./.sonar-venv/bin/pip install -q --upgrade pip
+          ./.sonar-venv/bin/pip install -q -e ".[adapters,dev]"
+          ./.sonar-venv/bin/pytest -q --cov=uticen_lite --cov-report=xml
+
       - name: SonarQube scan
         env:
           SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
