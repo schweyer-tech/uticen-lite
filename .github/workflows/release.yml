@@ -30,27 +30,30 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.11"
+          enable-cache: true
 
       - name: Install build + twine
-        run: pip install build twine
+        run: |
+          uv venv --clear
+          uv pip install build twine
 
       - name: Build wheel and sdist
-        run: python -m build
+        run: uv run --no-sync python -m build
 
       - name: twine check
-        run: twine check dist/*
+        run: uv run --no-sync twine check dist/*
 
       - name: Smoke-test wheel import
         run: |
-          pip install dist/*.whl
-          python -c "import uticen_lite; from uticen_lite import Violation; print('wheel import OK')"
+          uv pip install dist/*.whl
+          uv run --no-sync python -c "import uticen_lite; from uticen_lite import Violation; print('wheel import OK')"
 
       - name: Confirm no compiled deps in wheel
         run: |
-          python - <<'EOF'
+          uv run --no-sync python - <<'EOF'
           import zipfile, sys
           whl = next(__import__('pathlib').Path('dist').glob('*.whl'))
           with zipfile.ZipFile(whl) as z:
@@ -94,20 +97,25 @@ jobs:
           git describe --exact-match --match 'v*' --tags HEAD || {
             echo "::error::publish requires an exact v* tag on HEAD"; exit 1; }
 
-      - uses: actions/setup-python@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.11"
+          enable-cache: true
 
       - name: Tag matches package version
         # version is duplicated in pyproject.toml + __init__.py; this guard fails
         # the publish before upload so a future release can't ship a mislabeled wheel.
+        # stdlib-only (tomllib) and runs before any install, so use --no-project
+        # (no venv needed) rather than --no-sync.
         run: |
-          PKG=$(python -c "import tomllib,pathlib;print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")
+          PKG=$(uv run --no-project python -c "import tomllib,pathlib;print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")
           TAG="${GITHUB_REF_NAME#v}"
           [ "$PKG" = "$TAG" ] || { echo "::error::tag v$TAG != pyproject version $PKG"; exit 1; }
 
       - name: Install twine
-        run: pip install --upgrade twine
+        run: |
+          uv venv --clear
+          uv pip install --upgrade twine
 
       # Reuse the exact dist that build-and-check already built + twine-checked, so
       # the published bytes ARE the verified bytes (no second-build drift).
@@ -118,7 +126,7 @@ jobs:
           path: dist/
 
       - name: Verify distribution
-        run: twine check dist/*
+        run: uv run --no-sync twine check dist/*
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
